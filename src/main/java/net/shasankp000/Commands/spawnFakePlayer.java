@@ -4,7 +4,7 @@ import carpet.CarpetSettings;
 import carpet.patches.EntityPlayerMPFake;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
+// import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
