@@ -2,9 +2,10 @@ package net.shasankp000.Commands;
 
 import carpet.CarpetSettings;
 import carpet.patches.EntityPlayerMPFake;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-// import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
+import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
@@ -16,10 +17,10 @@ import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
+//import net.shasankp000.HttpClient.httpClient;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 public class spawnFakePlayer {
 
@@ -27,37 +28,45 @@ public class spawnFakePlayer {
 
     public static void register()  {
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(CommandManager.literal("spawnbot")
-                .executes(context -> {
-                    MinecraftServer server = context.getSource().getServer(); // gets the minecraft server
-                    BlockPos spawnPos = getBlockPos(context);
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            dispatcher.register(CommandManager.literal("spawnBot")
+                    .then(CommandManager.argument("botName", StringArgumentType.greedyString()) // gets all strings including whitespaces instead of a single string.
+                            .executes(context -> {
 
-                    RegistryKey<World> dimType = context.getSource().getWorld().getRegistryKey();
+                                MinecraftServer server = context.getSource().getServer(); // gets the minecraft server
+                                BlockPos spawnPos = getBlockPos(context);
 
-                    Vec2f facing = context.getSource().getRotation();
+                                RegistryKey<World> dimType = context.getSource().getWorld().getRegistryKey();
 
-                    Vec3d pos = new Vec3d(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
+                                Vec2f facing = context.getSource().getRotation();
 
-                    CarpetSettings.allowSpawningOfflinePlayers = true;
+                                Vec3d pos = new Vec3d(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
 
-                    GameMode mode = GameMode.SURVIVAL;
+                                CarpetSettings.allowSpawningOfflinePlayers = true;
 
-                    EntityPlayerMPFake.createFake(
-                            "Steve",
-                            server,
-                            pos,
-                            facing.y,
-                            facing.x,
-                            dimType,
-                            mode,
-                            false
-                            );
+                                GameMode mode = GameMode.SURVIVAL;
 
-                    LOGGER.info("Spawned new bot Steve!");
+                                String bot_name = StringArgumentType.getString(context, "botName");
+
+                                EntityPlayerMPFake.createFake(
+                                        bot_name,
+                                        server,
+                                        pos,
+                                        facing.y,
+                                        facing.x,
+                                        dimType,
+                                        mode,
+                                        false
+                                );
+
+                                LOGGER.info("Spawned new bot Steve!");
 
 
-                    return 1;
-                })));
+                                return 1;
+
+
+                            } )));
+        });
 
 
     }
@@ -82,13 +91,9 @@ public class spawnFakePlayer {
 
                     else {
 
-                        // SyncedClientOptions syncedClientOptions =  bot.getClientOptions();
-
                         BlockPos currentPosition = bot.getBlockPos();
                         BlockPos newPosition = currentPosition.add(1, 0, 0); // Move one block forward
                         bot.teleport(newPosition.getX(), newPosition.getY(), newPosition.getZ());
-
-
 
                         LOGGER.info("Teleported Steve 1 positive block ahead");
 
@@ -97,7 +102,35 @@ public class spawnFakePlayer {
                     return 1;
                 })));
 
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(CommandManager.literal("botJump")
+                .executes(context -> {
 
+                    MinecraftServer server = context.getSource().getServer();
+
+                    ServerPlayerEntity bot = server.getPlayerManager().getPlayer("Steve");
+
+
+                    if (bot == null) {
+
+                        context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
+                        server.sendMessage(Text.literal("Error! Bot not found!"));
+                        LOGGER.error("The requested bot could not be found on the server!");
+
+                    }
+
+                    else {
+
+//                        bot.jump();
+
+                        bot.travel(new Vec3d(1.0f, 1.0f, 1.0f));
+
+
+                        LOGGER.info("Steve jumped!");
+
+                    }
+
+                    return 1;
+                })));
 
 
     }

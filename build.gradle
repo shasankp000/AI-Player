@@ -34,6 +34,8 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 	modImplementation 'com.github.gnembon:fabric-carpet:1.4.128'
+	implementation 'com.github.FasterXML:jackson-databind:jackson-databind-2.17.2'
+	implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
 
 processResources {

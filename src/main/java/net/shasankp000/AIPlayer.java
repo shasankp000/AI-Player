@@ -3,12 +3,14 @@ package net.shasankp000;
 import net.fabricmc.api.ModInitializer;
 import net.shasankp000.Commands.spawnFakePlayer;
 
+import net.shasankp000.HttpClient.httpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AIPlayer implements ModInitializer {
 
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
+
 
 	@Override
 	public void onInitialize() {
@@ -17,7 +19,10 @@ public class AIPlayer implements ModInitializer {
 
 		spawnFakePlayer.register();
 		spawnFakePlayer.getBotData();
+		httpClient.getPlayerMessage();
 
 
 	}
+
+
 }
