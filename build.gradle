@@ -19,11 +19,16 @@ repositories {
 	mavenCentral()
 	maven { url 'https://jitpack.io' }
 
+	flatDir {
+		dirs "./lib"
+	}
 }
 
 fabricApi {
 	configureDataGeneration()
 }
+
+
 
 dependencies {
 	// To change the versions see the gradle.properties file
@@ -35,7 +40,7 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 	modImplementation 'com.github.gnembon:fabric-carpet:1.4.128'
 	implementation 'com.github.FasterXML:jackson-databind:jackson-databind-2.17.2'
-	implementation fileTree(dir: 'libs', include: ['*.jar'])
+
 }
 
 processResources {
@@ -47,7 +52,7 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 17
+		it.options.release = 17
 }
 
 java {

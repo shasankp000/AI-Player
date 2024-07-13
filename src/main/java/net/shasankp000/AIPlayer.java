@@ -18,7 +18,7 @@ public class AIPlayer implements ModInitializer {
 		LOGGER.info("Hello Fabric world!");
 
 		spawnFakePlayer.register();
-		spawnFakePlayer.getBotData();
+		spawnFakePlayer.additionalBotCommands();
 		httpClient.getPlayerMessage();
 
 
