@@ -4,7 +4,6 @@ package net.shasankp000.Commands;
 import carpet.CarpetSettings;
 
 import carpet.patches.EntityPlayerMPFake;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -20,10 +19,10 @@ import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
-//import net.shasankp000.HttpClient.httpClient;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +32,7 @@ public class spawnFakePlayer {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-    public static class BotMovementTask implements Runnable {
+    private static class BotMovementTask implements Runnable {
         private final MinecraftServer server;
         private final ServerCommandSource botSource;
         private final String botName;
@@ -48,6 +47,28 @@ public class spawnFakePlayer {
         public void run() {
             stopMoving(server, botSource, botName);
             LOGGER.info("{} has stopped walking!", botName);
+        }
+    }
+
+
+    private static class Node implements Comparable<Node> {
+        BlockPos position;
+        Node parent;
+        double gScore;
+        double hScore;
+        double fScore;
+
+        Node(BlockPos position, Node parent, double gScore, double hScore) {
+            this.position = position;
+            this.parent = parent;
+            this.gScore = gScore;
+            this.hScore = hScore;
+            this.fScore = gScore + hScore;
+        }
+
+        @Override
+        public int compareTo(Node other) {
+            return Double.compare(this.fScore, other.fScore);
         }
     }
 
@@ -192,7 +213,7 @@ public class spawnFakePlayer {
                             else {
 
                                 ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
-                                startMoving(server, botSource, botName);
+                                moveForward(server, botSource, botName);
 
                                 scheduler.schedule(new BotMovementTask(server, botSource, botName), travelTime, TimeUnit.SECONDS);
 
@@ -202,16 +223,182 @@ public class spawnFakePlayer {
                             return 1;
                         })))));
 
+
+
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(CommandManager.literal("botGo")
+                .then(CommandManager.argument("botName", StringArgumentType.string()) // gets all strings including whitespaces instead of a single string.
+                        .then(CommandManager.argument("x-axis", IntegerArgumentType.integer())
+                                .then(CommandManager.argument("y-axis", IntegerArgumentType.integer())
+                                        .then(CommandManager.argument("z-axis", IntegerArgumentType.integer())
+                                                .executes( context -> {
+
+                                                    MinecraftServer server = context.getSource().getServer();
+
+                                                    String botName = StringArgumentType.getString(context, "botName");
+
+                                                    int x_distance = IntegerArgumentType.getInteger(context, "x-axis");
+
+                                                    int y_distance = IntegerArgumentType.getInteger(context, "y-axis");
+
+                                                    int z_distance = IntegerArgumentType.getInteger(context, "z-axis");
+
+                                                    ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+
+                                                    if (bot == null) {
+
+                                                        context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
+                                                        server.sendMessage(Text.literal("Error! Bot not found!"));
+                                                        LOGGER.error("The requested bot could not be found on the server!");
+
+                                                    }
+
+                                                    else {
+                                                        ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
+
+                                                        server.sendMessage(Text.literal("Finding the shortest path to the target, please wait patiently if the game seems hung"));
+                                                        // Calculate path
+                                                        List<BlockPos> path = calculatePath(bot.getBlockPos(), new BlockPos(x_distance, y_distance , z_distance));
+
+                                                        path = simplifyPath(path);
+
+                                                        char axis = identifyPrimaryAxis(path);
+
+                                                        LOGGER.info("Primary axis: {}", axis);
+
+                                                        LOGGER.info("{}", path);
+
+                                                    }
+
+
+                                                    return 1;
+                                                })))))));
+
+    }
+
+    private static List<BlockPos> simplifyPath(List<BlockPos> path) {
+        List<BlockPos> simplifiedPath = new ArrayList<>();
+        BlockPos prevPos = null;
+        for (BlockPos pos : path) {
+            if (!pos.equals(prevPos)) {
+                simplifiedPath.add(pos);
+            }
+            prevPos = pos;
+        }
+        return simplifiedPath;
+    }
+
+    private static char identifyPrimaryAxis(List<BlockPos> path) {
+        int xChanges = 0;
+        int yChanges = 0;
+        int zChanges = 0;
+        BlockPos prevPos = path.get(0);
+
+        for (BlockPos pos : path) {
+            if (pos.getX() != prevPos.getX()) xChanges++;
+            if (pos.getY() != prevPos.getY()) yChanges++;
+            if (pos.getZ() != prevPos.getZ()) zChanges++;
+            prevPos = pos;
+        }
+
+        if (xChanges >= yChanges && xChanges >= zChanges) return 'x';
+        if (yChanges >= xChanges && yChanges >= zChanges) return 'y';
+        return 'z';
+    }
+
+    private static List<BlockPos> calculatePath(BlockPos start, BlockPos target) {
+        // A* algorithm for pathfinding
+        LOGGER.info("Finding the shortest path to the target, please wait patiently if the game seems hung");
+        PriorityQueue<Node> openSet = new PriorityQueue<>();
+        List<Node> closedSet = new ArrayList<>();
+
+        Node startNode = new Node(start, null, 0, getDistance(start, target));
+        openSet.add(startNode);
+
+        while (!openSet.isEmpty()) {
+            Node currentNode = openSet.poll();
+
+            if (currentNode.position.equals(target)) {
+                return reconstructPath(currentNode);
+            }
+
+            closedSet.add(currentNode);
+
+            for (BlockPos neighbor : getNeighbors(currentNode.position)) {
+                if (closedSet.stream().anyMatch(node -> node.position.equals(neighbor))) {
+                    continue;
+                }
+
+                double tentativeGScore = currentNode.gScore + getDistance(currentNode.position, neighbor);
+                Node neighborNode = openSet.stream().filter(node -> node.position.equals(neighbor)).findFirst().orElse(null);
+
+                if (neighborNode == null) {
+                    neighborNode = new Node(neighbor, currentNode, tentativeGScore, getDistance(neighbor, target));
+                    openSet.add(neighborNode);
+                } else if (tentativeGScore < neighborNode.gScore) {
+                    neighborNode.parent = currentNode;
+                    neighborNode.gScore = tentativeGScore;
+                    neighborNode.fScore = tentativeGScore + neighborNode.hScore;
+                }
+            }
+        }
+
+        return new ArrayList<>();
+    }
+
+    private static List<BlockPos> reconstructPath(Node node) {
+        List<BlockPos> path = new ArrayList<>();
+        while (node != null) {
+            path.add(0, node.position);
+            node = node.parent;
+        }
+        return path;
+    }
+
+    private static List<BlockPos> getNeighbors(BlockPos pos) {
+        List<BlockPos> neighbors = new ArrayList<>();
+        neighbors.add(pos.add(1, 0, 0));
+        neighbors.add(pos.add(-1, 0, 0));
+        neighbors.add(pos.add(0, 0, 1));
+        neighbors.add(pos.add(0, 0, -1));
+        neighbors.add(pos.add(0, 1, 0));
+        neighbors.add(pos.add(0, -1, 0));
+        return neighbors;
+    }
+
+    private static double getDistance(BlockPos pos1, BlockPos pos2) {
+        return Math.sqrt(pos1.getSquaredDistance(pos2));
     }
 
 
-    private static void startMoving(MinecraftServer server, ServerCommandSource source, String botName) {
+
+    public static void saySomething(MinecraftServer server, ServerCommandSource source, String message) {
+
+        if (source.getPlayer() != null) {
+
+            server.getCommandManager().executeWithPrefix(source, "/say " + message );
+
+        }
+
+    }
+
+    private static void moveForward(MinecraftServer server, ServerCommandSource source, String botName) {
 
         if (source.getPlayer() != null) {
 
             server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move forward");
 
         }
+
+    }
+
+    private static void moveBackward(MinecraftServer server, ServerCommandSource source, String botName) {
+
+        if (source.getPlayer() != null) {
+
+            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move backward");
+
+        }
+
 
     }
 
@@ -223,6 +410,26 @@ public class spawnFakePlayer {
 
         }
 
+
+    }
+
+    private static void moveLeft(MinecraftServer server, ServerCommandSource source, String botName) {
+
+        if (source.getPlayer() != null) {
+
+            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move left");
+
+        }
+
+    }
+
+    private static void moveRight(MinecraftServer server, ServerCommandSource source, String botName) {
+
+        if (source.getPlayer() != null) {
+
+            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move right");
+
+        }
 
     }
 
