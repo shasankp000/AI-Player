@@ -7,6 +7,7 @@
 ## I had to add that statement up there to prevent misunderstandings.
 
 This mod relies on the internal code of the Carpet mod, please star the repository of the mod: https://github.com/gnembon/fabric-carpet (Giving credit where it's due)
+
 This mod also relies on the ollam4j project. https://github.com/amithkoujalgi/ollama4j
 
 ![image](https://github.com/shasankp000/AI-Player/assets/46317225/6b8e22e2-cf00-462a-936b-d5b6f14fb228)
