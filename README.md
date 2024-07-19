@@ -20,7 +20,9 @@ Added basic bot movement.
 
 Progress : 45% 
 
-Implemented basic bot conversation [ needs a lot of improvements, yes I know ]
+Implemented basic bot conversation 
 
-[bot_conversation.mp4](https://github.com/user-attachments/assets/b7ca91a5-0bcf-4356-a856-afd502761fb9)
+[bandicam 2024-07-19 11-12-07-431.webm](https://github.com/user-attachments/assets/556d8d87-826a-4477-9717-74f38c9059e9)
+
+
 
