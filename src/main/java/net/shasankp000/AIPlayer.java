@@ -36,7 +36,7 @@ public class AIPlayer implements ModInitializer {
 
 		executor.submit(() -> {
 			try {
-				initializeOllamaClient(ollamaClient.botName);  // Replace "Steve" with your bot's default name
+				initializeOllamaClient();  // Replace "Steve" with your bot's default name
 			} catch (Exception e) {
 				LOGGER.error("Failed to initialize Ollama client", e);
 			}
