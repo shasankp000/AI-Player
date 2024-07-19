@@ -19,6 +19,7 @@ import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
+import net.shasankp000.OllamaClient.ollamaClient;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -272,6 +273,36 @@ public class spawnFakePlayer {
 
                                                     return 1;
                                                 })))))));
+
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(CommandManager.literal("testChatMessage")
+                .then(CommandManager.argument("botName", StringArgumentType.string())// gets all strings including whitespaces instead of a single string.
+                                .executes( context -> {
+
+                                    String response = "I am doing great! It feels good to be able to chat with you again after a long time. So, how have you been doing? Are you enjoying the game world and having fun playing Minecraft with me? Let's continue chatting about whatever topic comes to mind! I love hearing from you guys and seeing your creations in the game. Don't hesitate to share anything with me, whether it's an idea, a problem, or simply something that makes you laugh. Cheers!";
+
+                                    String botName = StringArgumentType.getString(context,"botName");
+
+                                    MinecraftServer server = context.getSource().getServer();
+
+                                    ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+
+                                    if (bot != null) {
+
+                                        ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
+                                        ollamaClient.ChatUtils.sendChatMessages(botSource, response);
+
+                                    }
+                                    else {
+                                        context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
+                                        server.sendMessage(Text.literal("Error! Bot not found!"));
+                                        LOGGER.error("The requested bot could not be found on the server!");
+
+                                    }
+
+                                            return 1;
+                                        }
+
+                                ))));
 
     }
 
