@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.http.HttpTimeoutException;
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -28,8 +30,52 @@ public class ollamaClient {
     private static OllamaChatResult chatResult;
     private static List<OllamaChatMessage> chatHistory = null;
     private static final String host = "http://localhost:11434";
-    private static boolean isInitialized = false;
     public static String botName = "Steve";
+
+    public static class ChatUtils {
+        private static final int MAX_CHAT_LENGTH = 100; // Adjust based on Minecraft's chat length limit
+
+        public static List<String> splitMessage(String message) {
+            List<String> messages = new ArrayList<>();
+            String[] sentences = message.split("(?<=[.!?])\\s*"); // Split by punctuation marks
+
+            StringBuilder currentMessage = new StringBuilder();
+            for (String sentence : sentences) {
+                if (currentMessage.length() + sentence.length() + 1 > MAX_CHAT_LENGTH) {
+                    messages.add(currentMessage.toString().trim());
+                    currentMessage.setLength(0);
+                }
+                if (!currentMessage.isEmpty()) {
+                    currentMessage.append(" ");
+                }
+                currentMessage.append(sentence);
+            }
+
+            if (!currentMessage.isEmpty()) {
+                messages.add(currentMessage.toString().trim());
+            }
+
+            return messages;
+        }
+
+
+        public static void sendChatMessages(ServerCommandSource source, String message) {
+            List<String> messages = splitMessage(message);
+
+            new Thread(() -> {
+                for (String msg : messages) {
+                    try {
+                        source.getServer().getCommandManager().executeWithPrefix(source, "/say " + msg);
+                        Thread.sleep(2500); // Introduce a slight delay between messages
+                    } catch (InterruptedException e) {
+                        LOGGER.error("{}", e.getMessage());
+                    }
+                }
+
+            }).start();
+
+        }
+    }
 
 
     public static void getPlayerMessage() {
@@ -47,7 +93,6 @@ public class ollamaClient {
 
         LOGGER.info("Player sent a message: {}", message);
 
-        testHttpRequest(context, botName);
         callClient(context, message);
 
         return 1;
@@ -70,6 +115,7 @@ public class ollamaClient {
         ServerPlayerEntity player = context.getSource().getPlayer();
 
         ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+        assert bot != null;
         ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
 
         if (pingOllamaServer()) {
@@ -94,39 +140,51 @@ public class ollamaClient {
     }
 
 
-    // Method to initialize Ollama client and set the system prompt
-    public static void initializeOllamaClient(String botName) {
-        if (!isInitialized) {
-            LOGGER.info("Initializing Ollama Client");
+    public static void initializeOllamaClient() {
+        LOGGER.info("Initializing Ollama Client");
 
-            String host = "http://localhost:11434/";
-            OllamaAPI ollamaAPI = new OllamaAPI(host);
+        int maxRetries = 3;
+        int retryCount = 0;
+        boolean initialized = false;
 
-            OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.TINYLLAMA);
+        String host = "http://localhost:11434/";
+        OllamaAPI ollamaAPI = new OllamaAPI(host);
+        ollamaAPI.setVerbose(true);
+        ollamaAPI.setRequestTimeoutSeconds(30); // Set timeout to 30 seconds
 
-            // Initial system prompt
-            OllamaChatRequestModel requestModel = builder
-                    .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant who has been connected to Minecraft using a mod. Your job is to talk, interact with the player and the world, and behave as if you are a second player in his world. Your name is " + botName + ". If the player talks to you, you will read the message thoroughly and then decide how long your response will be. After that you will send your response. Don't say anything now, wait for the player to say something.")
-                    .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
-                    .build();
-
+        while (!initialized && retryCount < maxRetries) {
             try {
+                // Initialize chat history with a system prompt
+                OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.PHI3);
+                OllamaChatRequestModel requestModel = builder
+                        .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other character in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to yourself or the player as '" + botName + "'. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, you should recognize these requests and trigger the appropriate function calls." + "Here are some examples of actions you might be asked to perform:\n" +
+                                "\n" +
+                                "Providing game tips or crafting recipes.\n" +
+                                "Giving information about specific Minecraft entities, items, or biomes.\n" +
+                                "Assisting with in-game tasks, like building structures or exploring areas.\n" +
+                                "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience.")
+                        .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
+                        .build();
+
                 chatResult = ollamaAPI.chat(requestModel);
                 chatHistory = chatResult.getChatHistory();
 
-                // Ignore the first message (response to system prompt)
-                if (!chatHistory.isEmpty()) {
-                    chatHistory.remove(chatHistory.size() - 1);
-                }
-
-                isInitialized = true;
                 LOGGER.info("Ollama Client initialized successfully");
+                initialized = true;
+            } catch (HttpTimeoutException e) {
+                retryCount++;
+                LOGGER.error("Failed to initialize Ollama Client: request timed out (attempt {}/{})", retryCount, maxRetries);
+                if (retryCount >= maxRetries) {
+                    LOGGER.error("Max retry attempts reached. Initialization failed.");
+                    throw new RuntimeException(e);
+                }
             } catch (OllamaBaseException | InterruptedException | IOException e) {
-                LOGGER.error("Failed to initialize Ollama Client: {}", e.getMessage(), e);
+                LOGGER.error("Failed to initialize Ollama Client: {}", e.getMessage());
                 throw new RuntimeException(e);
             }
         }
     }
+
 
     public static void callClient(CommandContext<ServerCommandSource> context, String playerMessage) {
         LOGGER.info("callClient invoked with playerMessage: {}", playerMessage);
@@ -147,8 +205,6 @@ public class ollamaClient {
 
             ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
 
-            // Initialize Ollama client if not already initialized
-            initializeOllamaClient(botName);
 
             OllamaAPI ollamaAPI = new OllamaAPI("http://localhost:11434/");
             LOGGER.info("Ollama API initialized");
@@ -166,7 +222,7 @@ public class ollamaClient {
                 chatResult = ollamaAPI.chat(requestModel);
                 chatHistory = chatResult.getChatHistory();
                 LOGGER.info("Chat result received: {}", chatResult.getResponse());
-                sendBotMessageInChunks(server, botSource, chatResult.getResponse());
+                ChatUtils.sendChatMessages(botSource, chatResult.getResponse());
             } catch (OllamaBaseException | InterruptedException | IOException e) {
                 LOGGER.error("Exception occurred: {}", e.getMessage(), e);
                 throw new RuntimeException(e);
@@ -176,22 +232,7 @@ public class ollamaClient {
         }
     }
 
-    private static void sendBotMessageInChunks(MinecraftServer server, ServerCommandSource botSource, String message) {
-        int maxLength = 100; // Adjust based on desired message length
-        String[] words = message.split(" ");
-        StringBuilder chunk = new StringBuilder();
 
-        for (String word : words) {
-            if (chunk.length() + word.length() + 1 > maxLength) {
-                server.getCommandManager().executeWithPrefix(botSource, "/say " + chunk.toString().trim());
-                chunk.setLength(0);
-            }
-            chunk.append(word).append(" ");
-        }
-        if (!chunk.isEmpty()) {
-            server.getCommandManager().executeWithPrefix(botSource, "/say " + chunk.toString().trim());
-        }
-    }
 
 
 }
