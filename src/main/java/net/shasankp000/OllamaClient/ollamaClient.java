@@ -8,11 +8,14 @@ import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
 import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
 import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
+import io.netty.util.concurrent.CompleteFuture;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +24,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.http.HttpTimeoutException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 
 
 public class ollamaClient {
@@ -31,9 +37,17 @@ public class ollamaClient {
     private static List<OllamaChatMessage> chatHistory = null;
     private static final String host = "http://localhost:11434";
     public static String botName = "Steve";
+    public static boolean isInitialized;
+
 
     public static class ChatUtils {
         private static final int MAX_CHAT_LENGTH = 100; // Adjust based on Minecraft's chat length limit
+
+        public static String chooseFormatterRandom() {
+            List<String> givenList = Arrays.asList("§9", "§b", "§d", "§e", "§6", "§1", "§2", "§3", "§4", "§5");
+            Random rand = new Random();
+            return givenList.get(rand.nextInt(givenList.size()));
+        }
 
         public static List<String> splitMessage(String message) {
             List<String> messages = new ArrayList<>();
@@ -62,10 +76,12 @@ public class ollamaClient {
         public static void sendChatMessages(ServerCommandSource source, String message) {
             List<String> messages = splitMessage(message);
 
+
             new Thread(() -> {
                 for (String msg : messages) {
                     try {
-                        source.getServer().getCommandManager().executeWithPrefix(source, "/say " + msg);
+                        String formatter = chooseFormatterRandom();
+                        source.getServer().getCommandManager().executeWithPrefix(source, "/say " + formatter + msg);
                         Thread.sleep(2500); // Introduce a slight delay between messages
                     } catch (InterruptedException e) {
                         LOGGER.error("{}", e.getMessage());
@@ -76,6 +92,8 @@ public class ollamaClient {
 
         }
     }
+
+
 
 
     public static void getPlayerMessage() {
@@ -90,8 +108,13 @@ public class ollamaClient {
     private static int execute(CommandContext<ServerCommandSource> context) {
         botName = StringArgumentType.getString(context, "botName");
         String message = StringArgumentType.getString(context, "message");
+        MinecraftServer server = context.getSource().getServer();
+        ServerCommandSource playerSource = server.getCommandSource();
+        String formatter = ChatUtils.chooseFormatterRandom();
 
+        server.getCommandManager().executeWithPrefix(playerSource, "/say "+ formatter + message);
         LOGGER.info("Player sent a message: {}", message);
+
 
         callClient(context, message);
 
@@ -139,97 +162,140 @@ public class ollamaClient {
 
     }
 
+    public static ServerPlayerEntity findPlayerWithPrefix(MinecraftServer server, String prefix) {
+        List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
+        for (ServerPlayerEntity player : players) {
+            if (player.getName().getString().startsWith(prefix)) {
+                return player;
+            }
+            System.out.println(player.getName().toString());
+        }
+        return null;
+    }
 
-    public static void initializeOllamaClient() {
-        LOGGER.info("Initializing Ollama Client");
 
-        int maxRetries = 3;
-        int retryCount = 0;
-        boolean initialized = false;
+    public static CompletableFuture<Void> initializeOllamaClient() {
+        return CompletableFuture.runAsync(() -> {
 
-        String host = "http://localhost:11434/";
-        OllamaAPI ollamaAPI = new OllamaAPI(host);
-        ollamaAPI.setVerbose(true);
-        ollamaAPI.setRequestTimeoutSeconds(30); // Set timeout to 30 seconds
+            LOGGER.info("Initializing Ollama Client");
 
-        while (!initialized && retryCount < maxRetries) {
-            try {
-                // Initialize chat history with a system prompt
-                OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.PHI3);
-                OllamaChatRequestModel requestModel = builder
-                        .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other character in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to yourself or the player as '" + botName + "'. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, you should recognize these requests and trigger the appropriate function calls." + "Here are some examples of actions you might be asked to perform:\n" +
-                                "\n" +
-                                "Providing game tips or crafting recipes.\n" +
-                                "Giving information about specific Minecraft entities, items, or biomes.\n" +
-                                "Assisting with in-game tasks, like building structures or exploring areas.\n" +
-                                "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience.")
-                        .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
-                        .build();
+            MinecraftServer server = MinecraftClient.getInstance().getServer();
+            assert server != null;
+            ServerPlayerEntity player = findPlayerWithPrefix(server, "Player");
 
-                chatResult = ollamaAPI.chat(requestModel);
-                chatHistory = chatResult.getChatHistory();
 
-                LOGGER.info("Ollama Client initialized successfully");
-                initialized = true;
-            } catch (HttpTimeoutException e) {
-                retryCount++;
-                LOGGER.error("Failed to initialize Ollama Client: request timed out (attempt {}/{})", retryCount, maxRetries);
-                if (retryCount >= maxRetries) {
-                    LOGGER.error("Max retry attempts reached. Initialization failed.");
+            int maxRetries = 3;
+            int retryCount = 0;
+            boolean initialized = false;
+
+            String host = "http://localhost:11434/";
+            OllamaAPI ollamaAPI = new OllamaAPI(host);
+            ollamaAPI.setVerbose(true);
+            ollamaAPI.setRequestTimeoutSeconds(90); // Set timeout to 30 seconds
+
+            while (!initialized && retryCount < maxRetries) {
+                try {
+                    // Initialize chat history with a system prompt
+                    OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.MISTRAL);
+                    OllamaChatRequestModel requestModel = builder
+                            .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other character in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to yourself or the player as '" + botName + "'. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, you should recognize these requests and trigger the appropriate function calls." + "Here are some examples of actions you might be asked to perform:\n" +
+                                    "\n" +
+                                    "Providing game tips or crafting recipes.\n" +
+                                    "Giving information about specific Minecraft entities, items, or biomes.\n" +
+                                    "Assisting with in-game tasks, like building structures or exploring areas.\n" +
+                                    "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. \n")
+
+                            .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
+                            .build();
+
+                    chatResult = ollamaAPI.chat(requestModel);
+                    chatHistory = chatResult.getChatHistory();
+
+                    LOGGER.info("Ollama Client initialized successfully");
+
+                    if (player!=null) {
+                        ServerCommandSource playerSource = player.getCommandSource();
+                        server.getCommandManager().executeWithPrefix(playerSource, "/say §b§lUplink established successfully!");
+                    }
+
+                    initialized = true;
+                    isInitialized = true;
+                } catch (HttpTimeoutException e) {
+                    retryCount++;
+                    LOGGER.error("Failed to initialize Ollama Client: request timed out (attempt {}/{})", retryCount, maxRetries);
+                    if (player != null) {
+                        ServerCommandSource playerSource = player.getCommandSource();
+                        server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink, request timed out (attempt "+ retryCount + "/"+ maxRetries +")");
+                    }
+                    isInitialized = false;
+                    if (retryCount >= maxRetries) {
+                        LOGGER.error("Max retry attempts reached. Initialization failed.");
+                        if (player != null) {
+                            ServerCommandSource playerSource = player.getCommandSource();
+                            server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink. Try checking the status of ollama server. Try running the model in ollama CLI once then re-run the game." );
+                        }
+                        isInitialized = false;
+                        throw new RuntimeException(e);
+                    }
+                } catch (OllamaBaseException | InterruptedException | IOException e) {
+                    LOGGER.error("Failed to initialize Ollama Client: {}", e.getMessage());
                     throw new RuntimeException(e);
                 }
-            } catch (OllamaBaseException | InterruptedException | IOException e) {
-                LOGGER.error("Failed to initialize Ollama Client: {}", e.getMessage());
-                throw new RuntimeException(e);
             }
-        }
+        });
+
     }
 
 
     public static void callClient(CommandContext<ServerCommandSource> context, String playerMessage) {
         LOGGER.info("callClient invoked with playerMessage: {}", playerMessage);
 
-        if (pingOllamaServer()) {
-            LOGGER.info("Ollama Server is reachable");
+        initializeOllamaClient().thenRun(() -> {
 
-            String botName = StringArgumentType.getString(context, "botName");
-            LOGGER.info("Bot name: {}", botName);
+            if (pingOllamaServer()) {
+                LOGGER.info("Ollama Server is reachable");
 
-            MinecraftServer server = context.getSource().getServer();
-            ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+                String botName = StringArgumentType.getString(context, "botName");
+                LOGGER.info("Bot name: {}", botName);
 
-            if (bot == null) {
-                LOGGER.error("Bot with name {} not found", botName);
-                return;
-            }
+                MinecraftServer server = context.getSource().getServer();
+                ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
 
-            ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
+                if (bot == null) {
+                    LOGGER.error("Bot with name {} not found", botName);
+                    return;
+                }
+
+                ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
 
 
-            OllamaAPI ollamaAPI = new OllamaAPI("http://localhost:11434/");
-            LOGGER.info("Ollama API initialized");
+                OllamaAPI ollamaAPI = new OllamaAPI("http://localhost:11434/");
+                LOGGER.info("Ollama API initialized");
 
-            OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.TINYLLAMA);
+                OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.TINYLLAMA);
 
-            OllamaChatRequestModel requestModel;
-            if (chatHistory == null) {
-                requestModel = builder.withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                OllamaChatRequestModel requestModel;
+                if (chatHistory == null) {
+                    requestModel = builder.withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                } else {
+                    requestModel = builder.withMessages(chatHistory).withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                }
+
+                try {
+                    chatResult = ollamaAPI.chat(requestModel);
+                    chatHistory = chatResult.getChatHistory();
+
+                    LOGGER.info("Chat result received: {}", chatResult.getResponse());
+                    ChatUtils.sendChatMessages(botSource, chatResult.getResponse());
+                } catch (OllamaBaseException | InterruptedException | IOException e) {
+                    LOGGER.error("Exception occurred: {}", e.getMessage(), e);
+                    throw new RuntimeException(e);
+                }
             } else {
-                requestModel = builder.withMessages(chatHistory).withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                LOGGER.info("Ollama Server is unreachable!");
             }
 
-            try {
-                chatResult = ollamaAPI.chat(requestModel);
-                chatHistory = chatResult.getChatHistory();
-                LOGGER.info("Chat result received: {}", chatResult.getResponse());
-                ChatUtils.sendChatMessages(botSource, chatResult.getResponse());
-            } catch (OllamaBaseException | InterruptedException | IOException e) {
-                LOGGER.error("Exception occurred: {}", e.getMessage(), e);
-                throw new RuntimeException(e);
-            }
-        } else {
-            LOGGER.info("Ollama Server is unreachable!");
-        }
+        });
     }
 
 
