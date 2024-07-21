@@ -138,7 +138,7 @@ This section is to describe the usage of the mod in-game
 
 ## Commands
 
-`/spawnBot <BotName>` This command is used to spawn a bot with the desired name. For testing purposes, please keep the bot name to Steve.
+`/spawnBot <BotName>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
 
 `/botWalk <till>` This command will make the bot walk forward for a specific amount of seconds.
 
