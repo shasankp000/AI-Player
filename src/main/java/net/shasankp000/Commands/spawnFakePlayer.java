@@ -20,7 +20,6 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 import net.shasankp000.ChatUtils.ChatUtils;
-import net.shasankp000.OllamaClient.ollamaClient;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
