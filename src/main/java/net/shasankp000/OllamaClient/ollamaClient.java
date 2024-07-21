@@ -15,7 +15,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+
+import net.shasankp000.ChatUtils.ChatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,10 +24,9 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.http.HttpTimeoutException;
-import java.util.ArrayList;
-import java.util.Arrays;
+
 import java.util.List;
-import java.util.Random;
+
 import java.util.concurrent.CompletableFuture;
 
 
@@ -38,62 +38,6 @@ public class ollamaClient {
     private static final String host = "http://localhost:11434";
     public static String botName = "Steve";
     public static boolean isInitialized;
-
-
-    public static class ChatUtils {
-        private static final int MAX_CHAT_LENGTH = 100; // Adjust based on Minecraft's chat length limit
-
-        public static String chooseFormatterRandom() {
-            List<String> givenList = Arrays.asList("§9", "§b", "§d", "§e", "§6", "§1", "§2", "§3", "§4", "§5");
-            Random rand = new Random();
-            return givenList.get(rand.nextInt(givenList.size()));
-        }
-
-        public static List<String> splitMessage(String message) {
-            List<String> messages = new ArrayList<>();
-            String[] sentences = message.split("(?<=[.!?])\\s*"); // Split by punctuation marks
-
-            StringBuilder currentMessage = new StringBuilder();
-            for (String sentence : sentences) {
-                if (currentMessage.length() + sentence.length() + 1 > MAX_CHAT_LENGTH) {
-                    messages.add(currentMessage.toString().trim());
-                    currentMessage.setLength(0);
-                }
-                if (!currentMessage.isEmpty()) {
-                    currentMessage.append(" ");
-                }
-                currentMessage.append(sentence);
-            }
-
-            if (!currentMessage.isEmpty()) {
-                messages.add(currentMessage.toString().trim());
-            }
-
-            return messages;
-        }
-
-
-        public static void sendChatMessages(ServerCommandSource source, String message) {
-            List<String> messages = splitMessage(message);
-
-
-            new Thread(() -> {
-                for (String msg : messages) {
-                    try {
-                        String formatter = chooseFormatterRandom();
-                        source.getServer().getCommandManager().executeWithPrefix(source, "/say " + formatter + msg);
-                        Thread.sleep(2500); // Introduce a slight delay between messages
-                    } catch (InterruptedException e) {
-                        LOGGER.error("{}", e.getMessage());
-                    }
-                }
-
-            }).start();
-
-        }
-    }
-
-
 
 
     public static void getPlayerMessage() {
@@ -196,14 +140,20 @@ public class ollamaClient {
             while (!initialized && retryCount < maxRetries) {
                 try {
                     // Initialize chat history with a system prompt
-                    OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.MISTRAL);
+                    OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.PHI3);
                     OllamaChatRequestModel requestModel = builder
                             .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other character in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to yourself or the player as '" + botName + "'. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, you should recognize these requests and trigger the appropriate function calls." + "Here are some examples of actions you might be asked to perform:\n" +
                                     "\n" +
                                     "Providing game tips or crafting recipes.\n" +
                                     "Giving information about specific Minecraft entities, items, or biomes.\n" +
                                     "Assisting with in-game tasks, like building structures or exploring areas.\n" +
-                                    "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. \n")
+                                    "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. " +
+                                    "If a player uses inappropriate language or discusses inappropriate topics, handle the situation by gently redirecting the conversation or by providing a neutral response that discourages further inappropriate behavior. \n" +
+                                    "\n" +
+                                    "For example:\n" +
+                                    "- If a player uses vulgar language, you can respond with: \"Let's keep our chat friendly and fun! Is there something else about Minecraft you'd like to discuss?\"\n" +
+                                    "- If a player insists on inappropriate topics, you can say: \"I'm here to help with Minecraft-related questions. How about we talk about your latest adventure in the game?\n" +
+                                    "- If a player says these words 'kill yourself' or 'kys', you should say try to respond calmly and normally and tell the player to see the beauty of life.")
 
                             .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
                             .build();
@@ -212,11 +162,6 @@ public class ollamaClient {
                     chatHistory = chatResult.getChatHistory();
 
                     LOGGER.info("Ollama Client initialized successfully");
-
-                    if (player!=null) {
-                        ServerCommandSource playerSource = player.getCommandSource();
-                        server.getCommandManager().executeWithPrefix(playerSource, "/say §b§lUplink established successfully!");
-                    }
 
                     initialized = true;
                     isInitialized = true;
