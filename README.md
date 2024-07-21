@@ -24,7 +24,12 @@ Implemented basic bot conversation
 
 [bandicam 2024-07-19 11-12-07-431.webm](https://github.com/user-attachments/assets/556d8d87-826a-4477-9717-74f38c9059e9)
 
+---
+# Donations
 
+Liked my work so far? Please consider buying me a coffee so that I can work peacefully and don't have to ask my mom for pocket money.
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/shasankp000)
 
 ---
 # Usage
