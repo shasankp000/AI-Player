@@ -34,7 +34,9 @@ Liked my work so far? Please consider buying me a coffee so that I can work peac
 ---
 # Usage
 
-This section will guide you to setup the mod, since a distributable jar file doesn't exist yet.
+## This section will guide you to setup the mod, since a distributable jar file doesn't exist yet.
+
+## Once the jar file is available, go directly to step 6.
 
 Step 1. Download Java 21. 
 
