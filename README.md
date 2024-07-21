@@ -44,6 +44,7 @@ Click on Download MSI and finish the installation process.
 
 Step 2. Download IntelliJ idea community edition.
 
+https://www.jetbrains.com/idea/download/?section=windows
 
 ![Screenshot 2024-07-21 123239](https://github.com/user-attachments/assets/75d636cb-99f8-4966-8a18-f9ae22ce46bc)
 
