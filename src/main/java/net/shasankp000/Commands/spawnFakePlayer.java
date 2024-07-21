@@ -19,6 +19,7 @@ import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
+import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.OllamaClient.ollamaClient;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -271,7 +272,7 @@ public class spawnFakePlayer {
                                     if (bot != null) {
 
                                         ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
-                                        ollamaClient.ChatUtils.sendChatMessages(botSource, response);
+                                        ChatUtils.sendChatMessages(botSource, response);
 
                                     }
                                     else {
