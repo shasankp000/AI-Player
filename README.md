@@ -18,11 +18,19 @@ Added basic bot movement.
 
 [botmovement.webm](https://github.com/user-attachments/assets/c9062a42-b914-403b-b44a-19fad1663bc8)
 
-Progress : 45% 
+Progress : 48% 
 
 Implemented basic bot conversation 
 
 [bandicam 2024-07-19 11-12-07-431.webm](https://github.com/user-attachments/assets/556d8d87-826a-4477-9717-74f38c9059e9)
+
+Added a mod configuration menu (Still a work in progress)
+
+
+https://github.com/user-attachments/assets/c6192c32-0e00-48e9-bebd-a0bc5dd73d89
+
+
+
 
 ---
 # Donations
