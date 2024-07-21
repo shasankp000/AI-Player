@@ -83,7 +83,49 @@ Additionally you can go to the terminal icon on the bottom left
 
 And type `./graldew build`
 
-Step 6. Finally click on the gradle icon again in the right sidebar.
+
+Step 6. Setup ollama.
+
+Go to https://ollama.com/
+
+![image](https://github.com/user-attachments/assets/c28798e4-c7bf-4faf-88e5-76315f88f0d1)
+
+Download based on your operating system.
+
+After installation, run ollama from your desktop. This will launch the ollama server. 
+
+This can be accessed in your system tray
+
+![image](https://github.com/user-attachments/assets/3ed6468e-0e8c-4723-ac80-1ab77a7208d4)
+
+
+Now open a command line client, on windows, search CMD or terminal and then open it.
+
+Depending on your specs, you can download a language model and then configure in the project to use it.
+
+For now, in the terminal, type ![image](https://github.com/user-attachments/assets/7ecf3eea-2a7c-481b-a914-53678081e60e)
+
+In this example we are going with the phi3 model.
+
+I do intend to add an option in the mod to change and configure models within the game GUI.
+
+Once done. Go to the next step.
+
+Step 7. Go to the files section
+
+![image](https://github.com/user-attachments/assets/443b12ad-cb8c-4049-8fa3-01875023c42a)
+
+Click on the ollamaClient 
+
+Go to line 199.
+
+[recording1](https://github.com/user-attachments/assets/bd01e7a7-ef5f-4379-9157-965c97b85ce3)
+
+Remove the current model type, then follow the video and set it to `OllamaModelType.PHI3`
+
+Although intelliJ autosaves but press `CTRL+S` to save.
+
+Step 8. Finally click on the gradle icon again in the right sidebar.
 
 ![image](https://github.com/user-attachments/assets/64b085c2-1624-4cfc-9b64-22fd293f1cfe)
 
