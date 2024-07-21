@@ -25,4 +25,15 @@ Implemented basic bot conversation
 [bandicam 2024-07-19 11-12-07-431.webm](https://github.com/user-attachments/assets/556d8d87-826a-4477-9717-74f38c9059e9)
 
 
+## Usage
+
+This section will guide you to setup the mod, since a distributable jar file doesn't exist yet.
+
+Step 1. Download IntelliJ idea community edition.
+
+
+![Screenshot 2024-07-21 123239](https://github.com/user-attachments/assets/75d636cb-99f8-4966-8a18-f9ae22ce46bc)
+
+
+
 
