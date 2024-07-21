@@ -3,6 +3,7 @@ package net.shasankp000;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
+import net.shasankp000.Commands.configCommand;
 import net.shasankp000.Commands.spawnFakePlayer;
 
 import net.shasankp000.OllamaClient.ollamaClient;
@@ -28,8 +29,9 @@ public class AIPlayer implements ModInitializer {
 		spawnFakePlayer.register();
 		spawnFakePlayer.additionalBotCommands();
 		ollamaClient.getPlayerMessage();
+		configCommand.register();
 
-		ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
+		//ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
 	}
 
 	private static void onServerStarted(MinecraftServer minecraftServer) {
