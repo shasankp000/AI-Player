@@ -89,5 +89,20 @@ Step 6. Finally click on the gradle icon again in the right sidebar.
 
 Fine the runClient task, and double click it to run minecraft with the mod.
 
+---
+# Mod usage
+
+This section is to describe the usage of the mod in-game
+
+## Commands
+
+`/spawnBot <BotName>` This command is used to spawn a bot with the desired name. For testing purposes, please keep the bot name to Steve.
+
+`/botWalk <till>` This command will make the bot walk forward for a specific amount of seconds.
+
+`/botGo <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
+
+`/tellBot <botName> <message>` This command will help you to talk to the bot.
+
 
 
