@@ -32,7 +32,7 @@ public class AIPlayer implements ModInitializer {
 		ollamaClient.getPlayerMessage();
 		configCommand.register();
 
-		//ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
+		ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
 	}
 
 	private static void onServerStarted(MinecraftServer minecraftServer) {
