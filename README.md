@@ -30,7 +30,7 @@ Implemented basic bot conversation
 Added a mod configuration menu (Still a work in progress)
 
 
-https://github.com/user-attachments/assets/c6192c32-0e00-48e9-bebd-a0bc5dd73d89
+[![Video Title](https://imgur.com/a/EBl9eU6)
 
 
 
