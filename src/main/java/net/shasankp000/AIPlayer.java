@@ -6,6 +6,7 @@ import net.minecraft.server.MinecraftServer;
 import net.shasankp000.Commands.configCommand;
 import net.shasankp000.Commands.spawnFakePlayer;
 
+import net.shasankp000.FilingSystem.AIPlayerConfig;
 import net.shasankp000.OllamaClient.ollamaClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +20,7 @@ public class AIPlayer implements ModInitializer {
 
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
 	private static final ExecutorService executor = Executors.newSingleThreadExecutor();
-
+	public static final AIPlayerConfig CONFIG = AIPlayerConfig.createAndLoad(); // initialize the config.
 
 	@Override
 	public void onInitialize() {
