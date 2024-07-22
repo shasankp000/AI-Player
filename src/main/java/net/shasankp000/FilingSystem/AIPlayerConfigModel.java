@@ -26,7 +26,8 @@ public class AIPlayerConfigModel {
     {
         try {
             modelList = getLanguageModels.get();
-            selectedModel = modelList.get(0); // set a language model by default
+            selectedModel = modelList.get(0);
+            selectedLanguageModel = selectedModel; // set a language model by default
         } catch (ollamaNotReachableException e) {
             LOGGER.error("{}", e.getMessage());
         }
