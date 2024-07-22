@@ -27,10 +27,11 @@ Implemented basic bot conversation
 
 [bandicam 2024-07-19 11-12-07-431.webm](https://github.com/user-attachments/assets/556d8d87-826a-4477-9717-74f38c9059e9)
 
+
 Added a mod configuration menu (Still a work in progress)
 
 
-[![Video Title](https://imgur.com/a/EBl9eU6)
+https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
 
 
 
