@@ -10,6 +10,10 @@ This mod relies on the internal code of the Carpet mod, please star the reposito
 
 This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/ollama4j
 
+---
+
+# Progress: 48%
+
 ![image](https://github.com/shasankp000/AI-Player/assets/46317225/6b8e22e2-cf00-462a-936b-d5b6f14fb228)
 
 Successfully managed to spawn a "second player" bot.
@@ -18,11 +22,19 @@ Added basic bot movement.
 
 [botmovement.webm](https://github.com/user-attachments/assets/c9062a42-b914-403b-b44a-19fad1663bc8)
 
-Progress : 45% 
 
 Implemented basic bot conversation 
 
 [bandicam 2024-07-19 11-12-07-431.webm](https://github.com/user-attachments/assets/556d8d87-826a-4477-9717-74f38c9059e9)
+
+
+Added a mod configuration menu (Still a work in progress)
+
+
+https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
+
+
+
 
 ---
 # Donations
