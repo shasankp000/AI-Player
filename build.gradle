@@ -18,6 +18,7 @@ repositories {
 	// for more information about repositories.
 	mavenCentral()
 	maven { url 'https://jitpack.io' }
+	maven { url 'https://maven.wispforest.io/releases/' }
 
 	flatDir {
 		dirs "./lib"
@@ -41,6 +42,8 @@ dependencies {
 	modImplementation 'com.github.gnembon:fabric-carpet:1.4.128'
 	implementation 'com.github.FasterXML:jackson-databind:jackson-databind-2.17.2'
 	implementation 'com.github.amithkoujalgi:ollama4j:1.0.77'
+	annotationProcessor modImplementation("io.wispforest:owo-lib:${project.owo_version}")
+	include "io.wispforest:owo-sentinel:${project.owo_version}"
 
 }
 
