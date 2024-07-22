@@ -21,7 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.http.HttpTimeoutException;
@@ -40,7 +39,7 @@ public class ollamaClient {
     private static final String host = "http://localhost:11434";
     public static String botName = "Steve";
     public static boolean isInitialized;
-    public static AIPlayerConfigModel aiPlayerConfigModel;
+    public static AIPlayerConfigModel aiPlayerConfigModel = new AIPlayerConfigModel();
 
     public static void getPlayerMessage() {
 
@@ -108,43 +107,62 @@ public class ollamaClient {
 
     }
 
-    public static ServerPlayerEntity findPlayerWithPrefix(MinecraftServer server, String prefix) {
-        List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
-        for (ServerPlayerEntity player : players) {
-            if (player.getName().getString().startsWith(prefix)) {
-                return player;
-            }
-            System.out.println(player.getName().toString());
-        }
-        return null;
-    }
-
-
     public static CompletableFuture<Void> initializeOllamaClient() {
         return CompletableFuture.runAsync(() -> {
-
             LOGGER.info("Initializing Ollama Client");
 
             MinecraftServer server = MinecraftClient.getInstance().getServer();
-            assert server != null;
-            ServerPlayerEntity player = findPlayerWithPrefix(server, "Player");
+            if (server == null) {
+                LOGGER.error("MinecraftServer is null.");
+                return;
+            }
 
+            LOGGER.info("MinecraftServer is not null. Proceeding to find player...");
+
+            // Wait until any player is available
+            ServerPlayerEntity player = null;
+            int maxWaitTime = 10000; // Max wait time of 10 seconds
+            int waitInterval = 100; // Check every 100 milliseconds
+            int waitedTime = 0;
+
+            while (player == null && waitedTime < maxWaitTime) {
+                player = findAnyPlayer(server);
+                if (player == null) {
+                    try {
+                        LOGGER.info("Player not found yet, waiting...");
+                        Thread.sleep(waitInterval);
+                    } catch (InterruptedException e) {
+                        LOGGER.error("Waiting for player interrupted: {}", e.getMessage());
+                        return;
+                    }
+                    waitedTime += waitInterval;
+                }
+            }
+
+            if (player == null) {
+                LOGGER.error("No player found after waiting for {} seconds.", maxWaitTime / 1000);
+                return;
+            }
+
+            LOGGER.info("Player found: {}", player.getName().getString());
 
             int maxRetries = 3;
             int retryCount = 0;
             boolean initialized = false;
 
+            LOGGER.info("Connecting to ollama server....");
+
             String host = "http://localhost:11434/";
             OllamaAPI ollamaAPI = new OllamaAPI(host);
             ollamaAPI.setVerbose(true);
-            ollamaAPI.setRequestTimeoutSeconds(90); // Set timeout to 30 seconds
+            ollamaAPI.setRequestTimeoutSeconds(90); // Set timeout to 90 seconds
 
             while (!initialized && retryCount < maxRetries) {
                 try {
                     String selectedLM = aiPlayerConfigModel.getSelectedLanguageModel();
+                    LOGGER.info("Setting language model to {}", selectedLM);
 
                     if (ModelNameChecker.isValidModelName(selectedLM)) {
-
                         OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(ModelNameManager.getModelType(selectedLM));
 
                         OllamaChatRequestModel requestModel = builder
@@ -159,36 +177,34 @@ public class ollamaClient {
                                         "For example:\n" +
                                         "- If a player uses vulgar language, you can respond with: \"Let's keep our chat friendly and fun! Is there something else about Minecraft you'd like to discuss?\"\n" +
                                         "- If a player insists on inappropriate topics, you can say: \"I'm here to help with Minecraft-related questions. How about we talk about your latest adventure in the game?\n" +
-                                        "- If a player says these words 'kill yourself' or 'kys', you should say try to respond calmly and normally and tell the player to see the beauty of life.")
-
+                                        "- If a player says these words 'kill yourself' or 'kys', you should say try to respond calmly and normally and tell the player to see the beauty of life." +
+                                        "- You are also addressed as he/him.")
                                 .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
                                 .build();
 
+                        LOGGER.info("Making API call to Ollama...");
+
                         chatResult = ollamaAPI.chat(requestModel);
                         chatHistory = chatResult.getChatHistory();
+
+                        LOGGER.info("API call to Ollama completed successfully.");
+                        ServerCommandSource playerSource = player.getCommandSource();
+                        server.getCommandManager().executeWithPrefix(playerSource, "/say §9Sent message to "+ botName + " successfully! Please give him some time to respond.");
+
                     }
 
-                    // Initialize chat history with a system prompt
-
                     LOGGER.info("Ollama Client initialized successfully");
-
                     initialized = true;
                     isInitialized = true;
                 } catch (HttpTimeoutException e) {
                     retryCount++;
                     LOGGER.error("Failed to initialize Ollama Client: request timed out (attempt {}/{})", retryCount, maxRetries);
-                    if (player != null) {
-                        ServerCommandSource playerSource = player.getCommandSource();
-                        server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink, request timed out (attempt "+ retryCount + "/"+ maxRetries +")");
-                    }
+                    ServerCommandSource playerSource = player.getCommandSource();
+                    server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink, request timed out (attempt " + retryCount + "/" + maxRetries + ")");
                     isInitialized = false;
                     if (retryCount >= maxRetries) {
                         LOGGER.error("Max retry attempts reached. Initialization failed.");
-                        if (player != null) {
-                            ServerCommandSource playerSource = player.getCommandSource();
-                            server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink. Try checking the status of ollama server. Try running the model in ollama CLI once then re-run the game." );
-                        }
-                        isInitialized = false;
+                        server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink. Try checking the status of ollama server. Try running the model in ollama CLI once then re-run the game.");
                         throw new RuntimeException(e);
                     }
                 } catch (OllamaBaseException | InterruptedException | IOException e) {
@@ -197,8 +213,22 @@ public class ollamaClient {
                 }
             }
         });
-
     }
+
+    // Helper function to find any player on the server
+    private static ServerPlayerEntity findAnyPlayer(MinecraftServer server) {
+        LOGGER.info("Finding any player...");
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            if (player != null) {
+                LOGGER.info("Player found: {}", player.getName().getString());
+                return player;
+            }
+        }
+        LOGGER.info("No players found.");
+        return null;
+    }
+
+
 
 
     public static void callClient(CommandContext<ServerCommandSource> context, String playerMessage) {
