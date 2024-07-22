@@ -1,26 +1,31 @@
 package net.shasankp000.GraphicalUserInterface;
 
-import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
-import io.github.amithkoujalgi.ollama4j.core.models.Model;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.toast.SystemToast;
 import net.minecraft.text.Text;
-import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
+import net.shasankp000.Exception.ollamaNotReachableException;
+import net.shasankp000.AIPlayer;
+import net.shasankp000.FilingSystem.AIPlayerConfigModel;
 import net.shasankp000.GraphicalUserInterface.Widgets.DropdownMenuWidget;
-import net.shasankp000.OllamaClient.ollamaClient;
-import java.io.IOException;
-import java.net.URISyntaxException;
+import net.shasankp000.FilingSystem.getLanguageModels;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class CustomScreen extends Screen {
 
+        public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
         public Screen parent;
         private TextFieldWidget textFieldWidget;
         private DropdownMenuWidget dropdownMenuWidget;
-
+        private String selectedModel = AIPlayerConfigModel.selectedModel;
+        public AIPlayerConfigModel aiPlayerConfigModel = new AIPlayerConfigModel();
 
         public CustomScreen(Text title, Screen parent) {
             super(title);
@@ -29,31 +34,17 @@ public class CustomScreen extends Screen {
 
         @Override
         protected void init() {
-
-            List<Model> models;
+            
             List<String> modelList = new ArrayList<>();
 
-            if (ollamaClient.pingOllamaServer()) {
-
-                String host = "http://localhost:11434/";
-
-                OllamaAPI ollamaAPI = new OllamaAPI(host);
-
-                try {
-                    models = ollamaAPI.listModels();
-                } catch (OllamaBaseException | IOException | InterruptedException | URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-
-
-                for (Model model: models) {
-
-                    modelList.add(model.getName());
-
-                }
+            try {
+                modelList = getLanguageModels.get();
+            } catch (ollamaNotReachableException e) {
+                LOGGER.error("{}", e.getMessage());
             }
 
-            DropdownMenuWidget dropdownMenuWidget = new DropdownMenuWidget(80, 40, 200, 20, Text.of("List of available models"), modelList);
+
+            DropdownMenuWidget dropdownMenuWidget = new DropdownMenuWidget(100, 40, 200, 20, Text.of("List of available models"), modelList);
             this.dropdownMenuWidget = dropdownMenuWidget;
             this.addSelectableChild(dropdownMenuWidget);
 
@@ -61,18 +52,24 @@ public class CustomScreen extends Screen {
             ButtonWidget buttonWidget2 = ButtonWidget.builder(Text.of("Close"), (btn1) -> {
                         this.close();
                     }
-            ).dimensions(this.width - 150, 40, 120, 20).build();
+            ).dimensions(this.width - 120, 40, 120, 20).build();
 
             ButtonWidget buttonWidget3 = ButtonWidget.builder(Text.of("Save"), (btn1) -> {
-                        this.close();
-                    }
+
+                        this.saveToFile();
+
+                        if (this.client != null) {
+                            this.client.getToastManager().add(
+                            SystemToast.create(this.client, SystemToast.Type.NARRATOR_TOGGLE, Text.of("Settings saved!"), Text.of("Saved settings.")));
+                        }
+
+            }
             ).dimensions(this.width - 150, 200, 120, 20).build();
 
             // x, y, width, height
             // It's recommended to use the fixed height of 20 to prevent rendering issues with the button
             // textures.
 
-            // Register the button widget.
 
             this.addDrawableChild(buttonWidget2);
             this.addDrawableChild(dropdownMenuWidget);
@@ -80,7 +77,6 @@ public class CustomScreen extends Screen {
 
         }
 
-//
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             super.render(context, mouseX, mouseY, delta);
@@ -89,8 +85,17 @@ public class CustomScreen extends Screen {
             // We'll subtract the font height from the Y position to make the text appear above the button.
             // Subtracting an extra 10 pixels will give the text some padding.
             // textRenderer, text, x, y, color, hasShadow
-            context.drawText(this.textRenderer, "AI-Player Mod configuration Menu",140, 20 - this.textRenderer.fontHeight - 10, 0xFFFFFFFF, true);
-            context.drawText(this.textRenderer, "Select Language Model",20, this.dropdownMenuWidget.getY()  - this.textRenderer.fontHeight - 10, 0xFFFFFFFF, true);
+
+            int yellow = 0xFFFFFF00;
+            int white = 0xFFFFFFFF;
+            int green = 0xFF00FF00;
+            int red = 0xFFFF0000;
+
+            context.drawText(this.textRenderer, "AI-Player Mod configuration Menu",140, 20 - this.textRenderer.fontHeight - 10, white, true);
+            context.drawText(this.textRenderer, "Select Language Model",5, this.dropdownMenuWidget.getY() + 5, yellow, true);
+            context.drawText(this.textRenderer, "Currently selected language model: " + selectedModel,100, this.dropdownMenuWidget.getY() + 30, green, true);
+            context.drawText(this.textRenderer, "After changing the selected language model, you will need to restart the game!",20, this.dropdownMenuWidget.getY() + 60, red, true);
+
         }
 
         @Override
@@ -98,6 +103,18 @@ public class CustomScreen extends Screen {
             if (this.client != null) {
                 this.client.setScreen(this.parent);
             }
+        }
+
+        private void saveToFile() {
+
+            String modelName = this.dropdownMenuWidget.getSelectedOption();
+            System.out.println(modelName);
+
+            aiPlayerConfigModel.setSelectedLanguageModel(modelName);
+
+            AIPlayer.CONFIG.selectedLanguageModel(modelName);
+            AIPlayer.CONFIG.save();
+
         }
 
     }
