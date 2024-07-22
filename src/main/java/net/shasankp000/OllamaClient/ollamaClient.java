@@ -8,7 +8,7 @@ import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
 import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
 import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
-import io.netty.util.concurrent.CompleteFuture;
+
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.server.MinecraftServer;
@@ -21,14 +21,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.http.HttpTimeoutException;
 
+
 import java.util.List;
 
 import java.util.concurrent.CompletableFuture;
-
+import net.shasankp000.FilingSystem.AIPlayerConfigModel;
 
 public class ollamaClient {
 
@@ -38,7 +40,7 @@ public class ollamaClient {
     private static final String host = "http://localhost:11434";
     public static String botName = "Steve";
     public static boolean isInitialized;
-
+    public static AIPlayerConfigModel aiPlayerConfigModel;
 
     public static void getPlayerMessage() {
 
@@ -139,27 +141,34 @@ public class ollamaClient {
 
             while (!initialized && retryCount < maxRetries) {
                 try {
+                    String selectedLM = aiPlayerConfigModel.getSelectedLanguageModel();
+
+                    if (ModelNameChecker.isValidModelName(selectedLM)) {
+
+                        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(ModelNameManager.getModelType(selectedLM));
+
+                        OllamaChatRequestModel requestModel = builder
+                                .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other character in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to yourself or the player as '" + botName + "'. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, you should recognize these requests and trigger the appropriate function calls." + "Here are some examples of actions you might be asked to perform:\n" +
+                                        "\n" +
+                                        "Providing game tips or crafting recipes.\n" +
+                                        "Giving information about specific Minecraft entities, items, or biomes.\n" +
+                                        "Assisting with in-game tasks, like building structures or exploring areas.\n" +
+                                        "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. " +
+                                        "If a player uses inappropriate language or discusses inappropriate topics, handle the situation by gently redirecting the conversation or by providing a neutral response that discourages further inappropriate behavior. \n" +
+                                        "\n" +
+                                        "For example:\n" +
+                                        "- If a player uses vulgar language, you can respond with: \"Let's keep our chat friendly and fun! Is there something else about Minecraft you'd like to discuss?\"\n" +
+                                        "- If a player insists on inappropriate topics, you can say: \"I'm here to help with Minecraft-related questions. How about we talk about your latest adventure in the game?\n" +
+                                        "- If a player says these words 'kill yourself' or 'kys', you should say try to respond calmly and normally and tell the player to see the beauty of life.")
+
+                                .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
+                                .build();
+
+                        chatResult = ollamaAPI.chat(requestModel);
+                        chatHistory = chatResult.getChatHistory();
+                    }
+
                     // Initialize chat history with a system prompt
-                    OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.PHI3);
-                    OllamaChatRequestModel requestModel = builder
-                            .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other character in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to yourself or the player as '" + botName + "'. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, you should recognize these requests and trigger the appropriate function calls." + "Here are some examples of actions you might be asked to perform:\n" +
-                                    "\n" +
-                                    "Providing game tips or crafting recipes.\n" +
-                                    "Giving information about specific Minecraft entities, items, or biomes.\n" +
-                                    "Assisting with in-game tasks, like building structures or exploring areas.\n" +
-                                    "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. " +
-                                    "If a player uses inappropriate language or discusses inappropriate topics, handle the situation by gently redirecting the conversation or by providing a neutral response that discourages further inappropriate behavior. \n" +
-                                    "\n" +
-                                    "For example:\n" +
-                                    "- If a player uses vulgar language, you can respond with: \"Let's keep our chat friendly and fun! Is there something else about Minecraft you'd like to discuss?\"\n" +
-                                    "- If a player insists on inappropriate topics, you can say: \"I'm here to help with Minecraft-related questions. How about we talk about your latest adventure in the game?\n" +
-                                    "- If a player says these words 'kill yourself' or 'kys', you should say try to respond calmly and normally and tell the player to see the beauty of life.")
-
-                            .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
-                            .build();
-
-                    chatResult = ollamaAPI.chat(requestModel);
-                    chatHistory = chatResult.getChatHistory();
 
                     LOGGER.info("Ollama Client initialized successfully");
 
