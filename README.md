@@ -17,13 +17,13 @@ Just know that I won't ever give up on this project.
 
 ---
   
-# A minecraft mod which aims to add a "second player" into the game which will actually be intelligent.
+A minecraft mod which aims to add a "second player" into the game which will actually be intelligent.
 
-## Ever felt lonely while playing minecraft alone during that two-week phase? Well, this mod aims to solve that problem of loneliness, not just catering to this particular use case, but even (hopefully in the future) to play in multiplayer servers as well.
+**Ever felt lonely while playing minecraft alone during that two-week phase? Well, this mod aims to solve that problem of loneliness, not just catering to this particular use case, but even (hopefully in the future) to play in multiplayer servers as well.**
 
-# Please note that this is not some sort of a commercialised AI product. This project is just a solution to a problem many Minecraft players have faced and do continue to face.
+**Please note that this is not some sort of a commercialised AI product. This project is just a solution to a problem many Minecraft players have faced and do continue to face.**
 
-## I had to add that statement up there to prevent misunderstandings.
+I had to add that statement up there to prevent misunderstandings.
 
 This mod relies on the internal code of the Carpet mod, please star the repository of the mod: https://github.com/gnembon/fabric-carpet (Giving credit where it's due)
 
