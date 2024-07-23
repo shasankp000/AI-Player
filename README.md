@@ -1,10 +1,29 @@
-  # A minecraft mod which aims to add a "second player" into the game which will actually be intelligent.
+# Read this section please.
 
-## Ever felt lonely while playing minecraft alone during that two-week phase? Well, this mod aims to solve that problem of loneliness, not just catering to this particular use case, but even (hopefully in the future) to play in multiplayer servers as well.
+This project so far is the result of thousands of hours of endless reasearch, trials and errors, and just the simple goal of eliminating loneliness from minecraft as much as possible.
+If you liked my work, please consider donating so that I can continue to work on this project in peace and can actually prove to my parents that my work is making a difference. (Also not having to ask for pocket money from mom).
 
-# Please note that this is not some sort of a commercialised AI product. This project is just a solution to a problem many Minecraft players have faced and do continue to face.
+Just know that I won't ever give up on this project.
 
-## I had to add that statement up there to prevent misunderstandings.
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/shasankp000)
+
+## Paypal
+
+[https://paypal.me/shasankp000](https://paypal.me/shasankp000)
+  
+---
+
+# Project description
+
+---
+  
+A minecraft mod which aims to add a "second player" into the game which will actually be intelligent.
+
+**Ever felt lonely while playing minecraft alone during that two-week phase? Well, this mod aims to solve that problem of loneliness, not just catering to this particular use case, but even (hopefully in the future) to play in multiplayer servers as well.**
+
+**Please note that this is not some sort of a commercialised AI product. This project is just a solution to a problem many Minecraft players have faced and do continue to face.**
+
+I had to add that statement up there to prevent misunderstandings.
 
 This mod relies on the internal code of the Carpet mod, please star the repository of the mod: https://github.com/gnembon/fabric-carpet (Giving credit where it's due)
 
@@ -33,15 +52,6 @@ Added a mod configuration menu (Still a work in progress)
 
 https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
 
-
-
-
----
-# Donations
-
-Liked my work so far? Please consider buying me a coffee so that I can work peacefully and don't have to ask my mom for pocket money.
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/shasankp000)
 
 ---
 # Usage
