@@ -1,6 +1,8 @@
 plugins {
 	id 'fabric-loom' version '1.7-SNAPSHOT'
 	id 'maven-publish'
+
+	id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
 
 version = project.mod_version
@@ -29,8 +31,6 @@ fabricApi {
 	configureDataGeneration()
 }
 
-
-
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
@@ -40,12 +40,34 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 	modImplementation 'com.github.gnembon:fabric-carpet:1.4.128'
-	implementation 'com.github.FasterXML:jackson-databind:jackson-databind-2.17.2'
 	implementation 'com.github.amithkoujalgi:ollama4j:1.0.77'
+	implementation 'com.github.FasterXML:jackson-core:jackson-core-2.17.2'
+	implementation 'com.github.FasterXML:jackson-databind:jackson-databind-2.17.2'
+	implementation 'com.github.FasterXML:jackson-datatype-jsr310:jackson-datatype-jsr310-2.8.4'
+	implementation 'com.github.FasterXML:jackson-annotations:jackson-annotations-2.17.2'
 	annotationProcessor modImplementation("io.wispforest:owo-lib:${project.owo_version}")
+	include "com.github.amithkoujalgi:ollama4j:1.0.77"
 	include "io.wispforest:owo-sentinel:${project.owo_version}"
+	include "com.github.FasterXML:jackson-databind:jackson-databind-2.17.2"
+	include "com.github.FasterXML:jackson-core:jackson-core-2.17.2"
+	include "com.github.FasterXML:jackson-datatype-jsr310:jackson-datatype-jsr310-2.8.4"
+	include "com.github.FasterXML:jackson-annotations:jackson-annotations-2.17.2"
+
 
 }
+
+shadowJar {
+	dependencies {
+		include(dependency('com.fasterxml.jackson.core:jackson-databind'))
+		include(dependency("io.wispforest:owo-sentinel:0.12.6+1.20.3"))
+		include(dependency("com.github.amithkoujalgi:ollama4j:1.0.77"))
+
+	}
+	relocate 'com.fasterxml.jackson', 'net.shasankp000.relocated.com.fasterxml.jackson'
+	relocate 'io.wispforest:owo-sentinel', 'net.shasankp000.relocated.io.wispforest:owo-sentinel'
+	relocate 'com.github.amithkoujalgi', 'net.shasankp000.relocated:com.github.amithkoujalgi'
+}
+
 
 processResources {
 	inputs.property "version", project.version
@@ -74,6 +96,8 @@ jar {
 		rename { "${it}_${project.base.archivesName.get()}"}
 	}
 }
+
+
 
 // configure the maven publication
 publishing {

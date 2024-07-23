@@ -27,7 +27,6 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import static net.shasankp000.PathFinding.PathFinder.*;
 
 
@@ -80,6 +79,8 @@ public class spawnFakePlayer {
 
                             String bot_name = StringArgumentType.getString(context, "botName");
 
+
+
                             EntityPlayerMPFake.createFake(
                                     bot_name,
                                     server,
@@ -90,6 +91,8 @@ public class spawnFakePlayer {
                                     mode,
                                     false
                             );
+
+
 
                             LOGGER.info("Spawned new bot {}!", bot_name);
 

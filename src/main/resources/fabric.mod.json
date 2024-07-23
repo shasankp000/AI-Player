@@ -3,15 +3,15 @@
 	"id": "ai-player",
 	"version": "${version}",
 	"name": "AI-Player",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "A minecraft mod which aims to add a \"second player\" into the game which will actually be intelligent.",
 	"authors": [
-		"Me!"
+		"shasankp000"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://modrinth.com/mod/ai-player",
+		"sources": "https://github.com/shasankp000/AI-player"
 	},
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/ai-player/icon.png",
 	"environment": "*",
 	"entrypoints": {
@@ -28,10 +28,12 @@
 	"depends": {
 		"fabricloader": ">=0.15.11",
 		"minecraft": "~1.20.1",
-		"java": ">=17",
+		"java": ">=21",
 		"fabric-api": "*"
 	},
 	"suggests": {
-		"another-mod": "*"
+		"carpet": "1.4.128",
+		"owo-lib": "0.12.6+1.20.3"
 	}
+
 }
