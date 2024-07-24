@@ -86,6 +86,12 @@ public class spawnFakePlayer {
 
                             LOGGER.info("Spawned new bot {}!", bot_name);
 
+                           ServerPlayerEntity bot = server.getPlayerManager().getPlayer(bot_name);
+
+                            if (bot != null) {
+                                bot.changeGameMode(mode);
+                            }
+
                             return 1;
 
 
