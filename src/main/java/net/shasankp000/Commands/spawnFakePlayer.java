@@ -3,7 +3,6 @@ package net.shasankp000.Commands;
 
 import carpet.CarpetSettings;
 
-import carpet.patches.EntityPlayerMPFake;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -20,6 +19,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 import net.shasankp000.ChatUtils.ChatUtils;
+import net.shasankp000.Entity.createFakePlayer;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,28 +29,19 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import static net.shasankp000.PathFinding.PathFinder.*;
 
-
 public class spawnFakePlayer {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-    private static class BotMovementTask implements Runnable {
-        private final MinecraftServer server;
-        private final ServerCommandSource botSource;
-        private final String botName;
-
-        public BotMovementTask(MinecraftServer server, ServerCommandSource botSource, String botName) {
-            this.server = server;
-            this.botSource = botSource;
-            this.botName = botName;
-        }
+    private record BotMovementTask(MinecraftServer server, ServerCommandSource botSource,
+                                   String botName) implements Runnable {
 
         @Override
-        public void run() {
-            stopMoving(server, botSource, botName);
-            LOGGER.info("{} has stopped walking!", botName);
+            public void run() {
+                stopMoving(server, botSource, botName);
+                LOGGER.info("{} has stopped walking!", botName);
+            }
         }
-    }
 
 
 
@@ -80,8 +71,7 @@ public class spawnFakePlayer {
                             String bot_name = StringArgumentType.getString(context, "botName");
 
 
-
-                            EntityPlayerMPFake.createFake(
+                            createFakePlayer.createFake(
                                     bot_name,
                                     server,
                                     pos,

@@ -1,15 +1,16 @@
 package net.shasankp000.FilingSystem;
 
-import io.wispforest.owo.config.Option;
 import io.wispforest.owo.config.annotation.Config;
-import io.wispforest.owo.config.annotation.Sync;
 import net.shasankp000.Exception.ollamaNotReachableException;
 
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Config(name = "settings", wrapperName = "AIPlayerConfig", saveOnModification = true)
 public class AIPlayerConfigModel {
@@ -21,6 +22,8 @@ public class AIPlayerConfigModel {
     public static String selectedModel;
 
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
+
+    public Map<String, String> BotGameProfile = new HashMap<>();
 
 
     {
@@ -34,7 +37,7 @@ public class AIPlayerConfigModel {
     }
 
 
-    // some getters and setters. For UI purpose.
+    // some getters and setters. For UI and config purpose.
 
     public String getSelectedLanguageModel() {
 
@@ -43,6 +46,16 @@ public class AIPlayerConfigModel {
 
     public void setSelectedLanguageModel(String selectedLanguageModel) {
         selectedModel = selectedLanguageModel;
+    }
+
+
+    public Map<String, String> getBotGameProfile() {
+
+        return BotGameProfile;
+    }
+
+    public void setBotGameProfile(HashMap<String, String> botGameProfile) {
+        BotGameProfile = botGameProfile;
     }
 
 }
