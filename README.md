@@ -168,13 +168,24 @@ This section is to describe the usage of the mod in-game
 
 ## Commands
 
-`/spawnBot <BotName>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
+*Main command*
 
-`/botWalk <till>` This command will make the bot walk forward for a specific amount of seconds.
+`/bot`
 
-`/botGo <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
+Sub commands: 
 
-`/tellBot <botName> <message>` This command will help you to talk to the bot.
+`spawm <botName>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
+
+`walk <botName> <till>` This command will make the bot walk forward for a specific amount of seconds.
+
+`/goTo <botName> <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
+
+`/sendAMessage <botName> <message>` This command will help you to talk to the bot.
+
+`/teleportForward <botName>` This command will teleport the bot forward by 1 positive block
+
+`/testChatMessage <botName>` A test command to make sure that the bot can send messages.
+
 
 
 
