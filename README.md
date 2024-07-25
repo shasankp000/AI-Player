@@ -197,6 +197,8 @@ Sub commands:
 
 `/testChatMessage <botName>` A test command to make sure that the bot can send messages.
 
+**Example Usage:**
 
+`/bot spawn Steve`
 
 
