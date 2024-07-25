@@ -10,6 +10,9 @@ Just know that I won't ever give up on this project.
 ## Paypal
 
 [https://paypal.me/shasankp000](https://paypal.me/shasankp000)
+
+
+**The footages for the bot conversation and config manager here in the github page is a bit outated. Check the modrinth page and download the mod to stay updated.** 
   
 ---
 
