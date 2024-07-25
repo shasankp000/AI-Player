@@ -230,7 +230,7 @@ public class createFakePlayer extends ServerPlayerEntity {
     @Override
     public void tick()
     {
-        if (this.getServer().getTicks() % 10 == 0)
+        if (Objects.requireNonNull(this.getServer()).getTicks() % 10 == 0)
         {
             this.networkHandler.syncWithPlayerPosition();
             this.getServerWorld().getChunkManager().updatePosition(this);

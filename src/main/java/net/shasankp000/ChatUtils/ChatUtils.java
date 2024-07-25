@@ -16,7 +16,7 @@ public class ChatUtils {
 
 
     public static String chooseFormatterRandom() {
-        List<String> givenList = Arrays.asList("§9", "§b", "§d", "§e", "§6", "§1", "§2", "§3", "§4", "§5");
+        List<String> givenList = Arrays.asList("§9", "§b", "§d", "§e", "§6", "§5", "§c", "§7");
         Random rand = new Random();
         return givenList.get(rand.nextInt(givenList.size()));
     }

@@ -9,10 +9,8 @@ import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
 import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
 
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 
@@ -41,16 +39,8 @@ public class ollamaClient {
     public static boolean isInitialized;
     public static AIPlayerConfigModel aiPlayerConfigModel = new AIPlayerConfigModel();
 
-    public static void getPlayerMessage() {
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(CommandManager.literal("tellBot")
-                .then(CommandManager.argument("botName", StringArgumentType.string())
-                .then(CommandManager.argument("message", StringArgumentType.greedyString()) // gets all strings including whitespaces instead of a single string.
-                        .executes(ollamaClient::execute)))));
-
-    }
-
-    private static int execute(CommandContext<ServerCommandSource> context) {
+    public static void execute(CommandContext<ServerCommandSource> context) {
         botName = StringArgumentType.getString(context, "botName");
         String message = StringArgumentType.getString(context, "message");
         MinecraftServer server = context.getSource().getServer();
@@ -63,7 +53,6 @@ public class ollamaClient {
 
         callClient(context, message);
 
-        return 1;
     }
 
     public static boolean pingOllamaServer() {

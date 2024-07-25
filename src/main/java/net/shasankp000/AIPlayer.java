@@ -28,8 +28,6 @@ public class AIPlayer implements ModInitializer {
 		LOGGER.info("Hello Fabric world!");
 
 		spawnFakePlayer.register();
-		spawnFakePlayer.additionalBotCommands();
-		ollamaClient.getPlayerMessage();
 		configCommand.register();
 
 		ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
