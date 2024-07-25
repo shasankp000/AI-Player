@@ -30,6 +30,13 @@ This mod relies on the internal code of the Carpet mod, please star the reposito
 This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/ollama4j
 
 ---
+# Download links
+
+1. From this github page, just download from the releases section or follow the steps in usage section to build and test.
+2. Modrinth: https://modrinth.com/mod/ai-player/ [Recommended as the github version is often unstable]
+3. Curseforge: Will upload soon after a few more patches and updates.
+
+---
 
 # Progress: 48%
 
@@ -56,9 +63,9 @@ https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
 ---
 # Usage
 
-## This section will guide you to setup the mod, since a distributable jar file doesn't exist yet.
+## If you want to manually build and test this project, follow from step 1.
 
-## Once the jar file is available, go directly to step 6.
+## For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
 
 Step 1. Download Java 21. 
 
