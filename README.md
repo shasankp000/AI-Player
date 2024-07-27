@@ -42,7 +42,7 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 ---
 
-# Progress: 48%
+# Progress: 49%
 
 ![image](https://github.com/shasankp000/AI-Player/assets/46317225/6b8e22e2-cf00-462a-936b-d5b6f14fb228)
 
@@ -62,6 +62,13 @@ Added a mod configuration menu (Still a work in progress)
 
 
 https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
+
+**Implemented intermediate XZ pathfinding for the bot**
+
+
+https://github.com/user-attachments/assets/687b72a2-a4a8-4ab7-8b77-7373d414bb28
+
+
 
 
 ---
