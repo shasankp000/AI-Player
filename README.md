@@ -10,12 +10,16 @@ Just know that I won't ever give up on this project.
 ## Paypal
 
 [https://paypal.me/shasankp000](https://paypal.me/shasankp000)
+
+
   
 ---
 
 # Project description
 
 ---
+
+**The footages for the bot conversation and config manager here in the github page is a bit outated. Check the modrinth page and download the mod to stay updated.** 
   
 A minecraft mod which aims to add a "second player" into the game which will actually be intelligent.
 
@@ -28,6 +32,13 @@ I had to add that statement up there to prevent misunderstandings.
 This mod relies on the internal code of the Carpet mod, please star the repository of the mod: https://github.com/gnembon/fabric-carpet (Giving credit where it's due)
 
 This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/ollama4j
+
+---
+# Download links
+
+1. From this github page, just download from the releases section or follow the steps in usage section to build and test.
+2. Modrinth: https://modrinth.com/mod/ai-player/ [Recommended as the github version is often unstable]
+3. Curseforge: Will upload soon after a few more patches and updates.
 
 ---
 
@@ -56,9 +67,9 @@ https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
 ---
 # Usage
 
-## This section will guide you to setup the mod, since a distributable jar file doesn't exist yet.
+## If you want to manually build and test this project, follow from step 1.
 
-## Once the jar file is available, go directly to step 6.
+## For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
 
 Step 1. Download Java 21. 
 
@@ -168,13 +179,26 @@ This section is to describe the usage of the mod in-game
 
 ## Commands
 
-`/spawnBot <BotName>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
+*Main command*
 
-`/botWalk <till>` This command will make the bot walk forward for a specific amount of seconds.
+`/bot`
 
-`/botGo <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
+Sub commands: 
 
-`/tellBot <botName> <message>` This command will help you to talk to the bot.
+`spawm <botName>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
 
+`walk <botName> <till>` This command will make the bot walk forward for a specific amount of seconds.
+
+`/goTo <botName> <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
+
+`/sendAMessage <botName> <message>` This command will help you to talk to the bot.
+
+`/teleportForward <botName>` This command will teleport the bot forward by 1 positive block
+
+`/testChatMessage <botName>` A test command to make sure that the bot can send messages.
+
+**Example Usage:**
+
+`/bot spawn Steve`
 
 
