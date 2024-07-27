@@ -66,7 +66,6 @@ public class createFakePlayer extends ServerPlayerEntity {
         UserCache.setUseRemote(false);
         GameProfile gameProfile;
         boolean useMojangAuth = server.isDedicated() && server.isOnlineMode();
-        System.out.println(useMojangAuth);
         AIPlayerConfigModel aiPlayerConfigModel = new AIPlayerConfigModel();
 
         try {
@@ -79,7 +78,6 @@ public class createFakePlayer extends ServerPlayerEntity {
         Map<String, String> existingBotProfile = AIPlayer.CONFIG.BotGameProfile();
 
         if (gameProfile == null) {
-            System.out.println("GP is null");
 
             System.out.println("Existing Bot Profiles: " + existingBotProfile);
 

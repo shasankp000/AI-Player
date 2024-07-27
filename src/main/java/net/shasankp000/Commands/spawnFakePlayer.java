@@ -29,20 +29,39 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import static net.shasankp000.PathFinding.PathFinder.*;
 import static net.minecraft.server.command.CommandManager.literal;
+import static net.shasankp000.PathFinding.PathTracer.tracePath;
+import carpet.helpers.EntityPlayerActionPack;
+import carpet.commands.PlayerCommand;
 
 public class spawnFakePlayer {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-    private record BotMovementTask(MinecraftServer server, ServerCommandSource botSource,
+    public record BotMovementTask(MinecraftServer server, ServerCommandSource botSource,
                                    String botName) implements Runnable {
 
         @Override
             public void run() {
+
                 stopMoving(server, botSource, botName);
+
                 LOGGER.info("{} has stopped walking!", botName);
+
             }
         }
+
+    public record BotStopTask(MinecraftServer server, ServerCommandSource botSource,
+                                  String botName) implements Runnable {
+
+        @Override
+        public void run() {
+
+            stopMoving(server, botSource, botName);
+            LOGGER.info("{} has stopped walking!", botName);
+
+
+        }
+    }
 
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
 
@@ -81,7 +100,7 @@ public class spawnFakePlayer {
                                         .then(CommandManager.argument("x-axis", IntegerArgumentType.integer())
                                                 .then(CommandManager.argument("y-axis", IntegerArgumentType.integer())
                                                         .then(CommandManager.argument("z-axis", IntegerArgumentType.integer())
-                                                                .executes(context -> { notImplementedMessage(context); return 1; })
+                                                                .executes(context -> { botGo(context); return 1; })
                                                         )
                                                 )
                                         )
@@ -218,7 +237,7 @@ public class spawnFakePlayer {
             ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
             moveForward(server, botSource, botName);
 
-            scheduler.schedule(new BotMovementTask(server, botSource, botName), travelTime, TimeUnit.SECONDS);
+            scheduler.schedule(new BotStopTask(server, botSource, botName), travelTime, TimeUnit.SECONDS);
 
 
         }
@@ -309,15 +328,19 @@ public class spawnFakePlayer {
 
             server.sendMessage(Text.literal("Finding the shortest path to the target, please wait patiently if the game seems hung"));
             // Calculate path
-            List<BlockPos> path = calculatePath(bot.getBlockPos(), new BlockPos(x_distance, y_distance , z_distance));
+            new Thread(() -> {
 
-            path = simplifyPath(path);
+                List<BlockPos> path = calculatePath(bot.getBlockPos(), new BlockPos(x_distance, y_distance , z_distance));
 
-            char axis = identifyPrimaryAxis(path);
+                path = simplifyPath(path);
 
-            LOGGER.info("Primary axis: {}", axis);
+                LOGGER.info("{}", path);
 
-            LOGGER.info("{}", path);
+                tracePath(server, botSource, botName, path);
+
+
+            }).start();
+
 
         }
 
@@ -325,7 +348,7 @@ public class spawnFakePlayer {
 
 
 
-    private static void moveForward(MinecraftServer server, ServerCommandSource source, String botName) {
+    public static void moveForward(MinecraftServer server, ServerCommandSource source, String botName) {
 
         if (source.getPlayer() != null) {
 
@@ -346,7 +369,7 @@ public class spawnFakePlayer {
 
     }
 
-    private static void stopMoving(MinecraftServer server, ServerCommandSource source, String botName) {
+    public static void stopMoving(MinecraftServer server, ServerCommandSource source, String botName) {
 
         if (source.getPlayer() != null) {
 

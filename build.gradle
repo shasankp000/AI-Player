@@ -53,6 +53,9 @@ dependencies {
 	include "com.github.FasterXML:jackson-datatype-jsr310:jackson-datatype-jsr310-2.8.4"
 	include "com.github.FasterXML:jackson-annotations:jackson-annotations-2.17.2"
 
+	dependencies {
+		implementation fileTree(dir: 'libs', include: ['*.jar'])
+	}
 
 }
 

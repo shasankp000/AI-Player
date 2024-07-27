@@ -45,7 +45,7 @@ public class PathFinder {
         return simplifiedPath;
     }
 
-    public static char identifyPrimaryAxis(List<BlockPos> path) {
+    public static List<String> identifyPrimaryAxis(List<BlockPos> path) {
         int xChanges = 0;
         int yChanges = 0;
         int zChanges = 0;
@@ -58,10 +58,31 @@ public class PathFinder {
             prevPos = pos;
         }
 
-        if (xChanges >= yChanges && xChanges >= zChanges) return 'x';
-        if (yChanges >= xChanges && yChanges >= zChanges) return 'y';
-        return 'z';
+        // Create a list to store the priority order
+        List<String> axisPriorityList = new ArrayList<>();
+
+        // Determine priority based on the number of changes
+        if (xChanges > 0 || yChanges > 0 || zChanges > 0) {
+            if (xChanges > 0) axisPriorityList.add("x");
+            if (yChanges > 0) axisPriorityList.add("y");
+            if (zChanges > 0) axisPriorityList.add("z");
+
+            // Create final copies for use in the lambda expression
+            final int finalXChanges = xChanges;
+            final int finalYChanges = yChanges;
+            final int finalZChanges = zChanges;
+
+            // Sort the list based on the number of changes
+            axisPriorityList.sort((a, b) -> {
+                int changesA = a.equals("x") ? finalXChanges : a.equals("y") ? finalYChanges : finalZChanges;
+                int changesB = b.equals("x") ? finalXChanges : b.equals("y") ? finalYChanges : finalZChanges;
+                return Integer.compare(changesB, changesA); // Sort in descending order
+            });
+        }
+
+        return axisPriorityList;
     }
+
 
     public static List<BlockPos> calculatePath(BlockPos start, BlockPos target) {
         // A* algorithm for pathfinding
