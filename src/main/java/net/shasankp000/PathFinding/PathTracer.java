@@ -83,6 +83,9 @@ public class PathTracer {
         }
 
         private void executeMovement(MovementJob job) {
+
+            System.out.println(botName + " is currently facing in " + Objects.requireNonNull(botSource.getPlayer()).getHorizontalFacing().getAxis().toString());
+
             updateFacing(server, botSource, botName, path, job.axis, Objects.requireNonNull(botSource.getPlayer()).getHorizontalFacing().getAxis().toString());
 
             BlockPos lastPos = path.get(path.size() - 1);
@@ -92,7 +95,7 @@ public class PathTracer {
 
             double travelTime = calculateTravelTime(distance);
 
-            int roundedTime = (int) ((int) Math.round(travelTime) + extraTime);
+            int roundedTime = (int) ((int) Math.round(travelTime));
 
             System.out.println(roundedTime);
 
@@ -108,7 +111,7 @@ public class PathTracer {
         }
 
         private void waitForMovementCompletion(MovementJob job) {
-            System.out.println("Waiting for movement job completion");
+          //  System.out.println("Waiting for movement job completion");
             BlockPos lastPos = path.get(path.size() - 1);
             BlockPos currentBotPos = Objects.requireNonNull(botSource.getPlayer()).getBlockPos();
 
@@ -124,11 +127,11 @@ public class PathTracer {
 
         private boolean hasReachedTarget(String axis, BlockPos currentPos, BlockPos targetPos) {
 
-            System.out.println(axis);
+           // System.out.println(axis);
             return switch (axis) {
-                case "x" -> currentPos.getX() == targetPos.getX();
+                case "x" -> currentPos.getX() > targetPos.getX();
                 case "y" -> currentPos.getY() == targetPos.getY();
-                case "z" -> currentPos.getZ() == targetPos.getZ();
+                case "z" -> currentPos.getZ() > targetPos.getZ();
                 default -> false;
             };
         }
@@ -151,26 +154,6 @@ public class PathTracer {
         }).start();
     }
 
-
-    private static void moveToNextPrimaryAxis(MinecraftServer server, ServerCommandSource botSource, String botName, List<BlockPos> path, String primaryAxis, String facingAxis, List<String> axisPriorityList) {
-        if (!axisPriorityList.isEmpty()) {
-            // Remove the reached axis from the priority list
-            axisPriorityList.remove(0);
-            if (!axisPriorityList.isEmpty()) {
-                // Update facing direction and move towards the next primary axis
-                String nextPrimaryAxis = axisPriorityList.get(0);
-                BlockPos lastPos = path.get(path.size() - 1);
-                BlockPos currentBotPos = Objects.requireNonNull(botSource.getPlayer()).getBlockPos();
-
-                int distance = calculateDistance(primaryAxis, currentBotPos, lastPos);
-
-                double travelTime = calculateTravelTime(distance);
-                updateFacing(server, botSource, botName, path, primaryAxis, facingAxis);
-                makeBotWalkForward(server, botSource, botName, travelTime);
-
-            }
-        }
-    }
 
     private static int calculateDistance(String axis, BlockPos start, BlockPos end) {
         return switch (axis) {
@@ -236,25 +219,55 @@ public class PathTracer {
 
             }
             else if(facingAxis.equals("x") && posNeg.equals("negative")) {
-                // turn left.
+                // turn west.
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look west");
                 server.getCommandManager().executeWithPrefix(botSource, "/say I am facing west now");
             }
 
             if(facingAxis.equals("z") && posNeg.equals("positive")) {
-                // turn east.
+                // turn south.
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look south");
                 server.getCommandManager().executeWithPrefix(botSource, "/say I am facing south now");
 
             }
             else if(facingAxis.equals("z") && posNeg.equals("negative")) {
-                // turn left.
+                // turn north.
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look north");
                 server.getCommandManager().executeWithPrefix(botSource, "/say I am facing north now");
             }
 
         }
 
+        else {
+
+            // In the case of execution of further jobs, when the bot is not facing in the primaryAxis, this part of the code is called.
+
+            posNeg = getPosNeg(path, primaryAxis);
+
+            if(primaryAxis.equals("x") && posNeg.equals("positive")) {
+                // turn east.
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look east");
+                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing east now");
+
+            }
+            else if(primaryAxis.equals("x") && posNeg.equals("negative")) {
+                // turn west.
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look west");
+                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing west now");
+            }
+
+            if(primaryAxis.equals("z") && posNeg.equals("positive")) {
+                // turn south.
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look south");
+                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing south now");
+
+            }
+            else if(primaryAxis.equals("z") && posNeg.equals("negative")) {
+                // turn north.
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look north");
+                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing north now");
+            }
+        }
 
 
     }
