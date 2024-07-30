@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
@@ -27,11 +28,11 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
 import static net.shasankp000.PathFinding.PathFinder.*;
 import static net.minecraft.server.command.CommandManager.literal;
 import static net.shasankp000.PathFinding.PathTracer.tracePath;
-import carpet.helpers.EntityPlayerActionPack;
-import carpet.commands.PlayerCommand;
+import static net.shasankp000.OllamaClient.ollamaClient.sendInitialResponse;
 
 public class spawnFakePlayer {
 
@@ -130,11 +131,11 @@ public class spawnFakePlayer {
 
         GameMode mode = GameMode.SURVIVAL;
 
-        String bot_name = StringArgumentType.getString(context, "botName");
+        String botName = StringArgumentType.getString(context, "botName");
 
 
         createFakePlayer.createFake(
-                bot_name,
+                botName,
                 server,
                 pos,
                 facing.y,
@@ -146,12 +147,13 @@ public class spawnFakePlayer {
 
 
 
-        LOGGER.info("Spawned new bot {}!", bot_name);
+        LOGGER.info("Spawned new bot {}!", botName);
 
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(bot_name);
+        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
 
-        if (bot != null) {
+        if (bot!=null) {
             bot.changeGameMode(mode);
+            sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
         }
 
 

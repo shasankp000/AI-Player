@@ -7,7 +7,6 @@ import net.shasankp000.Commands.configCommand;
 import net.shasankp000.Commands.spawnFakePlayer;
 
 import net.shasankp000.FilingSystem.AIPlayerConfig;
-import net.shasankp000.OllamaClient.ollamaClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +29,7 @@ public class AIPlayer implements ModInitializer {
 		spawnFakePlayer.register();
 		configCommand.register();
 
-		// ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
+		ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
 	}
 
 	private static void onServerStarted(MinecraftServer minecraftServer) {

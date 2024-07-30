@@ -14,20 +14,30 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 
+import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
 import net.shasankp000.ChatUtils.ChatUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static net.shasankp000.PathFinding.PathFinder.calculatePath;
+import static net.shasankp000.PathFinding.PathTracer.tracePath;
+import static net.shasankp000.PathFinding.PathFinder.simplifyPath;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.http.HttpTimeoutException;
 
 
-import java.util.List;
+import java.util.*;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
 import net.shasankp000.FilingSystem.AIPlayerConfigModel;
+import net.shasankp000.ChatUtils.NLPProcessor;
+import net.shasankp000.ChatUtils.NLPProcessor.Intent;
+
 
 public class ollamaClient {
 
@@ -38,20 +48,111 @@ public class ollamaClient {
     public static String botName = "Steve";
     public static boolean isInitialized;
     public static AIPlayerConfigModel aiPlayerConfigModel = new AIPlayerConfigModel();
+    public static String initialResponse = "";
 
 
     public static void execute(CommandContext<ServerCommandSource> context) {
         botName = StringArgumentType.getString(context, "botName");
+        ServerPlayerEntity bot = context.getSource().getServer().getPlayerManager().getPlayer(botName);
         String message = StringArgumentType.getString(context, "message");
         MinecraftServer server = context.getSource().getServer();
         ServerCommandSource playerSource = server.getCommandSource();
+        ServerCommandSource botSource = Objects.requireNonNull(server.getPlayerManager().getPlayer(botName)).getCommandSource().withSilent().withMaxLevel(4);
         String formatter = ChatUtils.chooseFormatterRandom();
 
-        server.getCommandManager().executeWithPrefix(playerSource, "/say "+ formatter + message);
-        LOGGER.info("Player sent a message: {}", message);
+        Intent intent = Intent.UNSPECIFIED;
+        String entityMessage = "";
+        List<String> entities = List.of();
+
+        new Thread( () -> {
+
+            server.getCommandManager().executeWithPrefix(playerSource, "/say " + formatter + message);
+            LOGGER.info("Player sent a message: {}", message);
+
+            server.getCommandManager().executeWithPrefix(botSource, "/say Processing your message, please wait.");
+
+        } ).start();
+
+        try {
+
+            NLPProcessor nlpProcessor = NLPProcessor.getInstance();
+            Map<Intent, List<String>> intentsAndEntities = nlpProcessor.runNlpTask(message);
+
+            for (Map.Entry<Intent, List<String>> entry : intentsAndEntities.entrySet()) {
+                intent = entry.getKey();
+                //       entityMessage = entry.getValue().isEmpty() ? "No entities detected" : entry.getValue().get(0);
+                entities = entry.getValue();
+
+//                    server.getCommandManager().executeWithPrefix(botSource, "/say Intent: " + intent.toString());
+//                    server.getCommandManager().executeWithPrefix(botSource, "/say Detected Entities: " + entityMessage);
+            }
+
+            if (intent.equals(Intent.GENERAL_CONVERSATION)) {
+
+                callClient(context, message);
+            }
+            else if ( intent.equals(Intent.ASK_INFORMATION) ) {
+
+                callClient(context, message);
+
+            }
+            else if (intent.equals(Intent.REQUEST_ACTION)) {
+                Set<String> moveSynonymsMap = NLPProcessor.SYNONYM_MAP.get("move");
+                Set<String> coordsSynonymsMap = NLPProcessor.SYNONYM_MAP.get("coordinates");
+                List<String> moveSynonymsList = moveSynonymsMap.stream().toList();
+                List<String> coordsSynonymsList = coordsSynonymsMap.stream().toList();
+
+                System.out.println(entities);
+                System.out.println(moveSynonymsList);
+                System.out.println(coordsSynonymsList);
+
+                boolean moveDetected = entities.stream().anyMatch(entity -> moveSynonymsList.contains(entity.toLowerCase()));
+                boolean coordsDetected = entities.stream().anyMatch(entity -> coordsSynonymsList.contains(entity.toLowerCase()));
+
+                System.out.println(moveDetected);
+                System.out.println(coordsDetected);
+
+                if (moveDetected || coordsDetected) {
+                    // Extract the numerical coordinates
+                    // Extract the "coordinates: ..." part from entities
+                    List<String> coordsNumbers = entities.stream()
+                            .filter(entity -> entity.matches("-?[0-9]+"))
+                            .collect(Collectors.toList());
+
+                    // Combine numbers into a coordinate string
+                    String coordsString = String.join(", ", coordsNumbers);
+                    System.out.println("Detected Coordinates: " + coordsString);
+
+                    // Split and parse the coordinates
+                    String[] coordsArray = coordsString.split(",\\s*"); // or "\\s+" for space-separated
+                    List<Integer> coordsList = Arrays.stream(coordsArray)
+                            .map(Integer::parseInt)
+                            .collect(Collectors.toList());
+
+                    // Example usage: printing the coordinates
+                    coordsList.forEach(System.out::println);
+
+                    int x = coordsList.get(0);
+                    int y = coordsList.get(1);
+                    int z = coordsList.get(2);
 
 
-        callClient(context, message);
+                    ChatUtils.sendChatMessages(botSource, "Moving to coordinates: " + coordsString + ".");
+
+                    assert bot != null;
+                    List<BlockPos> path = calculatePath(bot.getBlockPos(), new BlockPos(x, y, z));
+                    path = simplifyPath(path);
+                    tracePath(server, botSource, botName, path);
+
+                }
+            }
+
+
+        } catch (Exception e) {
+            LOGGER.error("Error processing message with NLP: ", e);
+            ChatUtils.sendChatMessages(botSource, "Seems like my Natural Language Processor ran into some issues. I am unable to understand what you just said.");
+        }
+
 
     }
 
@@ -107,33 +208,33 @@ public class ollamaClient {
             }
 
             LOGGER.info("MinecraftServer is not null. Proceeding to find player...");
-
-            // Wait until any player is available
-            ServerPlayerEntity player = null;
-            int maxWaitTime = 10000; // Max wait time of 10 seconds
-            int waitInterval = 100; // Check every 100 milliseconds
-            int waitedTime = 0;
-
-            while (player == null && waitedTime < maxWaitTime) {
-                player = findAnyPlayer(server);
-                if (player == null) {
-                    try {
-                        LOGGER.info("Player not found yet, waiting...");
-                        Thread.sleep(waitInterval);
-                    } catch (InterruptedException e) {
-                        LOGGER.error("Waiting for player interrupted: {}", e.getMessage());
-                        return;
-                    }
-                    waitedTime += waitInterval;
-                }
-            }
-
-            if (player == null) {
-                LOGGER.error("No player found after waiting for {} seconds.", maxWaitTime / 1000);
-                return;
-            }
-
-            LOGGER.info("Player found: {}", player.getName().getString());
+//
+//            // Wait until any player is available
+//            ServerPlayerEntity player = null;
+//            int maxWaitTime = 10000; // Max wait time of 10 seconds
+//            int waitInterval = 100; // Check every 100 milliseconds
+//            int waitedTime = 0;
+//
+//            while (player == null && waitedTime < maxWaitTime) {
+//                player = findAnyPlayer(server);
+//                if (player == null) {
+//                    try {
+//                        LOGGER.info("Player not found yet, waiting...");
+//                        Thread.sleep(waitInterval);
+//                    } catch (InterruptedException e) {
+//                        LOGGER.error("Waiting for player interrupted: {}", e.getMessage());
+//                        return;
+//                    }
+//                    waitedTime += waitInterval;
+//                }
+//            }
+//
+//            if (player == null) {
+//                LOGGER.error("No player found after waiting for {} seconds.", maxWaitTime / 1000);
+//                return;
+//            }
+//
+//            LOGGER.info("Player found: {}", player.getName().getString());
 
             int maxRetries = 3;
             int retryCount = 0;
@@ -177,10 +278,22 @@ public class ollamaClient {
                         chatHistory = chatResult.getChatHistory();
 
                         LOGGER.info("API call to Ollama completed successfully.");
-                        ServerCommandSource playerSource = player.getCommandSource();
-                        server.getCommandManager().executeWithPrefix(playerSource, "/say §9Sent message to "+ botName + " successfully! Please give him some time to respond.");
+                        server.sendMessage(Text.of(" §9Sent message to "+ botName + " successfully! Please give him some time to respond."));
 
                     }
+
+                    new Thread( () -> {
+
+                        // Make the bot say the initial response
+                        if (chatResult != null && !chatResult.getResponse().isEmpty()) {
+                            System.out.println("Not null");
+                            initialResponse = chatResult.getResponse();
+                        }
+                        else {
+                            System.out.println("null");
+                        }
+
+                    } ).start();
 
                     LOGGER.info("Ollama Client initialized successfully");
                     initialized = true;
@@ -188,12 +301,11 @@ public class ollamaClient {
                 } catch (HttpTimeoutException e) {
                     retryCount++;
                     LOGGER.error("Failed to initialize Ollama Client: request timed out (attempt {}/{})", retryCount, maxRetries);
-                    ServerCommandSource playerSource = player.getCommandSource();
-                    server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink, request timed out (attempt " + retryCount + "/" + maxRetries + ")");
+                    server.sendMessage(Text.of("§c§lFailed to establish uplink, request timed out (attempt " + retryCount + "/" + maxRetries + ")"));
                     isInitialized = false;
                     if (retryCount >= maxRetries) {
                         LOGGER.error("Max retry attempts reached. Initialization failed.");
-                        server.getCommandManager().executeWithPrefix(playerSource, "/say §c§lFailed to establish uplink. Try checking the status of ollama server. Try running the model in ollama CLI once then re-run the game.");
+                        server.sendMessage(Text.of("§c§lFailed to establish uplink. Try checking the status of ollama server. Try running the model in ollama CLI once then re-run the game."));
                         throw new RuntimeException(e);
                     }
                 } catch (OllamaBaseException | InterruptedException | IOException e) {
@@ -204,19 +316,24 @@ public class ollamaClient {
         });
     }
 
-    // Helper function to find any player on the server
-    private static ServerPlayerEntity findAnyPlayer(MinecraftServer server) {
-        LOGGER.info("Finding any player...");
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            if (player != null) {
-                LOGGER.info("Player found: {}", player.getName().getString());
-                return player;
-            }
-        }
-        LOGGER.info("No players found.");
-        return null;
-    }
+// //    Helper function to find any player on the server
+//    private static ServerPlayerEntity findAnyPlayer(MinecraftServer server) {
+//        LOGGER.info("Finding any player...");
+//        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+//            if (player != null) {
+//                LOGGER.info("Player found: {}", player.getName().getString());
+//                return player;
+//            }
+//        }
+//        LOGGER.info("No players found.");
+//        return null;
+//    }
 
+    public static void sendInitialResponse(ServerCommandSource botSource) {
+
+        ChatUtils.sendChatMessages(botSource, initialResponse);
+
+    }
 
 
 
@@ -230,6 +347,7 @@ public class ollamaClient {
 
                 String botName = StringArgumentType.getString(context, "botName");
                 LOGGER.info("Bot name: {}", botName);
+
 
                 MinecraftServer server = context.getSource().getServer();
                 ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
@@ -270,9 +388,6 @@ public class ollamaClient {
 
         });
     }
-
-
-
 
 }
 
