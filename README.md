@@ -42,7 +42,7 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 ---
 
-# Progress: 49%
+# Progress: 50%
 
 ![image](https://github.com/shasankp000/AI-Player/assets/46317225/6b8e22e2-cf00-462a-936b-d5b6f14fb228)
 
@@ -68,7 +68,10 @@ https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
 
 https://github.com/user-attachments/assets/687b72a2-a4a8-4ab7-8b77-7373d414bb28
 
+**Implemented Natural Language Processing for the bot to understand the intention and context of the user input and execute methods**
+Can only understand if you want the bot to go some coordinates.
 
+https://vimeo.com/992051891?share=copy
 
 
 ---
