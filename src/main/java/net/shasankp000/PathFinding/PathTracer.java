@@ -24,6 +24,7 @@ public class PathTracer {
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final double WALKING_SPEED = 4.317; // Blocks per second
     private static final double extraTime = 9.79; // Extra time due to gradual stopping. Need to do something about this.
+    private static boolean isMoving = false;
 
     public static class MovementJob implements Comparable<MovementJob> {
         String axis;
@@ -38,6 +39,10 @@ public class PathTracer {
         public int compareTo(MovementJob other) {
             return Integer.compare(this.priority, other.priority);
         }
+    }
+
+    public static boolean getBotMovementStatus() {
+        return isMoving;
     }
 
     public static Map<String, Integer> assignPriority(List<String> axisPriorityList) {
@@ -76,8 +81,10 @@ public class PathTracer {
             if (!jobQueue.isEmpty()) {
                 MovementJob job = jobQueue.poll();
                 executeMovement(job);
+                isMoving = true;
             }
             else {
+                isMoving = false;
                 LOGGER.info("No more jobs to process");
             }
         }
@@ -272,19 +279,4 @@ public class PathTracer {
 
     }
 
-    private static void moveBotInAxis(ServerCommandSource botSource, String botName, int delta, char axis) {
-        // Implement movement logic here
-        // For example, you could use the Carpet mod's move command:
-        String direction;
-        if (delta > 0) {
-            direction = (axis == 'x' ? "right" : axis == 'y' ? "up" : "forward");
-            System.out.println(direction);
-        } else {
-            direction = (axis == 'x' ? "left" : axis == 'y' ? "down" : "back");
-            System.out.println(direction);
-        }
-
-//        botSource.getServer().getCommandManager().executeWithPrefix(botSource.withLevel(2),
-//                String.format("/player %s move %s", botName, direction));
-    }
 }

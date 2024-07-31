@@ -6,7 +6,6 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
@@ -19,11 +18,14 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 import net.shasankp000.ChatUtils.ChatUtils;
+import net.shasankp000.Entity.AutoFaceEntity;
+import net.shasankp000.Entity.RayCasting;
 import net.shasankp000.Entity.createFakePlayer;
 import net.shasankp000.OllamaClient.ollamaClient;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -114,6 +116,18 @@ public class spawnFakePlayer {
                                         )
                                 )
                         )
+                        .then(literal("detectEntities")
+                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                                                .executes(context -> {
+                                                    String botName = StringArgumentType.getString(context,"botName");
+                                                    ServerPlayerEntity bot = context.getSource().getServer().getPlayerManager().getPlayer(botName);
+                                                    if (bot != null) {
+                                                        RayCasting.detect(bot);
+                                                    }
+                                                    return 1;
+                                                })
+                                )
+                        )
         ));
     }
 
@@ -154,6 +168,14 @@ public class spawnFakePlayer {
         if (bot!=null) {
             bot.changeGameMode(mode);
             sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+
+            try {
+                Thread.sleep(1500);
+                AutoFaceEntity.startAutoFace(bot);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
         }
 
 

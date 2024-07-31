@@ -29,7 +29,7 @@ public class AIPlayer implements ModInitializer {
 		spawnFakePlayer.register();
 		configCommand.register();
 
-		ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
+		//ServerLifecycleEvents.SERVER_STARTED.register(AIPlayer::onServerStarted);
 	}
 
 	private static void onServerStarted(MinecraftServer minecraftServer) {

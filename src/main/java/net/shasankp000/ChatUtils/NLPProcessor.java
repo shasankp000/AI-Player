@@ -1,40 +1,9 @@
 package net.shasankp000.ChatUtils;
 
-import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
-import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestBuilder;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestModel;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatResult;
-import io.github.amithkoujalgi.ollama4j.core.utils.PromptBuilder;
-import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-
-import java.io.IOException;
 import java.util.*;
 
 
 public class NLPProcessor {
-
-    private static final String HOST = "http://localhost:11434/";
-    private static OllamaAPI ollamaAPI;
-
-    // Private constructor to prevent instantiation
-    private NLPProcessor() {
-        ollamaAPI = new OllamaAPI(HOST);
-        ollamaAPI.setRequestTimeoutSeconds(90);
-    }
-
-    // Singleton instance holder
-    private static class NLPProcessorHolder {
-        private static final NLPProcessor INSTANCE = new NLPProcessor();
-    }
-
-    public static NLPProcessor getInstance() {
-        return NLPProcessorHolder.INSTANCE;
-    }
-
 
     public static final Map<String, String> INTENT_KEYWORDS = Map.<String, String>ofEntries(
             // Movement
@@ -220,7 +189,7 @@ public class NLPProcessor {
 
     static {
         // Movement-related actions
-        SYNONYM_MAP.put("move", new HashSet<>(Arrays.asList("go", "walk", "run", "travel", "proceed", "advance", "head", "step", "march")));
+        SYNONYM_MAP.put("move", new HashSet<>(Arrays.asList("go", "walk", "run", "travel", "proceed", "advance", "head", "step", "march", "explore")));
         SYNONYM_MAP.put("stop", new HashSet<>(Arrays.asList("halt", "pause", "cease", "stand", "stay", "wait")));
 
         // Attack and combat-related actions
@@ -269,20 +238,8 @@ public class NLPProcessor {
     public static Map<Intent, List<String>> runNlpTask(String userInput) {
         Map<Intent, List<String>> intentsAndEntities = new HashMap<>();
 
-        // Generate and process intent prompt
-        String intentPrompt = buildIntentPrompt(userInput);
-        String intentResponse = processInput(intentPrompt);
-
-        System.out.println(intentResponse);
-
         // Recognize the intent from the response
         Intent recognizedIntent = recognizeIntent(userInput);
-
-        System.out.println(recognizedIntent);
-
-        // Generate and process entity extraction prompt
-        // String entityPrompt = buildEntityExtractionPrompt(userInput);
-        // String entityResponse = processInput(entityPrompt);
 
         // Extract entities from the response
         List<String> entitiesFromPrompt = extractEntities(userInput);
@@ -292,33 +249,6 @@ public class NLPProcessor {
         return intentsAndEntities;
     }
 
-    private static String processInput(String prompt) {
-        PromptBuilder promptBuilder = new PromptBuilder().addLine(prompt);
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.PHI3);
-
-        OllamaChatRequestModel requestModel = builder
-                .withMessage(OllamaChatMessageRole.SYSTEM, promptBuilder.build())
-                .withMessage(OllamaChatMessageRole.USER, prompt)
-                .build();
-
-        OllamaChatResult chatResult;
-        try {
-            chatResult = ollamaAPI.chat(requestModel);
-        } catch (OllamaBaseException | IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        return chatResult.getResponse();
-    }
-
-    private static String buildIntentPrompt(String userInput) {
-        return "You are an NLP processing agent within the context of Minecraft. Your task is to analyze the user's input and determine the intent. " +
-                userInput + "Classify commands into the following intents: REQUEST_ACTION, ASK_INFORMATION, GENERAL_CONVERSATION, UNSPECIFIED. " +
-                "Consider synonyms and context-specific phrases such as 'go' for 'move', 'defeat' for 'attack', irrespective of lower/upper case, " +
-                "'gather' for 'collect', etc. For questions starting with 'what', 'how', 'why', 'when', 'who', irrespective of lower/upper case, classify as ASK_INFORMATION. " +
-                "Identify directional words like 'front', 'back', 'left', 'right', 'up', 'down', and their synonyms as entities irrespective of lower/upper case. " +
-                "Also, recognize any sequences of numbers, positive or negative as potential coordinates or numerical entities within the context of Minecraft. If you detect negative numbers, do not change them to positive. Return them as coordinates exactly as is." +
-                "Respond in the format: Intent: [intent]. Detected Entities: [entities]. Also rate your own results with an accuracy percentage. Answer in the format: Accuracy: 10% for example.";
-    }
 
     private static Intent recognizeIntent(String userInput) {
         String[] words = userInput.split("\\s+");
@@ -427,156 +357,6 @@ public class NLPProcessor {
         return false;
     }
 
-    public static void handleEntities(Intent intent, List<String> entities) {
-        switch (intent) {
-            case REQUEST_ACTION:
-                handleRequestActionEntities(entities);
-                break;
-            case ASK_INFORMATION:
-                handleAskInformationEntities(entities);
-                break;
-            case GENERAL_CONVERSATION:
-                handleGeneralConversationEntities(entities);
-                break;
-            default:
-                System.out.println("Unhandled intent: " + intent);
-        }
-    }
-
-    private static void handleRequestActionEntities(List<String> entities) {
-        Set<String> uniqueEntities = new HashSet<>(entities);
-        List<String> nonActionDescriptors = List.of("coordinates");
-
-        String coordinate = null;
-        String targetObject = null;
-        String primaryAction = null;
-
-        for (String entity : uniqueEntities) {
-            if (entity.matches("-?\\d+\\s+-?\\d+\\s+-?\\d+")) {
-                coordinate = entity;
-            } else if (nonActionDescriptors.contains(entity.toLowerCase())) {
-                continue;
-            } else if (entity.equalsIgnoreCase("move")) {
-                primaryAction = "move";
-            } else if (entity.equalsIgnoreCase("mine")) {
-                primaryAction = "mine";
-            } else if (entity.equalsIgnoreCase("check")) {
-                primaryAction = "check";
-            } else if (entity.equalsIgnoreCase("build")) {
-                primaryAction = "build";
-            } else if (entity.equalsIgnoreCase("craft")) {
-                primaryAction = "craft";
-            } else if (entity.equalsIgnoreCase("attack")) {
-                primaryAction = "attack";
-            } else {
-                targetObject = entity; // Capture the target object like "stone block"
-            }
-        }
-
-        if (primaryAction != null) {
-            switch (primaryAction) {
-                case "move":
-                    dummyMoveAction();
-                    break;
-                case "mine":
-                    if (targetObject != null) {
-                        System.out.println("Mining the " + targetObject + "...");
-                    }
-                    dummyMineAction();
-                    break;
-                case "check":
-                    dummyCheckAction();
-                    break;
-                case "build":
-                    dummyBuildAction();
-                    break;
-                case "craft":
-                    dummyCraftAction();
-                    break;
-                case "attack":
-                    dummyAttackAction();
-                    break;
-                default:
-                    System.out.println("Unknown action: " + primaryAction);
-            }
-        }
-
-        if (coordinate != null) {
-            System.out.println("Navigating to coordinates: " + coordinate);
-        }
-    }
-
-
-
-    private static void handleAskInformationEntities(List<String> entities) {
-        for (String entity : entities) {
-            if (entity.equalsIgnoreCase("check")) {
-                dummyCheckAction();
-            } else {
-                System.out.println("Unhandled information request: " + entity);
-            }
-        }
-    }
-
-    private static void handleGeneralConversationEntities(List<String> entities) {
-        System.out.println("Handling general conversation...");
-        // Add logic for general conversation if needed
-    }
-
-    public static void dummyMoveAction() {
-        System.out.println("Executing dummy move action...");
-    }
-
-    public static void dummyMineAction() {
-        System.out.println("Executing dummy mine action...");
-    }
-
-    public static void dummyCheckAction() {
-        System.out.println("Executing dummy check action...");
-    }
-
-    public static void dummyBuildAction() {
-        System.out.println("Executing dummy build action...");
-    }
-
-    public static void dummyCraftAction() {
-        System.out.println("Executing dummy craft action...");
-    }
-
-    public static void dummyAttackAction() {
-        System.out.println("Executing dummy attack action...");
-    }
-
-    public static void dummyCoordinateAction(String coordinates) {
-        System.out.println("Navigating to coordinates: " + coordinates);
-    }
-
-
-//    public static void main(String[] args) {
-//        NLPProcessor ignored = new NLPProcessor();
-//        Scanner scanner = new Scanner(System.in);
-//
-//        while (true) {
-//            System.out.print("Enter message: ");
-//            String userInput = scanner.nextLine().trim();
-//
-//            Map<NLPProcessor.Intent, List<String>> intentsAndEntities = runNlpTask(userInput);
-//
-//            for (Map.Entry<NLPProcessor.Intent, List<String>> entry : intentsAndEntities.entrySet()) {
-//                System.out.println("Recalculated Intent: " + entry.getKey());
-//                System.out.println("Entities: " + entry.getValue());
-//
-//                handleEntities(entry.getKey(), entry.getValue());
-//            }
-//
-//            System.out.println("Enter 'exit' to quit.");
-//            String exitInput = scanner.nextLine().trim();
-//            if (exitInput.equalsIgnoreCase("exit")) {
-//                break;
-//            }
-//        }
-//        scanner.close();
-//    }
 
     public enum Intent {
         REQUEST_ACTION,

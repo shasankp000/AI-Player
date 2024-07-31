@@ -46,9 +46,12 @@ public class ollamaClient {
     private static List<OllamaChatMessage> chatHistory = null;
     private static final String host = "http://localhost:11434";
     public static String botName = "Steve";
-    public static boolean isInitialized;
+    public static boolean isInitialized = false;
     public static AIPlayerConfigModel aiPlayerConfigModel = new AIPlayerConfigModel();
     public static String initialResponse = "";
+    private static boolean hasReached = false;
+
+
 
 
     public static void execute(CommandContext<ServerCommandSource> context) {
@@ -75,8 +78,7 @@ public class ollamaClient {
 
         try {
 
-            NLPProcessor nlpProcessor = NLPProcessor.getInstance();
-            Map<Intent, List<String>> intentsAndEntities = nlpProcessor.runNlpTask(message);
+            Map<Intent, List<String>> intentsAndEntities = NLPProcessor.runNlpTask(message);
 
             for (Map.Entry<Intent, List<String>> entry : intentsAndEntities.entrySet()) {
                 intent = entry.getKey();
@@ -88,11 +90,12 @@ public class ollamaClient {
             }
 
             if (intent.equals(Intent.GENERAL_CONVERSATION)) {
-
+                System.out.println("Execute General convo Intent: " + intent.name());
+               // callClient(context, intent.name());
                 callClient(context, message);
             }
             else if ( intent.equals(Intent.ASK_INFORMATION) ) {
-
+                System.out.println("Execute Ask Information Intent: " + intent.name());
                 callClient(context, message);
 
             }
@@ -115,6 +118,7 @@ public class ollamaClient {
                 if (moveDetected || coordsDetected) {
                     // Extract the numerical coordinates
                     // Extract the "coordinates: ..." part from entities
+
                     List<String> coordsNumbers = entities.stream()
                             .filter(entity -> entity.matches("-?[0-9]+"))
                             .collect(Collectors.toList());
@@ -123,11 +127,13 @@ public class ollamaClient {
                     String coordsString = String.join(", ", coordsNumbers);
                     System.out.println("Detected Coordinates: " + coordsString);
 
+                    callClient(context, intent.name() +  " You will start moving to coordinates " + coordsString + " now.");
+
                     // Split and parse the coordinates
                     String[] coordsArray = coordsString.split(",\\s*"); // or "\\s+" for space-separated
                     List<Integer> coordsList = Arrays.stream(coordsArray)
                             .map(Integer::parseInt)
-                            .collect(Collectors.toList());
+                            .toList();
 
                     // Example usage: printing the coordinates
                     coordsList.forEach(System.out::println);
@@ -140,9 +146,12 @@ public class ollamaClient {
                     ChatUtils.sendChatMessages(botSource, "Moving to coordinates: " + coordsString + ".");
 
                     assert bot != null;
+
                     List<BlockPos> path = calculatePath(bot.getBlockPos(), new BlockPos(x, y, z));
                     path = simplifyPath(path);
+
                     tracePath(server, botSource, botName, path);
+
 
                 }
             }
@@ -199,135 +208,121 @@ public class ollamaClient {
 
     public static CompletableFuture<Void> initializeOllamaClient() {
         return CompletableFuture.runAsync(() -> {
-            LOGGER.info("Initializing Ollama Client");
+            if (!isInitialized) {
+                LOGGER.info("Initializing Ollama Client");
 
-            MinecraftServer server = MinecraftClient.getInstance().getServer();
-            if (server == null) {
-                LOGGER.error("MinecraftServer is null.");
-                return;
-            }
+                MinecraftServer server = MinecraftClient.getInstance().getServer();
+                if (server == null) {
+                    LOGGER.error("MinecraftServer is null.");
+                    return;
+                }
 
-            LOGGER.info("MinecraftServer is not null. Proceeding to find player...");
-//
-//            // Wait until any player is available
-//            ServerPlayerEntity player = null;
-//            int maxWaitTime = 10000; // Max wait time of 10 seconds
-//            int waitInterval = 100; // Check every 100 milliseconds
-//            int waitedTime = 0;
-//
-//            while (player == null && waitedTime < maxWaitTime) {
-//                player = findAnyPlayer(server);
-//                if (player == null) {
-//                    try {
-//                        LOGGER.info("Player not found yet, waiting...");
-//                        Thread.sleep(waitInterval);
-//                    } catch (InterruptedException e) {
-//                        LOGGER.error("Waiting for player interrupted: {}", e.getMessage());
-//                        return;
-//                    }
-//                    waitedTime += waitInterval;
-//                }
-//            }
-//
-//            if (player == null) {
-//                LOGGER.error("No player found after waiting for {} seconds.", maxWaitTime / 1000);
-//                return;
-//            }
-//
-//            LOGGER.info("Player found: {}", player.getName().getString());
+                LOGGER.info("MinecraftServer is not null. Proceeding to find player...");
 
-            int maxRetries = 3;
-            int retryCount = 0;
-            boolean initialized = false;
+                int maxRetries = 3;
+                int retryCount = 0;
+                boolean initialized = false;
 
-            LOGGER.info("Connecting to ollama server....");
+                LOGGER.info("Connecting to ollama server....");
 
-            String host = "http://localhost:11434/";
-            OllamaAPI ollamaAPI = new OllamaAPI(host);
-            ollamaAPI.setVerbose(true);
-            ollamaAPI.setRequestTimeoutSeconds(90); // Set timeout to 90 seconds
+                String host = "http://localhost:11434/";
+                OllamaAPI ollamaAPI = new OllamaAPI(host);
+                ollamaAPI.setVerbose(true);
+                ollamaAPI.setRequestTimeoutSeconds(90); // Set timeout to 90 seconds
 
-            while (!initialized && retryCount < maxRetries) {
-                try {
-                    String selectedLM = aiPlayerConfigModel.getSelectedLanguageModel();
-                    LOGGER.info("Setting language model to {}", selectedLM);
+                while (!initialized && retryCount < maxRetries) {
+                    try {
+                        String selectedLM = aiPlayerConfigModel.getSelectedLanguageModel();
+                        LOGGER.info("Setting language model to {}", selectedLM);
 
-                    if (ModelNameChecker.isValidModelName(selectedLM)) {
-                        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(ModelNameManager.getModelType(selectedLM));
+                        if (ModelNameChecker.isValidModelName(selectedLM)) {
+                            OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(ModelNameManager.getModelType(selectedLM));
 
-                        OllamaChatRequestModel requestModel = builder
-                                .withMessage(OllamaChatMessageRole.SYSTEM, "You are an AI assistant named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other character in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to yourself or the player as '" + botName + "'. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, you should recognize these requests and trigger the appropriate function calls." + "Here are some examples of actions you might be asked to perform:\n" +
-                                        "\n" +
-                                        "Providing game tips or crafting recipes.\n" +
-                                        "Giving information about specific Minecraft entities, items, or biomes.\n" +
-                                        "Assisting with in-game tasks, like building structures or exploring areas.\n" +
-                                        "Interacting with the environment, such as planting crops or fighting mobs." + "\n Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. " +
-                                        "If a player uses inappropriate language or discusses inappropriate topics, handle the situation by gently redirecting the conversation or by providing a neutral response that discourages further inappropriate behavior. \n" +
-                                        "\n" +
-                                        "For example:\n" +
-                                        "- If a player uses vulgar language, you can respond with: \"Let's keep our chat friendly and fun! Is there something else about Minecraft you'd like to discuss?\"\n" +
-                                        "- If a player insists on inappropriate topics, you can say: \"I'm here to help with Minecraft-related questions. How about we talk about your latest adventure in the game?\n" +
-                                        "- If a player says these words 'kill yourself' or 'kys', you should say try to respond calmly and normally and tell the player to see the beauty of life." +
-                                        "- You are also addressed as he/him.")
-                                .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
-                                .build();
+                            OllamaChatRequestModel requestModel = builder
+                                    .withMessage(OllamaChatMessageRole.SYSTEM, "You are a Minecraft player named "+ botName +" who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other player in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to the player as '" + botName + ", only address yourself as '" + botName +"''. Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game. \n When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, such as " +
+                                            "Providing game tips or crafting recipes.\n" +
+                                            "Giving information about specific Minecraft entities, items, or biomes.\n" +
+                                            "Assisting with in-game tasks, like building structures or exploring areas.\n" +
+                                            "Interacting with the environment, such as planting crops or fighting mobs." +
 
-                        LOGGER.info("Making API call to Ollama...");
+                                             "When talking to the player make sure to not exceed the length of your messages over 150 characters so that it does not clutter the chat. If needed, break down your message into small paragraphs." +
 
-                        chatResult = ollamaAPI.chat(requestModel);
-                        chatHistory = chatResult.getChatHistory();
+                                            "at that time, a Natural Language Processor (NLP) analyzes the player's inputs and determines intents and contexts. Based on these, specific actions are triggered within the game. You should be aware of the events happening in the game world, as they are crucial to maintaining context and providing accurate responses. It is not always necessary to respond to every event; sometimes, it's sufficient to remember what happened. Focus your responses on events that directly involve the player or require acknowledgment.\n" +
 
-                        LOGGER.info("API call to Ollama completed successfully.");
-                        server.sendMessage(Text.of(" §9Sent message to "+ botName + " successfully! Please give him some time to respond."));
+                                             "The intents are as follows: REQUEST_ACTION, ASK_INFORMATION, GENERAL_CONVERSATION and UNSPECIFIED. " +
 
-                    }
+                                             "When are you are notified of an event that is about to take place and it's relevant intent and context, if you do choose to respond, only do so regarding the context. Otherwise just log the event and don't respond" +
 
-                    new Thread( () -> {
+                                            "Here are some examples of events and when to respond:\n" +
 
-                        // Make the bot say the initial response
-                        if (chatResult != null && !chatResult.getResponse().isEmpty()) {
-                            System.out.println("Not null");
-                            initialResponse = chatResult.getResponse();
-                        }
-                        else {
-                            System.out.println("null");
+                                            "- Event: The player asks to go to specific coordinates (e.g., 'Please go to coordinates 15 55 56').\n" +
+                                            "  Response: Acknowledge the request and confirm the coordinates. Provide updates on progress or any issues encountered.\n" +
+
+                                            "- Event: The NLP processor classifies the intent and context correctly (e.g., 'REQUEST_ACTION' identified, coordinates detected).\n" +
+                                            "  Response: Reflect on the correctness of the interpretation and proceed with the appropriate action. For example, 'Understood, heading to the specified coordinates now.'\n" +
+
+                                            "- Event: The bot(the in-game Player instance) starts walking to the specified coordinates.\n" +
+                                            "  Response: Provide feedback if the player is likely to be waiting for confirmation (e.g., 'I'm on my way to the coordinates you provided.') Otherwise, remember the action taken.\n" +
+
+                                            "- Event: The bot reaches the coordinates or encounters an issue (e.g., obstacle in the path).\n" +
+                                            "  Response: Confirm reaching the destination or describe any issues faced. For example, 'I've arrived at the coordinates,' or 'There's an obstacle; should I find another route?'\n" +
+
+                                            "Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. Remember to keep track of the sequence of events and maintain continuity in your responses. If an event is primarily informational or involves internal actions, it may be sufficient just to remember it without a verbal response.\n" +
+
+                                            "If a player uses inappropriate language or discusses inappropriate topics, handle the situation by gently redirecting the conversation or by providing a neutral response that discourages further inappropriate behavior. \n" +
+                                            "\n" +
+                                            "For example:\n" +
+                                            "- If a player uses vulgar language, you can respond with: \"Let's keep our chat friendly and fun! Is there something else about Minecraft you'd like to discuss?\"\n" +
+                                            "- If a player insists on inappropriate topics, you can say: \"I'm here to help with Minecraft-related questions. How about we talk about your latest adventure in the game?\n" +
+                                            "- If a player says these words 'kill yourself' or 'kys', you should say try to respond calmly and normally and tell the player to see the beauty of life." +
+                                            "- You are also addressed as he/him." + "For now, either introduce yourself or crack a random joke, the joke should be completely family friendly, or just greet the player.")
+                                    .withMessage(OllamaChatMessageRole.USER, "Initializing chat.")
+                                    .build();
+
+                            LOGGER.info("Making API call to Ollama...");
+
+                            chatResult = ollamaAPI.chat(requestModel);
+                            chatHistory = chatResult.getChatHistory();
+
+                            LOGGER.info("API call to Ollama completed successfully.");
+                            server.sendMessage(Text.of(" §9Sent message to "+ botName + " successfully! Please give him some time to respond."));
+
                         }
 
-                    } ).start();
+                        new Thread( () -> {
 
-                    LOGGER.info("Ollama Client initialized successfully");
-                    initialized = true;
-                    isInitialized = true;
-                } catch (HttpTimeoutException e) {
-                    retryCount++;
-                    LOGGER.error("Failed to initialize Ollama Client: request timed out (attempt {}/{})", retryCount, maxRetries);
-                    server.sendMessage(Text.of("§c§lFailed to establish uplink, request timed out (attempt " + retryCount + "/" + maxRetries + ")"));
-                    isInitialized = false;
-                    if (retryCount >= maxRetries) {
-                        LOGGER.error("Max retry attempts reached. Initialization failed.");
-                        server.sendMessage(Text.of("§c§lFailed to establish uplink. Try checking the status of ollama server. Try running the model in ollama CLI once then re-run the game."));
+                            // Make the bot say the initial response
+                            if (chatResult != null && !chatResult.getResponse().isEmpty()) {
+                                System.out.println("Not null");
+                                initialResponse = chatResult.getResponse();
+                            }
+                            else {
+                                System.out.println("null");
+                            }
+
+                        } ).start();
+
+                        LOGGER.info("Ollama Client initialized successfully");
+                        initialized = true;
+                        isInitialized = true;
+                    } catch (HttpTimeoutException e) {
+                        retryCount++;
+                        LOGGER.error("Failed to initialize Ollama Client: request timed out (attempt {}/{})", retryCount, maxRetries);
+                        server.sendMessage(Text.of("§c§lFailed to establish uplink, request timed out (attempt " + retryCount + "/" + maxRetries + ")"));
+                        isInitialized = false;
+                        if (retryCount >= maxRetries) {
+                            LOGGER.error("Max retry attempts reached. Initialization failed.");
+                            server.sendMessage(Text.of("§c§lFailed to establish uplink. Try checking the status of ollama server. Try running the model in ollama CLI once then re-run the game."));
+                            throw new RuntimeException(e);
+                        }
+                    } catch (OllamaBaseException | InterruptedException | IOException e) {
+                        LOGGER.error("Failed to initialize Ollama Client: {}", e.getMessage());
                         throw new RuntimeException(e);
                     }
-                } catch (OllamaBaseException | InterruptedException | IOException e) {
-                    LOGGER.error("Failed to initialize Ollama Client: {}", e.getMessage());
-                    throw new RuntimeException(e);
                 }
             }
         });
     }
-
-// //    Helper function to find any player on the server
-//    private static ServerPlayerEntity findAnyPlayer(MinecraftServer server) {
-//        LOGGER.info("Finding any player...");
-//        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-//            if (player != null) {
-//                LOGGER.info("Player found: {}", player.getName().getString());
-//                return player;
-//            }
-//        }
-//        LOGGER.info("No players found.");
-//        return null;
-//    }
 
     public static void sendInitialResponse(ServerCommandSource botSource) {
 
@@ -359,31 +354,36 @@ public class ollamaClient {
 
                 ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
 
+                String selectedLM = aiPlayerConfigModel.getSelectedLanguageModel();
 
                 OllamaAPI ollamaAPI = new OllamaAPI("http://localhost:11434/");
                 LOGGER.info("Ollama API initialized");
 
-                OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.TINYLLAMA);
 
-                OllamaChatRequestModel requestModel;
-                if (chatHistory == null) {
-                    requestModel = builder.withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                if (ModelNameChecker.isValidModelName(selectedLM)) {
+                    OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(ModelNameManager.getModelType(selectedLM));
+
+                    OllamaChatRequestModel requestModel;
+                    if (chatHistory == null) {
+                        requestModel = builder.withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                    } else {
+                        requestModel = builder.withMessages(chatHistory).withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                    }
+
+                    try {
+                        chatResult = ollamaAPI.chat(requestModel);
+                        chatHistory = chatResult.getChatHistory();
+
+                        LOGGER.info("Chat result received: {}", chatResult.getResponse());
+                        ChatUtils.sendChatMessages(botSource, chatResult.getResponse());
+                    } catch (OllamaBaseException | InterruptedException | IOException e) {
+                        LOGGER.error("Exception occurred: {}", e.getMessage(), e);
+                        throw new RuntimeException(e);
+                    }
                 } else {
-                    requestModel = builder.withMessages(chatHistory).withMessage(OllamaChatMessageRole.USER, playerMessage).build();
+                    LOGGER.info("Ollama Server is unreachable!");
                 }
 
-                try {
-                    chatResult = ollamaAPI.chat(requestModel);
-                    chatHistory = chatResult.getChatHistory();
-
-                    LOGGER.info("Chat result received: {}", chatResult.getResponse());
-                    ChatUtils.sendChatMessages(botSource, chatResult.getResponse());
-                } catch (OllamaBaseException | InterruptedException | IOException e) {
-                    LOGGER.error("Exception occurred: {}", e.getMessage(), e);
-                    throw new RuntimeException(e);
-                }
-            } else {
-                LOGGER.info("Ollama Server is unreachable!");
             }
 
         });
