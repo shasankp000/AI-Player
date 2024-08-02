@@ -36,6 +36,9 @@ public class RayCasting {
         if (hitResult.getType() == HitResult.Type.BLOCK) {
             System.out.println("Block detected at: " + hitResult.getBlockPos());
             bot.sendMessage(Text.literal("Block detected in front."));
+
+           ChatUtils.sendChatMessages(bot.getCommandSource().withSilent().withMaxLevel(4), "Block detected in front at " + hitResult.getBlockPos().toString()); 
+            
         } else if (hitResult.getType() == HitResult.Type.MISS) {
             System.out.println("Nothing detected in front by raycast");
             bot.sendMessage(Text.literal("Nothing detected in front."));
