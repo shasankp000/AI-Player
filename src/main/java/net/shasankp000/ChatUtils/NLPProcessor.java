@@ -95,6 +95,17 @@ public class NLPProcessor {
     );
 
     public static final Map<String, Integer> KEYWORD_CONFIDENCE = Map.<String, Integer>ofEntries(
+
+            // Actions
+            Map.entry("check", 90),
+            Map.entry("move", 91),
+            Map.entry("attack", 92),
+            Map.entry("jump", 89),
+            Map.entry("sneak", 93),
+            Map.entry("look", 94),
+            Map.entry("turn", 94),
+            Map.entry("interact", 95),
+
             // Materials
             Map.entry("wood", 80),
             Map.entry("stone", 80),
@@ -189,7 +200,7 @@ public class NLPProcessor {
 
     static {
         // Movement-related actions
-        SYNONYM_MAP.put("move", new HashSet<>(Arrays.asList("go", "walk", "run", "travel", "proceed", "advance", "head", "step", "march", "explore")));
+        SYNONYM_MAP.put("move", new HashSet<>(Arrays.asList("move", "go", "walk", "run", "travel", "proceed", "advance", "head", "step", "march", "explore")));
         SYNONYM_MAP.put("stop", new HashSet<>(Arrays.asList("halt", "pause", "cease", "stand", "stay", "wait")));
 
         // Attack and combat-related actions
@@ -203,7 +214,7 @@ public class NLPProcessor {
 
         // Exploration and discovery actions
         SYNONYM_MAP.put("explore", new HashSet<>(Arrays.asList("discover", "search", "find", "locate", "uncover", "reveal", "investigate", "scout")));
-        SYNONYM_MAP.put("check", new HashSet<>(Arrays.asList("inspect", "examine", "observe", "survey", "review")));
+        SYNONYM_MAP.put("check", new HashSet<>(Arrays.asList("check","inspect", "examine", "observe", "survey", "review")));
 
         // Interaction with objects or entities
         SYNONYM_MAP.put("use", new HashSet<>(Arrays.asList("activate", "operate", "apply", "utilize")));
@@ -300,7 +311,13 @@ public class NLPProcessor {
                 int score = calculateConfidenceScore(word, keyword);
 
                 if (score >= minConfidenceThreshold) {
-                    if (keyword.equals("coordinates")) {
+
+                    Set<String> coordsSynonymsMap = NLPProcessor.SYNONYM_MAP.get("coordinates");
+                    List<String> coordsSynonymsList = coordsSynonymsMap.stream().toList();
+
+                    boolean coordsDetected = entities.stream().anyMatch(entity -> coordsSynonymsList.contains(entity.toLowerCase()));
+
+                    if (coordsDetected) {
                         foundCoordinates = true;
                     } else {
                         entities.add(keyword);

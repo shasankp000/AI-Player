@@ -8,6 +8,7 @@ import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
+import net.shasankp000.ChatUtils.ChatUtils;
 
 public class RayCasting {
 
@@ -37,7 +38,7 @@ public class RayCasting {
             System.out.println("Block detected at: " + hitResult.getBlockPos());
             bot.sendMessage(Text.literal("Block detected in front."));
 
-           ChatUtils.sendChatMessages(bot.getCommandSource().withSilent().withMaxLevel(4), "Block detected in front at " + hitResult.getBlockPos().toString()); 
+           ChatUtils.sendChatMessages(bot.getCommandSource().withSilent().withMaxLevel(4), "Block detected in front at " + hitResult.getBlockPos().getX() + ", " + hitResult.getBlockPos().getY() + ", " + hitResult.getBlockPos().getZ());
             
         } else if (hitResult.getType() == HitResult.Type.MISS) {
             System.out.println("Nothing detected in front by raycast");

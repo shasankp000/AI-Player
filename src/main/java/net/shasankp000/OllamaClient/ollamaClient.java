@@ -17,6 +17,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.shasankp000.ChatUtils.ChatUtils;
+import net.shasankp000.Entity.RayCasting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +65,6 @@ public class ollamaClient {
         String formatter = ChatUtils.chooseFormatterRandom();
 
         Intent intent = Intent.UNSPECIFIED;
-        String entityMessage = "";
         List<String> entities = List.of();
 
         new Thread( () -> {
@@ -82,11 +82,8 @@ public class ollamaClient {
 
             for (Map.Entry<Intent, List<String>> entry : intentsAndEntities.entrySet()) {
                 intent = entry.getKey();
-                //       entityMessage = entry.getValue().isEmpty() ? "No entities detected" : entry.getValue().get(0);
                 entities = entry.getValue();
 
-//                    server.getCommandManager().executeWithPrefix(botSource, "/say Intent: " + intent.toString());
-//                    server.getCommandManager().executeWithPrefix(botSource, "/say Detected Entities: " + entityMessage);
             }
 
             if (intent.equals(Intent.GENERAL_CONVERSATION)) {
@@ -96,9 +93,9 @@ public class ollamaClient {
             }
             else if ( intent.equals(Intent.ASK_INFORMATION) ) {
                 System.out.println("Execute Ask Information Intent: " + intent.name());
-                callClient(context, message);
+//                callClient(context, message);
 
-                Set<String> checkSynonymsMap = NLPProcessor.SYNONYM_MAP.get("move");
+                Set<String> checkSynonymsMap = NLPProcessor.SYNONYM_MAP.get("check");
                 List<String> checkSynonymsList = checkSynonymsMap.stream().toList();
 
                 System.out.println(entities);
