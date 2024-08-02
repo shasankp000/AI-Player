@@ -98,6 +98,23 @@ public class ollamaClient {
                 System.out.println("Execute Ask Information Intent: " + intent.name());
                 callClient(context, message);
 
+                Set<String> checkSynonymsMap = NLPProcessor.SYNONYM_MAP.get("move");
+                List<String> checkSynonymsList = checkSynonymsMap.stream().toList();
+
+                System.out.println(entities);
+                System.out.println(checkSynonymsList);
+
+                boolean checkDetected = entities.stream().anyMatch(entity -> checkSynonymsList.contains(entity.toLowerCase()));
+
+                System.out.println(checkDetected);
+
+                if (checkDetected) {
+
+                    RayCasting.detect(bot);
+
+                }
+
+
             }
             else if (intent.equals(Intent.REQUEST_ACTION)) {
                 Set<String> moveSynonymsMap = NLPProcessor.SYNONYM_MAP.get("move");
