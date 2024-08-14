@@ -11,6 +11,14 @@ Just know that I won't ever give up on this project.
 
 [https://paypal.me/shasankp000](https://paypal.me/shasankp000)
 
+---
+# Also, THIS!
+
+If anyone is interested on the underlying algorithms I am working on for increased **intelligence** for the minecraft bot, feel free to check out this repository: 
+
+https://github.com/shasankp000/AI-Tricks
+
+I am open to suggestions/improvements, if any. (Obviously there will be improvements from my own end).
 
   
 ---
