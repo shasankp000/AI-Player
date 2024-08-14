@@ -3,7 +3,6 @@ package net.shasankp000.PathFinding;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
 import net.shasankp000.Commands.spawnFakePlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +13,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static net.shasankp000.Commands.spawnFakePlayer.stopMoving;
 import static net.shasankp000.PathFinding.PathFinder.identifyPrimaryAxis;
 import static net.shasankp000.Commands.spawnFakePlayer.moveForward;
 
@@ -42,7 +40,7 @@ public class PathTracer {
     }
 
     public static boolean getBotMovementStatus() {
-        return isMoving;
+        return PathTracer.isMoving;
     }
 
     public static Map<String, Integer> assignPriority(List<String> axisPriorityList) {
@@ -64,7 +62,6 @@ public class PathTracer {
         private String botName;
         private List<BlockPos> path;
         private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        private boolean isMoving = false;
 
         public BotMovementManager(MinecraftServer server, ServerCommandSource botSource, String botName, List<BlockPos> path) {
             this.server = server;
@@ -78,16 +75,20 @@ public class PathTracer {
         }
 
         public void processJobs() {
+
             if (!jobQueue.isEmpty()) {
                 MovementJob job = jobQueue.poll();
                 executeMovement(job);
-                isMoving = true;
+                PathTracer.isMoving = true;
+
             }
             else {
-                isMoving = false;
+                PathTracer.isMoving = false;
                 LOGGER.info("No more jobs to process");
+
             }
         }
+
 
         private void executeMovement(MovementJob job) {
 
@@ -108,9 +109,9 @@ public class PathTracer {
 
             makeBotWalkForward(server, botSource, botName, travelTime);
 
-            isMoving = true; // Mark as moving
+            PathTracer.isMoving = true; // Mark as moving
 
-            System.out.println(isMoving);
+            System.out.println("Marked isMoving: " + isMoving);
             System.out.println("Executing movement on axis: " + job.axis);
 //
             // Schedule a task to check for movement completion
@@ -160,6 +161,70 @@ public class PathTracer {
 
         }).start();
     }
+
+    public static String tracePathOutput(MinecraftServer server, ServerCommandSource botSource, String botName, List<BlockPos> path) {
+
+            String output = null;
+
+            List<String> axisPriorityList = identifyPrimaryAxis(path);
+
+            System.out.println("Primary axis identified.");
+            Map<String, Integer> priorityMap = assignPriority(axisPriorityList);
+
+            BotMovementManager manager = new BotMovementManager(server, botSource, botName, path);
+
+            for (Map.Entry<String, Integer> entry : priorityMap.entrySet()) {
+                manager.addMovementJob(entry.getKey(), entry.getValue());
+            }
+
+            // Process jobs synchronously in the CompletableFuture's thread
+            manager.processJobs();
+            System.out.println("Processing movement jobs...");
+
+            // After processing, check if the bot reached the target position
+
+            BlockPos lastPos = path.get(path.size() - 1);
+            BlockPos currentBotPos;
+
+            while (true) {
+
+                if (!isMoving) {
+
+                    currentBotPos = Objects.requireNonNull(botSource.getPlayer()).getBlockPos();
+
+                    System.out.println("Last position: " + lastPos);
+                    System.out.println("Current position: " + currentBotPos);
+
+                    if (currentBotPos.getX() >= lastPos.getX() && currentBotPos.getZ() > lastPos.getZ()) {
+                        output = "The bot has reached target position.";
+                        server.getCommandManager().executeWithPrefix(botSource, "/say I have reached the target destination");
+                    }
+                    else {
+                        output = "The bot could not reach the target position. An investigation into the matter is recommended.";
+                    }
+
+                    break;
+
+                }
+
+                else {
+
+                    try {
+                        Thread.sleep(5000L);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
+            }
+
+          return output;
+
+
+    }
+
+
+
 
 
     private static int calculateDistance(String axis, BlockPos start, BlockPos end) {
@@ -222,25 +287,25 @@ public class PathTracer {
             if(facingAxis.equals("x") && posNeg.equals("positive")) {
                 // turn east.
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look east");
-                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing east now");
+
 
             }
             else if(facingAxis.equals("x") && posNeg.equals("negative")) {
                 // turn west.
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look west");
-                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing west now");
+
             }
 
             if(facingAxis.equals("z") && posNeg.equals("positive")) {
                 // turn south.
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look south");
-                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing south now");
+
 
             }
             else if(facingAxis.equals("z") && posNeg.equals("negative")) {
                 // turn north.
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look north");
-                server.getCommandManager().executeWithPrefix(botSource, "/say I am facing north now");
+
             }
 
         }

@@ -1,5 +1,6 @@
 package net.shasankp000.Entity;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.damage.DamageSource;
@@ -9,9 +10,13 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
+import net.shasankp000.PathFinding.PathTracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -20,24 +25,31 @@ import static net.shasankp000.PathFinding.PathTracer.getBotMovementStatus;
 
 public class AutoFaceEntity {
 
+    public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
     private static final double BOUNDING_BOX_SIZE = 5.0; // Detection range in blocks
     private static final int INTERVAL_SECONDS = 2; // Interval in seconds to check for nearby entities
     private static final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService executor2 = Executors.newSingleThreadScheduledExecutor();
+    private static final ExecutorService executor3 = Executors.newSingleThreadExecutor();
     private static final double FOV_ANGLE = 60.0; // Field of view angle in degrees
+    private static boolean botBusy;
 
-    private static boolean isBotBusy(ServerPlayerEntity bot) {
-        // Define logic to determine if the bot is busy (e.g., walking, mining)
+    private static boolean isBotBusy() {
 
-        if (getBotMovementStatus()) {
-            return true;
-        }
-        // Placeholder implementation
-        return false; // Replace with actual task check
+        return getBotMovementStatus();
+
     }
 
     public static void startAutoFace(ServerPlayerEntity bot) {
 
         MinecraftServer server = bot.getServer();
+
+        executor2.scheduleAtFixedRate(() -> {
+
+            botBusy =  isBotBusy(); // keeps checking for bot status.
+
+
+        }, 0, INTERVAL_SECONDS, TimeUnit.SECONDS);
 
 
         executor.scheduleAtFixedRate(() -> {
@@ -45,7 +57,7 @@ public class AutoFaceEntity {
 
             if (server!= null && server.isRunning()) {
 
-                if(!isBotBusy(bot)) {
+                if(!botBusy) {
 
                     List<Entity> nearbyEntities = detectNearbyEntities(bot, BOUNDING_BOX_SIZE);
                     FaceClosestEntity.faceClosestEntity(bot, nearbyEntities);
@@ -61,9 +73,11 @@ public class AutoFaceEntity {
 
             }
 
-            else if(!server.isRunning()){
+            else if (server != null && !server.isRunning()) {
 
                 stopAutoFace();
+
+                System.out.println("Autoface stopped.");
 
                 try {
 
@@ -77,22 +91,30 @@ public class AutoFaceEntity {
                             }
                         }
                     });
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
 
                     System.out.println(e.getMessage());
                 }
 
 
-
             }
-
 
 
         }, 0, INTERVAL_SECONDS, TimeUnit.SECONDS);
 
 
 
+    }
+
+    public static void onServerStopped(MinecraftServer minecraftServer) {
+
+        executor3.submit(() -> {
+            try {
+                stopAutoFace();
+            } catch (Exception e) {
+                LOGGER.error("Failed to initialize Ollama client", e);
+            }
+        });
     }
 
     private static List<Entity> filterEntitiesInFront(ServerPlayerEntity bot, List<Entity> entities) {

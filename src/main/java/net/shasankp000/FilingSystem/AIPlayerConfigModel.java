@@ -40,7 +40,7 @@ public class AIPlayerConfigModel {
 
     public String getSelectedLanguageModel() {
 
-        return selectedModel;
+        return selectedLanguageModel;
     }
 
     public void setSelectedLanguageModel(String selectedLanguageModel) {

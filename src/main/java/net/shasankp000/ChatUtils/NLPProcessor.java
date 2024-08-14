@@ -1,377 +1,242 @@
 package net.shasankp000.ChatUtils;
 
-import java.util.*;
+import com.google.gson.JsonSyntaxException;
+import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
+import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
+import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole;
+import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestBuilder;
+import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestModel;
+import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatResult;
+import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 
 public class NLPProcessor {
 
-    public static final Map<String, String> INTENT_KEYWORDS = Map.<String, String>ofEntries(
-            // Movement
-            Map.entry("move", "REQUEST_ACTION"),
-            Map.entry("go", "REQUEST_ACTION"),
-            Map.entry("walk", "REQUEST_ACTION"),
-            Map.entry("run", "REQUEST_ACTION"),
-            Map.entry("navigate", "REQUEST_ACTION"),
-            Map.entry("travel", "REQUEST_ACTION"),
-            Map.entry("step", "REQUEST_ACTION"),
-            Map.entry("approach", "REQUEST_ACTION"),
-            Map.entry("advance", "REQUEST_ACTION"),
+    private static final Logger logger = LoggerFactory.getLogger("ai-player");
+    private static final String host = "http://localhost:11434/";
+    private static final OllamaAPI ollamaAPI = new OllamaAPI(host);
 
-            // Mining
-            Map.entry("mine", "REQUEST_ACTION"),
-            Map.entry("dig", "REQUEST_ACTION"),
-            Map.entry("excavate", "REQUEST_ACTION"),
-            Map.entry("collect", "REQUEST_ACTION"),
-            Map.entry("gather", "REQUEST_ACTION"),
-            Map.entry("break", "REQUEST_ACTION"),
-            Map.entry("harvest", "REQUEST_ACTION"),
+    private static String buildPrompt() {
+        return "You are a first-principles reasoning function caller AI agent that takes a question/user prompt from a minecraft player and finds the intention of the question/prompt  Here are some example prompts that you may receive:\n" +
+                " 1. Could you check if there is a block in front of you?\n" +
+                " 2. Look around for any hostile mobs, and report to me if you find any.\n" +
+                " 3. Could you mine some stone and bring them to me?\n" +
+                " 4. Craft a set of iron armor.\n" +
+                " 5. Did you go somewhere recently?\n" +
+                "\n" +
+                " These are the following intentions which the prompt may cater to and which you have to figure out:\n" +
+                "\n" +
+                " 1. REQUEST_ACTION: This intention corresponds towards requesting a minecraft bot to take an action such as going somewhere, exploring, scouting etc.\n" +
+                " 2. ASK_INFORMATION: This intention corresponds asking a minecraft bot for information, which could be about the game or anything else.\n" +
+                " 3. GENERAL_CONVERSATION: This intention corresponds towards just making general conversation or small talk with the minecraft bot.\n" +
+                " 4. UNSPECIFIED: This intention corresponds to a message which lacks enough context for proper understanding.\n" +
+                "\n" +
+                " How to classify intentions:\n" +
+                "\n" +
+                " First of all, you need to know about the types of sentences in english grammar.\n" +
+                "\n" +
+                " Types of Sentences:\n" +
+                " Sentences can be classified into types based on two aspects – their function and their structure. They are categorised into four types based on their function and into three based on their structure. Assertive/declarative, interrogative, imperative and exclamatory sentences are the four types of sentences. The three types of sentences, according to the latter classification, are simple, complex and compound sentences.\n" +
+                "\n" +
+                " Let us look at each of these in detail.\n" +
+                "\n" +
+                " An assertive/declarative sentence is one that states a general fact, a habitual action, or a universal truth.  For example, ‘Today is Wednesday.’\n" +
+                " An imperative sentence is used to give a command or make a request. Unlike the other three types of sentences, imperative sentences do not always require a subject; they can start with a verb. For example, ‘Turn off the lights and fans when you leave the class.’\n" +
+                " An interrogative sentence asks a question. For example, ‘Where do you stay?’\n" +
+                " An exclamatory sentence expresses sudden emotions or feelings. For example, ‘What a wonderful sight!’\n" +
+                "\n" +
+                " Now, let us learn what simple, compound and complex sentences are. This categorisation is made based on the nature of clauses in the sentence.\n" +
+                "\n" +
+                " Simple sentences contain just one independent clause. For instance, ‘The dog chased the little wounded bird.’\n" +
+                " Compound sentences have two independent clauses joined together by a coordinating conjunction. For instance, ‘I like watching Marvel movies, but my friend likes watching DC movies.’\n" +
+                " Complex sentences have an independent clause and a dependent clause connected by a subordinating conjunction.  For example, ‘Though we were tired, we played another game of football.’\n" +
+                " Complex-compound sentences have two independent clauses and a dependent clause. For instance, ‘Although we knew it would rain, we did not carry an umbrella, so we got wet.’\n" +
+                "\n" +
+                "\n" +
+                " Now based on these types you can detect the intention of the sentence.\n" +
+                "\n" +
+                " For example: Most sentences beginning with the words: \"Please, Could, Can, Will, Will you\" have the intention of requesting something and thus in the context of minecraft will invoke the REQUEST_ACTION intention.\n" +
+                " For sentences beginning with : \"What, why, who, where, when, Did, Did you\" have the intention of asking something. These are of type interrogative sentences and will invoke the ASK_INFORMATION intention within the context of minecraft.\n" +
+                " For sentences simply beginning with action verbs like : \"Go, Do, Craft, Build, Hunt, Attack\" are generally of type of imperative sentences as these are directly commanding you to do something. Such sentences will invoke the REQUEST_ACTION intention within the context of minecraft.\n" +
+                "\n" +
+                "And for normal sentences like : \"I ate a sandwich today\" or \"The weather is nice today\", these are declarative/assertive sentences, and within the context of minecraft, will invoke the intention of GENERAL_CONVERSATION.\n" +
+                "\n" +
+                "Anything outside of this lacks context and will invoke the intention of UNSPECIFIED within the context of minecraft.\n" +
+                "\n" +
+                "A few more examples for your better learning.\n" +
+                "\n" +
+                "Examples:\n" +
+                "\n" +
+                "1. REQUEST_ACTION:\n" +
+                "Could you mine some stone and bring them to me?\n" +
+                "Please craft a set of iron armor.\n" +
+                "Go to coordinates 10 -60 11.\n" +
+                "Attack the nearest hostile mob.\n" +
+                "Build a shelter before nightfall.\n" +
+                "\n" +
+                "2. ASK_INFORMATION:\n" +
+                "Did you find any diamonds?\n" +
+                "Where are the closest villagers?\n" +
+                "What time is it in the game?\n" +
+                "How many hearts do you have left?\n" +
+                "Why is the sun setting so quickly?\n" +
+                "\n" +
+                "3. GENERAL_CONVERSATION:\n" +
+                "I built a house today.\n" +
+                "The sky looks really clear.\n" +
+                "I love exploring caves.\n" +
+                "My friend joined the game earlier.\n" +
+                "This is a fun server.\n" +
+                "\n" +
+                "4. UNSPECIFIED:\n" +
+                "Incomplete: Can you...\n" +
+                "Ambiguous: Do it.\n" +
+                "Vague: Make something cool.\n" +
+                "Out of context: \"What are we?\n" +
+                "General statement with unclear intent: The weather.\n" +
+                "\n" +
+                "For further ease of classification of input, here are some keywords you can focus on within the prompt.\n" +
+                "\n" +
+                "Such keywords include:\n" +
+                "\n" +
+                "         move\n" +
+                "         go\n" +
+                "         walk\n" +
+                "         run\n" +
+                "         navigate\n" +
+                "         travel\n" +
+                "         step\n" +
+                "         approach\n" +
+                "         advance\n" +
+                "         mine\n" +
+                "         dig\n" +
+                "         excavate\n" +
+                "         collect\n" +
+                "         gather\n" +
+                "         break\n" +
+                "         harvest\n" +
+                "         attack\n" +
+                "         fight\n" +
+                "         defend\n" +
+                "         slay\n" +
+                "         kill\n" +
+                "         vanquish\n" +
+                "         destroy\n" +
+                "         battle\n" +
+                "         craft\n" +
+                "         create\n" +
+                "         make\n" +
+                "         build\n" +
+                "         forge\n" +
+                "         assemble\n" +
+                "         trade\n" +
+                "         barter\n" +
+                "         exchange\n" +
+                "         buy\n" +
+                "         sell\n" +
+                "         explore\n" +
+                "         discover\n" +
+                "         find\n" +
+                "         search\n" +
+                "         locate\n" +
+                "         scout\n" +
+                "         construct\n" +
+                "         erect\n" +
+                "         place\n" +
+                "         set\n" +
+                "         farm\n" +
+                "         plant\n" +
+                "         grow\n" +
+                "         cultivate\n" +
+                "         use\n" +
+                "         utilize\n" +
+                "         activate\n" +
+                "         employ\n" +
+                "         operate\n" +
+                "         handle\n" +
+                "         check\n" +
+                "         search\n" +
+                "\n" +
+                "         Some of the above keywords are synonyms of each other. (e.g check -> search, kill -> vanquish, gather->collect)\n" +
+                "\n" +
+                "         So you must be on the lookout for the synonyms of such keywords as well.\n" +
+                "\n" +
+                "         These keywords fall under the category of action-verbs. Since your purpose is to design the output that will call a function, which will trigger an action, you need to know what a verb is and what action-verbs are to further your ease in selecting the appropriate function.\n" +
+                "\n" +
+                "         A verb is a a word used to describe an action, state, or occurrence, and forming the main part of the predicate of a sentence, such as hear, become, happen.\n" +
+                "\n" +
+                "         An action verb (also called a dynamic verb) describes the action that the subject of the sentence performs (e.g., “I  run”).\n" +
+                "\n" +
+                "         Example of action verbs:\n" +
+                "\n" +
+                "         We \"traveled\" to Spain last summer.\n" +
+                "         My grandfather \"walks\" with a stick.\n" +
+                "\n" +
+                "         The train \"arrived\" on time.\n" +
+                "\n" +
+                "         I \"ate\" a sandwich for lunch.\n" +
+                "\n" +
+                "         All the verbs within quotations cite actions that were caused/triggered.\n" +
+                "\n" +
+                "         So when you are supplied with a prompt that contain the *keywords* which is provided earlier, know that these are actions which correspond to a particular tool within the provided tools.\n" +
+                "\n" +
+                "However detecting such keyword and immediately classifying it as an action is incorrect.\n" +
+                "\n" +
+                "Sometimes sentences like \"So, did you go somewhere recently?\" means to ASK_INFORMATION while making conversation. Remember to analyze the entire sentence.\n" +
+                "\n" +
+                "RESPOND ONLY AS THE AFOREMENTIONED INTENTION TAGS, i.e REQUEST_ACTION, ASK_INFORMATION, GENERAL_CONVERSATION and UNSPECIFIED, NOT A SINGLE WORD MORE.\n" +
+                "\n" +
+                "\n" +
+                " While returning the intention output, do not say anything else. By anything else, I mean any other word at all. \n" +
+                "Do not worry about actually executing this corresponding methods based on the user prompts or conversing with the user, that will be taken care of by another system by analyzing your output. \n" +
+                "Thus it is imperative that you output only the intention, and nothing else. \n";
 
-            // Combat
-            Map.entry("attack", "REQUEST_ACTION"),
-            Map.entry("fight", "REQUEST_ACTION"),
-            Map.entry("defend", "REQUEST_ACTION"),
-            Map.entry("slay", "REQUEST_ACTION"),
-            Map.entry("kill", "REQUEST_ACTION"),
-            Map.entry("vanquish", "REQUEST_ACTION"),
-            Map.entry("destroy", "REQUEST_ACTION"),
-            Map.entry("battle", "REQUEST_ACTION"),
-
-            // Crafting
-            Map.entry("craft", "REQUEST_ACTION"),
-            Map.entry("create", "REQUEST_ACTION"),
-            Map.entry("make", "REQUEST_ACTION"),
-            Map.entry("build", "REQUEST_ACTION"),
-            Map.entry("forge", "REQUEST_ACTION"),
-            Map.entry("assemble", "REQUEST_ACTION"),
-
-            // Trading/Bartering
-            Map.entry("trade", "REQUEST_ACTION"),
-            Map.entry("barter", "REQUEST_ACTION"),
-            Map.entry("exchange", "REQUEST_ACTION"),
-            Map.entry("buy", "REQUEST_ACTION"),
-            Map.entry("sell", "REQUEST_ACTION"),
-
-            // Exploration
-            Map.entry("explore", "REQUEST_ACTION"),
-            Map.entry("discover", "REQUEST_ACTION"),
-            Map.entry("find", "REQUEST_ACTION"),
-            Map.entry("search", "REQUEST_ACTION"),
-            Map.entry("locate", "REQUEST_ACTION"),
-            Map.entry("scout", "REQUEST_ACTION"),
-
-            // Building
-            Map.entry("construct", "REQUEST_ACTION"),
-            Map.entry("erect", "REQUEST_ACTION"),
-            Map.entry("place", "REQUEST_ACTION"),
-            Map.entry("set", "REQUEST_ACTION"),
-
-            // Farming
-            Map.entry("farm", "REQUEST_ACTION"),
-            Map.entry("plant", "REQUEST_ACTION"),
-            Map.entry("grow", "REQUEST_ACTION"),
-            Map.entry("cultivate", "REQUEST_ACTION"),
-
-            // Utility
-            Map.entry("use", "REQUEST_ACTION"),
-            Map.entry("utilize", "REQUEST_ACTION"),
-            Map.entry("activate", "REQUEST_ACTION"),
-            Map.entry("employ", "REQUEST_ACTION"),
-            Map.entry("operate", "REQUEST_ACTION"),
-            Map.entry("handle", "REQUEST_ACTION"),
-
-            // Information Requests
-            Map.entry("what", "ASK_INFORMATION"),
-            Map.entry("how", "ASK_INFORMATION"),
-            Map.entry("why", "ASK_INFORMATION"),
-            Map.entry("when", "ASK_INFORMATION"),
-            Map.entry("who", "ASK_INFORMATION"),
-            Map.entry("check", "ASK_INFORMATION"),
-
-            // General Conversation
-            Map.entry("hello", "GENERAL_CONVERSATION"),
-            Map.entry("hi", "GENERAL_CONVERSATION"),
-            Map.entry("hey", "GENERAL_CONVERSATION"),
-            Map.entry("greetings", "GENERAL_CONVERSATION")
-    );
-
-    public static final Map<String, Integer> KEYWORD_CONFIDENCE = Map.<String, Integer>ofEntries(
-
-            // Actions
-            Map.entry("check", 90),
-            Map.entry("move", 91),
-            Map.entry("attack", 92),
-            Map.entry("jump", 89),
-            Map.entry("sneak", 93),
-            Map.entry("look", 94),
-            Map.entry("turn", 94),
-            Map.entry("interact", 95),
-
-            // Materials
-            Map.entry("wood", 80),
-            Map.entry("stone", 80),
-            Map.entry("iron", 80),
-            Map.entry("diamond", 90),
-            Map.entry("gold", 80),
-            Map.entry("emerald", 85),
-            Map.entry("obsidian", 85),
-            Map.entry("lava", 70),
-            Map.entry("water", 70),
-
-            // Tools
-            Map.entry("axe", 80),
-            Map.entry("pickaxe", 80),
-            Map.entry("shovel", 80),
-            Map.entry("sword", 85),
-            Map.entry("bow", 75),
-            Map.entry("hoe", 70),
-            Map.entry("shield", 80),
-            Map.entry("armor", 80),
-
-            // Tools
-            Map.entry("axes", 80),
-            Map.entry("pickaxes", 80),
-            Map.entry("shovels", 80),
-            Map.entry("swords", 85),
-            Map.entry("bows", 75),
-            Map.entry("hoes", 70),
-            Map.entry("shields", 80),
-            Map.entry("armors", 80),
-
-            // Mobs
-            Map.entry("zombie", 85),
-            Map.entry("skeleton", 85),
-            Map.entry("creeper", 85),
-            Map.entry("spider", 80),
-            Map.entry("enderman", 90),
-            Map.entry("blaze", 90),
-            Map.entry("ender dragon", 95),
-            Map.entry("villager", 80),
-            Map.entry("pillager", 85),
-
-            // Plural variants.
-            Map.entry("zombies", 85),
-            Map.entry("skeletons", 85),
-            Map.entry("creepers", 85),
-            Map.entry("spiders", 80),
-            Map.entry("endermen", 90),
-            Map.entry("blazes", 90),
-            Map.entry("villagers", 80),
-            Map.entry("pillagers", 85),
-
-            // Structures
-            Map.entry("house", 70),
-            Map.entry("village", 75),
-            Map.entry("fortress", 85),
-            Map.entry("stronghold", 90),
-            Map.entry("portal", 85),
-            Map.entry("tower", 75),
-
-            // Plural variants
-            Map.entry("houses", 70),
-            Map.entry("villages", 75),
-            Map.entry("fortresses", 85),
-            Map.entry("strongholds", 90),
-            Map.entry("portals", 85),
-            Map.entry("towers", 75),
-
-            // Locations
-            Map.entry("nether", 85),
-            Map.entry("end", 90),
-            Map.entry("overworld", 70),
-            Map.entry("mine", 80),
-            Map.entry("cave", 80),
-
-            // Actions
-            Map.entry("build", 80),
-            Map.entry("craft", 80),
-            Map.entry("explore", 75),
-            Map.entry("fight", 85),
-            Map.entry("trade", 80),
-            Map.entry("farm", 75),
-            Map.entry("defend", 80),
-            Map.entry("use", 75),
-
-            // Movement
-
-            Map.entry("coordinates", 90)
-    );
-
-    public static final Map<String, Set<String>> SYNONYM_MAP = new HashMap<>();
-
-    static {
-        // Movement-related actions
-        SYNONYM_MAP.put("move", new HashSet<>(Arrays.asList("move", "go", "walk", "run", "travel", "proceed", "advance", "head", "step", "march", "explore")));
-        SYNONYM_MAP.put("stop", new HashSet<>(Arrays.asList("halt", "pause", "cease", "stand", "stay", "wait")));
-
-        // Attack and combat-related actions
-        SYNONYM_MAP.put("attack", new HashSet<>(Arrays.asList("defeat", "fight", "strike", "assault", "hit", "battle", "destroy", "kill", "slay")));
-        SYNONYM_MAP.put("defend", new HashSet<>(Arrays.asList("protect", "guard", "shield", "block", "secure")));
-
-        // Gathering and resource-related actions
-        SYNONYM_MAP.put("gather", new HashSet<>(Arrays.asList("collect", "harvest", "pick", "fetch", "acquire", "accumulate", "obtain")));
-        SYNONYM_MAP.put("mine", new HashSet<>(Arrays.asList("dig", "excavate", "extract", "gather")));
-        SYNONYM_MAP.put("craft", new HashSet<>(Arrays.asList("build", "construct", "make", "create", "forge")));
-
-        // Exploration and discovery actions
-        SYNONYM_MAP.put("explore", new HashSet<>(Arrays.asList("discover", "search", "find", "locate", "uncover", "reveal", "investigate", "scout")));
-        SYNONYM_MAP.put("check", new HashSet<>(Arrays.asList("check","inspect", "examine", "observe", "survey", "review")));
-
-        // Interaction with objects or entities
-        SYNONYM_MAP.put("use", new HashSet<>(Arrays.asList("activate", "operate", "apply", "utilize")));
-        SYNONYM_MAP.put("talk", new HashSet<>(Arrays.asList("speak", "communicate", "chat", "converse", "discuss")));
-        SYNONYM_MAP.put("trade", new HashSet<>(Arrays.asList("exchange", "barter", "buy", "sell", "deal")));
-
-        // Directions
-        SYNONYM_MAP.put("front", new HashSet<>(Arrays.asList("ahead", "forward", "in front")));
-        SYNONYM_MAP.put("back", new HashSet<>(Arrays.asList("behind", "reverse", "retreat")));
-        SYNONYM_MAP.put("left", new HashSet<>(Arrays.asList("port", "side", "to the left")));
-        SYNONYM_MAP.put("right", new HashSet<>(Arrays.asList("starboard", "to the right", "side")));
-        SYNONYM_MAP.put("up", new HashSet<>(Arrays.asList("above", "over", "ascend", "rise", "elevate")));
-        SYNONYM_MAP.put("down", new HashSet<>(Arrays.asList("below", "under", "descend", "drop", "fall")));
-
-        // General Conversation
-        SYNONYM_MAP.put("hello", new HashSet<>(Arrays.asList("hi", "hey", "greetings", "salutations", "howdy")));
-        SYNONYM_MAP.put("goodbye", new HashSet<>(Arrays.asList("bye", "farewell", "see you", "later", "take care")));
-        SYNONYM_MAP.put("thanks", new HashSet<>(Arrays.asList("thank you", "appreciate it", "grateful", "much obliged")));
-        SYNONYM_MAP.put("yes", new HashSet<>(Arrays.asList("yeah", "yep", "affirmative", "sure", "okay")));
-        SYNONYM_MAP.put("no", new HashSet<>(Arrays.asList("nope", "negative", "nah", "not really")));
-
-        // Weather and environment-related terms
-        SYNONYM_MAP.put("weather", new HashSet<>(Arrays.asList("climate", "conditions", "forecast", "temperature")));
-        SYNONYM_MAP.put("day", new HashSet<>(Arrays.asList("morning", "afternoon", "sunrise", "sunset")));
-        SYNONYM_MAP.put("night", new HashSet<>(Arrays.asList("evening", "dark", "dusk", "midnight")));
-
-        SYNONYM_MAP.put("coordinates", new HashSet<>(Arrays.asList("coordinates","coords", "co-ordinates")));
     }
 
+    public static Intent getIntention(String userPrompt) {
+
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.PHI3); // LLAMA2 is surprisingly much less error-prone compared to phi3.
+
+        String systemPrompt = buildPrompt();
+        String response;
+
+        Intent intent = Intent.UNSPECIFIED; // unspecified intention by default.
+
+        try {
 
 
-    public static Map<Intent, List<String>> runNlpTask(String userInput) {
-        Map<Intent, List<String>> intentsAndEntities = new HashMap<>();
+            OllamaChatRequestModel requestModel = builder
+                    .withMessage(OllamaChatMessageRole.SYSTEM, systemPrompt)
+                    .withMessage(OllamaChatMessageRole.USER, userPrompt)
+                    .build();
 
-        // Recognize the intent from the response
-        Intent recognizedIntent = recognizeIntent(userInput);
+            OllamaChatResult chatResult = ollamaAPI.chat(requestModel);
+            response = chatResult.getResponse();
 
-        // Extract entities from the response
-        List<String> entitiesFromPrompt = extractEntities(userInput);
+            if (response.equalsIgnoreCase("REQUEST_ACTION") || response.contains("REQUEST_ACTION")) {
 
-        intentsAndEntities.put(recognizedIntent, entitiesFromPrompt);
-
-        return intentsAndEntities;
-    }
-
-
-    private static Intent recognizeIntent(String userInput) {
-        String[] words = userInput.split("\\s+");
-        Map<String, Integer> intentScores = new HashMap<>();
-
-        // Iterate over each word in the response and calculate the confidence score
-        for (String word : words) {
-            for (Map.Entry<String, String> entry : INTENT_KEYWORDS.entrySet()) {
-                String keyword = entry.getKey();
-                String intent = entry.getValue();
-                int score = calculateConfidenceScore(word, keyword);
-
-                // Aggregate scores for each intent
-                intentScores.put(intent, intentScores.getOrDefault(intent, 0) + score);
-
-                // Break the loop if maximum score is reached
-                if (score == 100) {
-                    break;
-                }
-            }
-        }
-
-        // Find the intent with the highest score
-        String recognizedIntent = intentScores.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse("UNSPECIFIED");
-
-        return switch (recognizedIntent) {
-            case "REQUEST_ACTION" -> Intent.REQUEST_ACTION;
-            case "ASK_INFORMATION" -> Intent.ASK_INFORMATION;
-            case "GENERAL_CONVERSATION" -> Intent.GENERAL_CONVERSATION;
-            default -> Intent.UNSPECIFIED;
-        };
-    }
-
-
-    private static List<String> extractEntities(String userInput) {
-        String[] words = userInput.split("\\s+");
-        List<String> entities = new ArrayList<>();
-        int minConfidenceThreshold = 50; // Minimum confidence score to consider an entity
-
-        boolean foundCoordinates = false;
-        List<String> coordinates = new ArrayList<>();
-
-        for (String word : words) {
-            for (Map.Entry<String, Integer> entry : KEYWORD_CONFIDENCE.entrySet()) {
-                String keyword = entry.getKey();
-                int score = calculateConfidenceScore(word, keyword);
-
-                if (score >= minConfidenceThreshold) {
-
-                    Set<String> coordsSynonymsMap = NLPProcessor.SYNONYM_MAP.get("coordinates");
-                    List<String> coordsSynonymsList = coordsSynonymsMap.stream().toList();
-
-                    boolean coordsDetected = entities.stream().anyMatch(entity -> coordsSynonymsList.contains(entity.toLowerCase()));
-
-                    if (coordsDetected) {
-                        foundCoordinates = true;
-                    } else {
-                        entities.add(keyword);
-                    }
-                    // Break if a significant confidence score is achieved
-                    break;
-                }
+                intent = Intent.REQUEST_ACTION;
             }
 
-            // Check for numbers if "coordinates" is detected
-            if (foundCoordinates && word.matches("-?[0-9]+")) {
-                coordinates.add(word);
+            else if (response.equalsIgnoreCase("ASK_INFORMATION") || response.contains("ASK_INFORMATION")) {
+
+                intent = Intent.ASK_INFORMATION;
             }
+
+            else if (response.equalsIgnoreCase("GENERAL_CONVERSATION") || response.contains("GENERAL_CONVERSATION")) {
+
+                intent = Intent.GENERAL_CONVERSATION;
+            }
+
+
+        } catch (OllamaBaseException | IOException | InterruptedException | JsonSyntaxException e) {
+            logger.error("{}", (Object) e.getStackTrace());
         }
 
-        if (!coordinates.isEmpty()) {
-            entities.add("coordinates");
-            entities.addAll(coordinates);
-        }
-
-        return entities;
-    }
-
-
-    private static int calculateConfidenceScore(String word, String keyword) {
-       // System.out.println("Word: " + word + " Keyword: " + keyword);
-        if (word.equalsIgnoreCase(keyword)) {
-            return 100; // Exact match
-        } else if (areSynonyms(word, keyword)) {
-            return 80; // Synonym match
-        } else {
-            return 0; // No match
-        }
-    }
-
-    public static boolean areSynonyms(String word1, String word2) {
-        word1 = word1.toLowerCase();
-        word2 = word2.toLowerCase();
-
-        if (word1.equals(word2)) {
-            return true; // Exact match
-        }
-
-        // Check if word1 is a synonym of word2
-        if (SYNONYM_MAP.containsKey(word2)) {
-            return SYNONYM_MAP.get(word2).contains(word1);
-        }
-
-        // Check if word2 is a synonym of word1
-        if (SYNONYM_MAP.containsKey(word1)) {
-            return SYNONYM_MAP.get(word1).contains(word2);
-        }
-
-        return false;
+        return intent;
     }
 
 

@@ -2,7 +2,6 @@ package net.shasankp000.Entity;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
@@ -11,7 +10,6 @@ public class FaceClosestEntity {
 
     public static void faceClosestEntity(ServerPlayerEntity bot, List<Entity> entities) {
         if (entities.isEmpty()) {
-            System.out.println("No entities to face.");
             return;
         }
 

@@ -45,13 +45,16 @@ dependencies {
 	implementation 'com.github.FasterXML:jackson-databind:jackson-databind-2.17.2'
 	implementation 'com.github.FasterXML:jackson-datatype-jsr310:jackson-datatype-jsr310-2.8.4'
 	implementation 'com.github.FasterXML:jackson-annotations:jackson-annotations-2.17.2'
+	implementation group: 'org.xerial', name: 'sqlite-jdbc', version: '3.46.0.1'
 	annotationProcessor modImplementation("io.wispforest:owo-lib:${project.owo_version}")
+
 	include "com.github.amithkoujalgi:ollama4j:1.0.77"
 	include "io.wispforest:owo-sentinel:${project.owo_version}"
 	include "com.github.FasterXML:jackson-databind:jackson-databind-2.17.2"
 	include "com.github.FasterXML:jackson-core:jackson-core-2.17.2"
 	include "com.github.FasterXML:jackson-datatype-jsr310:jackson-datatype-jsr310-2.8.4"
 	include "com.github.FasterXML:jackson-annotations:jackson-annotations-2.17.2"
+	include "org.xerial:sqlite-jdbc:3.46.0.1"
 
 	dependencies {
 		implementation fileTree(dir: 'libs', include: ['*.jar'])

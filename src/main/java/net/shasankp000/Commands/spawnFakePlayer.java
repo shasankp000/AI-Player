@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static net.shasankp000.OllamaClient.ollamaClient.initializeOllamaClient;
 import static net.shasankp000.PathFinding.PathFinder.*;
 import static net.minecraft.server.command.CommandManager.literal;
 import static net.shasankp000.PathFinding.PathTracer.tracePath;
@@ -167,11 +168,29 @@ public class spawnFakePlayer {
 
         if (bot!=null) {
             bot.changeGameMode(mode);
-            sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+
+            ollamaClient.botName = botName; // set the bot's name.
+
+            ServerCommandSource serverSource = server.getCommandSource();
+
+            ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
+
+            initializeOllamaClient().thenRun(
+                    () -> {
+
+                        sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+
+                    }
+            );
+
+
 
             try {
                 Thread.sleep(1500);
                 AutoFaceEntity.startAutoFace(bot);
+
+
+
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
