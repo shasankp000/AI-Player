@@ -50,7 +50,62 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 ---
 
-# Progress: 51%
+# Progress: 60%
+
+## For the nerds
+
+Sucessfully implemented the intellgence update.
+
+So, for the tech savvy people, I have implemented the following features.
+
+**LONG TERM MEMORY**: This mod now features concepts used in the field AI like Natural Language Processing (much better now) and something called
+
+**Retrieval Augmented Generation (RAG)**.
+
+How does it work?
+
+Well:
+
+![Retrieval Augmented Generation process outline](https://cdn.modrinth.com/data/cached_images/f4f51461946d8fb02be131d6ea53db238cdbd8c4.png)
+
+![Vectors](https://media.geeksforgeeks.org/wp-content/uploads/20200911171455/UntitledDiagram2.png)
+
+
+We convert the user input, to a set of vector embeddings which is a list of numbers.
+
+Then **physics 101!**
+
+A vector is a representation of 3 coordinates in the XYZ plane. It has two parts, a direction and a magnitude.
+
+If you have two vectors, you can check their similarity by checking the angle between them.
+
+The closer the vectors are to each other, the more **similar** they are!
+
+Now if you have two sentences, converted to vectors, you can find out whether they are similar to each other using this process.
+
+In this particular instance I have used a method called **cosine similarity**
+
+[Cosine similarity](https://www.geeksforgeeks.org/cosine-similarity/)
+
+Where you find the similarity using the formula
+
+`(x, y) = x . y / |x| . |y|`
+
+where |x| and |y| are the magnitudes of the vectors.
+
+
+So we use this technique to fetch a bunch of stored conversation and event data from an SQL database, generate their vector embeddings, and then run that against the user's prompt. We get then further sort on the basis on let's say timestamps and we get the most relevant conversation for what the player said.
+
+
+Pair this with **function calling**. Which combines Natural Language processing to understand what the player wants the bot to do, then call a pre-coded method, for example movement and block check, to get the bot to do the task.
+
+Save this data, i.e what the bot did just now to the database and you get even more improved memory!
+
+To top it all off, Llama 2 is the best performing model for this mod right now, so I will suggest y'all to use llama2.
+
+In fact some of the methods won't even run without llama2 like the RAG for example so it's a must.
+
+---
 
 ![image](https://github.com/shasankp000/AI-Player/assets/46317225/6b8e22e2-cf00-462a-936b-d5b6f14fb228)
 
@@ -172,7 +227,14 @@ Depending on your specs, you can download a language model and then configure in
 
 For now, in the terminal, type ![image](https://github.com/user-attachments/assets/7ecf3eea-2a7c-481b-a914-53678081e60e)
 
-In this example we are going with the phi3 model.
+~~In this example we are going with the phi3 model.~~
+
+For the updated version 1.0.2, you will need to download the `llama2` model: `ollama pull llama2` 
+And another model `nomic-embed-text`: `ollama pull nomic-embed-text`
+
+Without llama2, intelligence will be very low
+Without nomic-embed-text, the mod will crash.
+
 
 I do intend to add an option in the mod to change and configure models within the game GUI.
 
