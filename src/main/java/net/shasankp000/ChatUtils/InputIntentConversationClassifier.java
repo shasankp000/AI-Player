@@ -81,6 +81,8 @@ public class InputIntentConversationClassifier {
                 "This is a fun server.\n" +
                 "So, what was your name again?" +
 
+                "Any assertive/declarative sentence invokes GENERAL_CONVERSATION" +
+
                 "INTENTION: UNSPECIFIED: \n" +
                 "?\n" +
                 "Huh?\n" +
@@ -89,12 +91,21 @@ public class InputIntentConversationClassifier {
                 "What?\n" +
                 "....." +
 
+                "Basically anything which doesn't make sense or doesn't provide enough context falls under UNSPECIFIED" +
+                "When you receive such prompts with inadequate context, ONLY RESPOND AS UNSPECIFIED. DO NOT RESPOND WITH ANYTHING ELSE OR AS ANYTHING ELSE UNDER ANY CIRCUMSTANCES."+
+
                 "INTENTION: ASK_INFORMATION: \n" +
                 "Did you find any diamonds?\n" +
                 "Where are the closest villagers?\n" +
                 "What time is it in the game?\n" +
                 "How many hearts do you have left?\n" +
                 "Why is the sun setting so quickly?\n" +
+                "How do I craft a shield?"+
+                "Tell me the recipe of a fire resistance potion"+
+                "How do I craft wooden planks?"+
+
+                "Basically any prompt that starts with interrogative words like what, who, when, where, how, what if, etc all will invoke ASK_INFORMATION" +
+                "Any interrogative sentence invokes ASK_INFORMATION" +
 
                 "INTENTION: REQUEST_ACTION: \n"+
                 "Could you mine some stone and bring them to me?\n" +
@@ -103,13 +114,17 @@ public class InputIntentConversationClassifier {
                 "Attack the nearest hostile mob.\n" +
                 "Build a shelter before nightfall.\n" +
 
-                "Basically anything which doesn't make sense or doesn't provide enough context falls under UNSPECIFIED" +
-                "When you receive such prompts with inadequate context, ONLY RESPOND AS UNSPECIFIED. DO NOT RESPOND WITH ANYTHING ELSE OR AS ANYTHING ELSE UNDER ANY CIRCUMSTANCES."+
+                "Any imperative sentence invokes REQUEST_ACTION" +
+
 
                 "\n" +
                 "However, sometimes you may encounter prompts which at first glance may look like general conversation, but they are actually not so:\n" +
                 "\n" +
                 "Sometimes sentences like \"So, did you go somewhere recently?\" or \"So Steve, How do I craft a shield?\" means to ASK_INFORMATION (which is another intention) while making conversation. Thus, remember to analyze the entire sentence.\n" +
+
+                "Sometimes sentences like \"So, how do I craft a shield?\",  or  \"Tell me the recipe of a fire resistance potion\" may appear to be requesting an action, but in reality it's about asking information regarding these topics, about crafting a shield or making a fire resistance potion in these examples."+
+                "Thus, before arriving to a final conclusion, please analyze the sentences properly."+
+
                 "\n" +
                 "RESPOND ONLY AS THE AFOREMENTIONED INTENTION TAGS, i.e GENERAL_CONVERSATION, REQUEST_ACTION, ASK_INFORMATION OR UNSPECIFIED, NOT A SINGLE WORD MORE.\n" +
                 "\n" +
@@ -122,7 +137,7 @@ public class InputIntentConversationClassifier {
 
     public static InputIntentConversationClassifier.Intent getConversationIntent(String userPrompt) {
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2); // LLAMA2 is surprisingly much less error-prone compared to phi3.
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.MISTRAL); // LLAMA2 is surprisingly much less error-prone compared to phi3.
 
         String systemPrompt = buildPrompt();
         String response;
@@ -163,7 +178,6 @@ public class InputIntentConversationClassifier {
         return intent;
 
     }
-
 
     public enum Intent {
         REQUEST_ACTION,
