@@ -4,12 +4,14 @@ package net.shasankp000.OllamaClient;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
 import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
 
 import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -53,8 +55,8 @@ public class ollamaClient {
     private static final String DB_URL = "jdbc:sqlite:" + gameDir + "/sqlite_databases/memory_agent.db";
 
 
-    public static void execute(CommandContext<ServerCommandSource> context) {
-        botName = StringArgumentType.getString(context, "botName");
+    public static void execute(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        botName = EntityArgumentType.getPlayer(context, "bot").getName().getLiteralString();
 
         System.out.println("Bot name set to: " + botName);
 

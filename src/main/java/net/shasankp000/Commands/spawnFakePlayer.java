@@ -5,7 +5,10 @@ package net.shasankp000.Commands;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.command.argument.BlockPosArgumentType;
+import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
@@ -73,54 +76,50 @@ public class spawnFakePlayer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 CommandManager.literal("bot")
                         .then(literal("spawn")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                                .then(CommandManager.argument("bot_name", StringArgumentType.string())
                                         .executes(context -> { spawnBot(context); return 1; })
                                 )
                         )
                         .then(literal("walk")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .then(CommandManager.argument("till", IntegerArgumentType.integer())
                                                 .executes(context -> { botWalk(context); return 1; })
                                         )
                                 )
                         )
                         .then(literal("jump")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .executes(context -> { botJump(context); return 1; })
                                 )
                         )
-                        .then(literal("teleportForward")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                        .then(literal("teleport_forward")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .executes(context -> { teleportForward(context); return 1; })
                                 )
                         )
-                        .then(literal("testChatMessage")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                        .then(literal("test_chat_message")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .executes(context -> { testChatMessage(context); return 1; })
                                 )
                         )
-                        .then(literal("goTo")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
-                                        .then(CommandManager.argument("x-axis", IntegerArgumentType.integer())
-                                                .then(CommandManager.argument("y-axis", IntegerArgumentType.integer())
-                                                        .then(CommandManager.argument("z-axis", IntegerArgumentType.integer())
-                                                                .executes(context -> { botGo(context); return 1; })
-                                                        )
-                                                )
+                        .then(literal("go_to")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                                .executes(context -> { botGo(context); return 1; })
                                         )
                                 )
                         )
-                        .then(literal("sendAMessage")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                        .then(literal("send_message_to")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .then(CommandManager.argument("message", StringArgumentType.greedyString())
                                                 .executes(context -> { ollamaClient.execute(context); return 1; })
                                         )
                                 )
                         )
-                        .then(literal("detectEntities")
-                                .then(CommandManager.argument("botName", StringArgumentType.string())
+                        .then(literal("detect_entities")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
                                                 .executes(context -> {
-                                                    String botName = StringArgumentType.getString(context,"botName");
+                                                    String botName = StringArgumentType.getString(context,"bot_name");
                                                     ServerPlayerEntity bot = context.getSource().getServer().getPlayerManager().getPlayer(botName);
                                                     if (bot != null) {
                                                         RayCasting.detect(bot);
@@ -146,7 +145,7 @@ public class spawnFakePlayer {
 
         GameMode mode = GameMode.SURVIVAL;
 
-        String botName = StringArgumentType.getString(context, "botName");
+        String botName = StringArgumentType.getString(context, "bot_name");
 
 
         createFakePlayer.createFake(
@@ -204,7 +203,7 @@ public class spawnFakePlayer {
 
         MinecraftServer server = context.getSource().getServer();
 
-        String botName = StringArgumentType.getString(context, "botName");
+        String botName = StringArgumentType.getString(context, "bot_name");
 
         ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
 
@@ -231,10 +230,8 @@ public class spawnFakePlayer {
     private static void teleportForward(CommandContext<ServerCommandSource> context) {
         MinecraftServer server = context.getSource().getServer();
 
-        String botName = StringArgumentType.getString(context, "botName");
-
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
-
+        ServerPlayerEntity bot = null;
+        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
 
@@ -245,6 +242,7 @@ public class spawnFakePlayer {
         }
 
         else {
+            String botName = bot.getName().getLiteralString();
 
             BlockPos currentPosition = bot.getBlockPos();
             BlockPos newPosition = currentPosition.add(1, 0, 0); // Move one block forward
@@ -260,11 +258,10 @@ public class spawnFakePlayer {
 
         MinecraftServer server = context.getSource().getServer();
 
-        String botName = StringArgumentType.getString(context, "botName");
+        ServerPlayerEntity bot = null;
+        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
         int travelTime = IntegerArgumentType.getInteger(context, "till");
-
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
 
 
         if (bot == null) {
@@ -276,6 +273,8 @@ public class spawnFakePlayer {
         }
 
         else {
+
+            String botName = bot.getName().getLiteralString();
 
             ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
             moveForward(server, botSource, botName);
@@ -292,9 +291,8 @@ public class spawnFakePlayer {
 
         MinecraftServer server = context.getSource().getServer();
 
-        String bot_name = StringArgumentType.getString(context, "botName");
-
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(bot_name);
+        ServerPlayerEntity bot = null;
+        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
 
         if (bot == null) {
@@ -307,10 +305,12 @@ public class spawnFakePlayer {
 
         else {
 
+            String botName = bot.getName().getLiteralString();
+
             bot.jump();
 
 
-            LOGGER.info("{} jumped!", bot_name);
+            LOGGER.info("{} jumped!", botName);
 
 
         }
@@ -321,11 +321,10 @@ public class spawnFakePlayer {
 
         String response = "I am doing great! It feels good to be able to chat with you again after a long time. So, how have you been doing? Are you enjoying the game world and having fun playing Minecraft with me? Let's continue chatting about whatever topic comes to mind! I love hearing from you guys and seeing your creations in the game. Don't hesitate to share anything with me, whether it's an idea, a problem, or simply something that makes you laugh. Cheers!";
 
-        String botName = StringArgumentType.getString(context,"botName");
-
         MinecraftServer server = context.getSource().getServer();
 
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+        ServerPlayerEntity bot = null;
+        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
         if (bot != null) {
 
@@ -348,15 +347,16 @@ public class spawnFakePlayer {
 
         MinecraftServer server = context.getSource().getServer();
 
-        String botName = StringArgumentType.getString(context, "botName");
+        BlockPos position = BlockPosArgumentType.getBlockPos(context, "pos");
 
-        int x_distance = IntegerArgumentType.getInteger(context, "x-axis");
+        int x_distance = position.getX();
 
-        int y_distance = IntegerArgumentType.getInteger(context, "y-axis");
+        int y_distance = position.getY();
 
-        int z_distance = IntegerArgumentType.getInteger(context, "z-axis");
+        int z_distance = position.getZ();
 
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+        ServerPlayerEntity bot = null;
+        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
 
@@ -367,13 +367,16 @@ public class spawnFakePlayer {
         }
 
         else {
+            String botName = bot.getName().getLiteralString();
+
             ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
 
             server.sendMessage(Text.literal("Finding the shortest path to the target, please wait patiently if the game seems hung"));
             // Calculate path
+            ServerPlayerEntity finalBot = bot;
             new Thread(() -> {
 
-                List<BlockPos> path = calculatePath(bot.getBlockPos(), new BlockPos(x_distance, y_distance , z_distance));
+                List<BlockPos> path = calculatePath(finalBot.getBlockPos(), new BlockPos(x_distance, y_distance , z_distance));
 
                 path = simplifyPath(path);
 
