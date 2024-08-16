@@ -152,6 +152,23 @@ https://github.com/user-attachments/assets/d6cd7d86-9651-4e6f-b14a-56332206a440
 
 ## For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
 
+**For users who have used the mod before, transitioning to version 1.0.2-hotfix-2**
+
+```
+1. Go to your game folder (.minecraft)/config and you will find a settings.json5 file.
+Delete that
+
+2.(If you have run the previous 1.0.2 version already then) again go back to your .minecraft. you will find a folder called "sqlite_databases". Inside that is a file called memory_agent.db
+
+3. Delete that as well.
+4. Install the models, mistral, llama2 and nomic-embed-text
+
+5.Then run the game
+6. Inside the game run /configMan to set the language model to llama2.
+
+Then spawn the bot and start talking!
+```
+
 Step 1. Download Java 21. 
 
 This project is built on java 21 to support carpet mod's updated API.
