@@ -169,15 +169,20 @@ Delete that
 Then spawn the bot and start talking!
 ```
 
+---
+# Buidling the project from intellij
+
 Step 1. Download Java 21. 
 
 This project is built on java 21 to support carpet mod's updated API.
 
 Go to: https://bell-sw.com/pages/downloads/#jdk-21-lts
 
-Click on Download MSI and finish the installation process.
+Click on Download MSI and finish the installation process. [Windows]
 
 ![image](https://github.com/user-attachments/assets/8cf3cbe1-91a9-4d7e-9510-84723d928025)
+
+**For linux users, depending on your system install openjdk-21-jdk package.**
 
 
 Step 2. Download IntelliJ idea community edition.
