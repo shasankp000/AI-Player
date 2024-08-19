@@ -99,10 +99,12 @@ public class RAGImplementation {
 
 
     private static List<Double> parseEmbedding(String embeddingString) {
-        String[] parts = embeddingString.split(",");
         List<Double> embedding = new ArrayList<>();
-        for (String part : parts) {
-            embedding.add(Double.parseDouble(part));
+        if (embeddingString != null) {
+            String[] parts = embeddingString.split(",");
+            for (String part : parts) {
+                embedding.add(Double.parseDouble(part));
+            }
         }
         return embedding;
     }
@@ -138,7 +140,8 @@ public class RAGImplementation {
 
     public static double calculateCosineSimilarity(List<Double> vec1, List<Double> vec2) {
         if (vec1.size() != vec2.size()) {
-            throw new IllegalArgumentException("Vectors must be of the same length");
+            LOGGER.warn("Vectors are not of same length, possible initial response in the data.");
+            return 0.0;
         }
 
         double dotProduct = 0.0;
@@ -201,7 +204,7 @@ public class RAGImplementation {
             }
         }
         catch (Exception e) {
-            logger.error("Caught exception: {}", e.getMessage());
+            logger.error("Caught exception while fetching conversation data: {}", e.getMessage());
         }
 
         return conversations;
@@ -269,10 +272,12 @@ public class RAGImplementation {
               
                 Remember that when you respond with the context data, you MUST DO SO in the PAST TENSE, since the context data is also a recording of your past actions.
                 
+                And it goes without saying that you have to analyse the context data and find it's relevancy to the player's prompt and only answer what you find relevant among the context data.
+                
                 DO NOT MAKE UP RESPONSES WHICH DO NOT EXIST IN THE CONTEXT DATA. USE ONLY THE CONTEXT DATA FOR YOUR RESPONSES. NO OTHER INFORMATION MUST BE USED AT ALL.
                 
-                "No relevant data found from database. Analyze current user input and answer accordingly."
-                
+                If you find this message instead: "No relevant data found from database. Analyze current user input and answer accordingly."
+               
                 Then this means that based on the current user input, no relevant data was found on the database. So you must analyze the current user input and answer accordingly. Be it providing an answer to a new question or solving a problem in the game.
                 
                 You will also be given the current date and time at which the user asks the current question to you. Use this information for sorting through the context data for the most recent conversation or if the user asks you a question about a topic from a specific date.
@@ -309,7 +314,7 @@ public class RAGImplementation {
                     List<RAGImplementation.Conversation> relevantConversations = RAGImplementation.findRelevantConversations(embedding, conversationList, 2);
                     relevantConversationSet.addAll(relevantConversations);
                 } catch (IOException | InterruptedException | OllamaBaseException e) {
-                    LOGGER.error("Caught new exception: {}", (Object) e.getStackTrace());
+                    LOGGER.error("Caught new exception in fetching relevant conversations: {}", (Object) e.getStackTrace());
                     throw new RuntimeException(e);
                 }
             }
@@ -332,18 +337,22 @@ public class RAGImplementation {
                     relevantConversationString.append("Response: ").append(conversation.response).append("\n");
                     relevantConversationString.append("Similarity: ").append(conversation.similarity).append("\n");
                 }
+
+                else {
+                    relevantConversationString.append("Irrelevant");
+                }
+
             }
 
-
-            if (classify_conversations(dateTime, playerMessage ,relevantConversationString.toString())) {
+            if (!relevantConversationString.toString().equals("Irrelevant")) {
 
                 finalRelevantConversationString = relevantConversationString.toString();
+
             }
 
             else {
 
                 finalRelevantConversationString = "No relevant data found from database. Analyze current user input and answer accordingly.";
-
             }
 
         }
@@ -362,7 +371,7 @@ public class RAGImplementation {
                     List<RAGImplementation.Event> relevantEvents = RAGImplementation.findRelevantEvents(embedding, eventList, 2);
                     relevantEventSet.addAll(relevantEvents);
                 } catch (IOException | InterruptedException | OllamaBaseException e) {
-                    LOGGER.error("Caught new exception: {}", (Object) e.getStackTrace());
+                    LOGGER.error("Caught new exception in fetching relevant events: {}", (Object) e.getStackTrace());
                     throw new RuntimeException(e);
                 }
             }
@@ -421,12 +430,12 @@ public class RAGImplementation {
 
         String systemPrompt = buildSystemPrompt();
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
 
         OllamaChatRequestModel chatRequestModel = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, systemPrompt)
                 .withMessage(OllamaChatMessageRole.USER, "User prompt: " + PlayerMessage)
-                .withMessage(OllamaChatMessageRole.USER, "Relevant context data: " + relevantContext)
+                .withMessage(OllamaChatMessageRole.USER, "Context data from database: " + relevantContext)
                 .withMessage(OllamaChatMessageRole.USER, "Current date and time: " + dateTime)
                 .build();
 
@@ -448,7 +457,7 @@ public class RAGImplementation {
 
 
         } catch (OllamaBaseException | IOException | InterruptedException | SQLException e) {
-            LOGGER.error("Caught new exception: {}", e.getMessage());
+            LOGGER.error("Caught new exception while running RAG task: {}", e.getMessage());
             throw new RuntimeException(e);
         }
 
@@ -482,7 +491,7 @@ public class RAGImplementation {
             }
         }
         catch (Exception e) {
-            logger.error("Caught exception: {}", e.getMessage());
+            logger.error("Caught exception while fetching event data: {}", e.getMessage());
         }
 
         return events;
