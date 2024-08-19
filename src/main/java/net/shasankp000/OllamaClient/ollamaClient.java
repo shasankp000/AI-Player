@@ -14,10 +14,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-
 import net.minecraft.text.Text;
-
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.ChatUtils.Helper.RAGImplementation;
 import net.shasankp000.ChatUtils.InputIntentConversationClassifier;
@@ -27,13 +24,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
+
 import java.net.http.HttpTimeoutException;
 
 import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 
 import net.shasankp000.AIPlayer;
 
@@ -45,7 +40,6 @@ public class ollamaClient {
 
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
     private static OllamaChatResult chatResult;
-    private static List<OllamaChatMessage> chatHistory = null;
     private static final String host = "http://localhost:11434";
     public static String botName = "";
     public static boolean isInitialized = false;
@@ -87,7 +81,7 @@ public class ollamaClient {
             if (intent1.equals(InputIntentConversationClassifier.Intent.GENERAL_CONVERSATION)) {
 
                 System.out.println("Execute General convo Intent: " + intent1.name());
-                callClient(context, message);
+                RAGImplementation.runRagTask(dateTime, message, botSource);
             }
 
             else if (intent1.equals(InputIntentConversationClassifier.Intent.ASK_INFORMATION) ) {
@@ -136,34 +130,6 @@ public class ollamaClient {
 
     }
 
-    public static void testHttpRequest(CommandContext<ServerCommandSource> context, String botName) {
-        MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity player = context.getSource().getPlayer();
-
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
-        assert bot != null;
-        ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
-
-        if (pingOllamaServer()) {
-            try {
-            URL url = new URL(host);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-
-            int responseCode = connection.getResponseCode();
-            String responseMessage = connection.getResponseMessage();
-
-            System.out.println(responseCode);
-
-            server.getCommandManager().executeWithPrefix(botSource, "/say HTTP Response: " + responseCode + " " + responseMessage);
-             }
-            catch (Exception e) {
-            server.getCommandManager().executeWithPrefix(botSource, "/say HTTP Request failed: " + e.getMessage());
-            }
-        }
-
-
-    }
 
     private static String generateSystemPrompt() {
 
@@ -178,7 +144,6 @@ public class ollamaClient {
                 Giving information about specific Minecraft entities, items, or biomes.
                 Assisting with in-game tasks, like building structures or exploring areas.
                 Interacting with the environment, such as planting crops or fighting mobs.
-                When talking to the player, make sure not to exceed the length of your messages over 150 characters so that it does not clutter the chat. If needed, break down your message into small paragraphs.
                
                 Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. Remember to keep track of the sequence of events and maintain continuity in your responses. If an event is primarily informational or involves internal actions, it may be sufficient just to remember it without a verbal response.
                 
@@ -201,12 +166,10 @@ public class ollamaClient {
                 For now introduce yourself with your name.
                 """;
 
-
     }
 
 
-    public static CompletableFuture<Void> initializeOllamaClient() {
-        return CompletableFuture.runAsync(() -> {
+    public static void initializeOllamaClient() {
             if (!isInitialized) {
                 LOGGER.info("Initializing Ollama Client");
 
@@ -242,7 +205,6 @@ public class ollamaClient {
                         LOGGER.info("Making API call to Ollama...");
 
                         chatResult = ollamaAPI.chat(requestModel);
-                        chatHistory = chatResult.getChatHistory();
 
                         LOGGER.info("API call to Ollama completed successfully.");
                         server.sendMessage(Text.of(" §9Sent message to "+ botName + " successfully! Please give him some time to respond."));
@@ -292,7 +254,6 @@ public class ollamaClient {
                     }
                 }
             }
-        });
     }
 
 
@@ -320,91 +281,21 @@ public class ollamaClient {
             else {
                 System.out.println("No initial response detected.");
 
+
                 try {
-                    SQLiteDB.storeInitialResponseWithEmbedding(DB_URL, initialResponse);
+
+                    List<Double> promptEmbeddingList = ollamaAPI.generateEmbeddings(OllamaModelType.NOMIC_EMBED_TEXT, generateSystemPrompt());
+                    List<Double> responseEmbeddingList = ollamaAPI.generateEmbeddings(OllamaModelType.NOMIC_EMBED_TEXT, initialResponse);
+
+                    SQLiteDB.storeConversationWithEmbedding(DB_URL, generateSystemPrompt(), initialResponse, promptEmbeddingList, responseEmbeddingList);
                     System.out.println("Saved initial response to database.");
-                } catch (SQLException e) {
+                } catch (SQLException | IOException | InterruptedException | OllamaBaseException e) {
                     LOGGER.error("Caught exception while saving initial response: {}", e.getMessage());
                     throw new RuntimeException(e);
                 }
 
             }
 
-
-
-
-
-
-    }
-
-    public static void callClient(CommandContext<ServerCommandSource> context, String playerMessage) {
-        LOGGER.info("callClient invoked with playerMessage: {}", playerMessage);
-
-        initializeOllamaClient().thenRun(() -> {
-
-            if (pingOllamaServer()) {
-                LOGGER.info("Ollama Server is reachable");
-
-                String botName = StringArgumentType.getString(context, "botName");
-                LOGGER.info("Bot name: {}", botName);
-
-                MinecraftServer server = context.getSource().getServer();
-                ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
-
-                if (bot == null) {
-                    LOGGER.error("Bot with name {} not found", botName);
-                    return;
-                }
-
-                ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
-
-                String selectedLM = AIPlayer.CONFIG.selectedLanguageModel();
-                LOGGER.info("Selected language model: {}", selectedLM);
-
-                String systemPrompt = generateSystemPrompt();
-
-                OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(ModelNameManager.getModelType(selectedLM));
-
-                OllamaChatRequestModel requestModel;
-                if (chatHistory == null && SQLiteDB.dbEmpty) {
-                        requestModel = builder
-                                .withMessage(OllamaChatMessageRole.SYSTEM, systemPrompt)
-                                .withMessage(OllamaChatMessageRole.USER, playerMessage)
-                                .build();
-                } else {
-                        requestModel = builder
-                                .withMessages(chatHistory)
-                                .withMessage(OllamaChatMessageRole.SYSTEM, systemPrompt)
-                                .withMessage(OllamaChatMessageRole.USER, playerMessage)
-                                .build();
-                    }
-
-                try {
-                    chatResult = ollamaAPI.chat(requestModel);
-                    chatHistory = chatResult.getChatHistory();
-
-                    String response = chatResult.getResponse();
-
-                    LOGGER.info("Chat result received: {}", chatResult.getResponse());
-                    ChatUtils.sendChatMessages(botSource, response);
-
-                    // assuming most conversations and inquiries will be general conversation related.
-
-                    // generate embeddings.
-
-                    List<Double> promptEmbedding = ollamaAPI.generateEmbeddings(OllamaModelType.NOMIC_EMBED_TEXT, playerMessage);
-                    List<Double> responseEmbedding = ollamaAPI.generateEmbeddings(OllamaModelType.NOMIC_EMBED_TEXT, response);
-
-                    SQLiteDB.storeConversationWithEmbedding(DB_URL, playerMessage, response, promptEmbedding, responseEmbedding);
-                } catch (OllamaBaseException | InterruptedException | IOException | SQLException e) {
-                    LOGGER.error("Exception occurred: {}", e.getMessage(), e);
-                    throw new RuntimeException(e);
-                }
-            } else {
-                LOGGER.info("Ollama Server is unreachable or model name is invalid!");
-            }
-
-        });
     }
 
 
