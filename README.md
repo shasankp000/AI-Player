@@ -42,6 +42,16 @@ This mod relies on the internal code of the Carpet mod, please star the reposito
 This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/ollama4j
 
 ---
+
+# Upcoming features
+
+- Fully implemented pathfinding for the bot.
+- Collision and entity detection(detects entites around it and looks at it).
+- Interaction with the world environment in general.
+
+---
+
+
 # Download links
 
 1. From this github page, just download from the releases section or follow the steps in usage section to build and test.
@@ -289,26 +299,32 @@ This section is to describe the usage of the mod in-game
 
 ## Commands
 
-*Main command*
+**Main command**
 
 `/bot`
 
 Sub commands: 
 
-`spawm <botName>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
+`spawm <bot>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
 
-`walk <botName> <till>` This command will make the bot walk forward for a specific amount of seconds.
+`walk <bot> <till>` This command will make the bot walk forward for a specific amount of seconds.
 
-`/goTo <botName> <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
+`go_to <bot> <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
 
-`/sendAMessage <botName> <message>` This command will help you to talk to the bot.
+`send_message_to <bot> <message>` This command will help you to talk to the bot.
 
-`/teleportForward <botName>` This command will teleport the bot forward by 1 positive block
+`teleport_forward <bot>` This command will teleport the bot forward by 1 positive block
 
-`/testChatMessage <botName>` A test command to make sure that the bot can send messages.
+`test_chat_message <bot>` A test command to make sure that the bot can send messages.
+
+`detect_entities <bot> A command which is supposed to detect entities around the bot`
 
 **Example Usage:**
 
 `/bot spawn Steve`
+
+The above command changes credits go to [Mr. Álvaro Carvalho](https://github.com/A11v1r15)
+
+And yes since this mod relies on carpet mod, you can spawn a bot using carpet mod's commands too and try the mod. But if you happen to be playing in offline mode, then I recommend using the mod's in built spawn command.
 
 
