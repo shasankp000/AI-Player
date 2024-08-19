@@ -391,7 +391,7 @@ public class FunctionCallerV2 {
 
     public static void run(String userPrompt) {
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2); // LLAMA2 is surprisingly much less error-prone compared to phi3.
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2); // LLAMA2 is surprisingly much less error-prone compared to phi3.
 
         String systemPrompt = FunctionCallerV2.buildPrompt(toolBuilder());
         Gson ignored = new Gson();
@@ -416,7 +416,7 @@ public class FunctionCallerV2 {
 
 
             } catch (OllamaBaseException | IOException | InterruptedException | JsonSyntaxException e) {
-                logger.error("{}", (Object) e.getStackTrace());
+                logger.error("Error while running function caller task: {}", (Object) e.getStackTrace());
             }
 
     }
@@ -495,6 +495,7 @@ public class FunctionCallerV2 {
                 try {
                     Thread.sleep(500L); // Check every 500ms
                 } catch (InterruptedException e) {
+                    logger.error("Couldn't get function call output");
                     throw new RuntimeException(e);
                 }
             }
