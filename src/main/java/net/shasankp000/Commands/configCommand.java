@@ -5,7 +5,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.text.Text;
-import net.shasankp000.GraphicalUserInterface.CustomScreen;
+import net.shasankp000.GraphicalUserInterface.ConfigManager;
 
 
 public class configCommand {
@@ -18,7 +18,7 @@ public class configCommand {
 
                                     MinecraftClient.getInstance().execute(() -> {
                                         Screen currentScreen = MinecraftClient.getInstance().currentScreen;
-                                        MinecraftClient.getInstance().setScreen(new CustomScreen(Text.empty(), currentScreen));
+                                        MinecraftClient.getInstance().setScreen(new ConfigManager(Text.empty(), currentScreen));
                                     });
 
                                     return 1;

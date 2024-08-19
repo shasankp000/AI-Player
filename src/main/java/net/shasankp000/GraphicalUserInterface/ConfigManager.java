@@ -3,7 +3,6 @@ package net.shasankp000.GraphicalUserInterface;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.toast.SystemToast;
 import net.minecraft.text.Text;
 import net.shasankp000.Exception.ollamaNotReachableException;
@@ -18,16 +17,14 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CustomScreen extends Screen {
+public class ConfigManager extends Screen {
 
         public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
         public Screen parent;
-        private TextFieldWidget textFieldWidget;
         private DropdownMenuWidget dropdownMenuWidget;
-        private String selectedModel = AIPlayerConfigModel.selectedModel;
         public AIPlayerConfigModel aiPlayerConfigModel = new AIPlayerConfigModel();
 
-        public CustomScreen(Text title, Screen parent) {
+        public ConfigManager(Text title, Screen parent) {
             super(title);
             this.parent = parent;
         }
@@ -93,7 +90,7 @@ public class CustomScreen extends Screen {
 
             context.drawText(this.textRenderer, "AI-Player Mod configuration Menu",140, 20 - this.textRenderer.fontHeight - 10, white, true);
             context.drawText(this.textRenderer, "Select Language Model",5, this.dropdownMenuWidget.getY() + 5, yellow, true);
-            context.drawText(this.textRenderer, "Currently selected language model: " + selectedModel,100, this.dropdownMenuWidget.getY() + 30, green, true);
+            context.drawText(this.textRenderer, "Currently selected language model: " + AIPlayer.CONFIG.selectedLanguageModel(),100, this.dropdownMenuWidget.getY() + 30, green, true);
             context.drawText(this.textRenderer, "After changing the selected language model, you will need to restart the game!",20, this.dropdownMenuWidget.getY() + 60, red, true);
 
         }
@@ -114,6 +111,11 @@ public class CustomScreen extends Screen {
 
             AIPlayer.CONFIG.selectedLanguageModel(modelName);
             AIPlayer.CONFIG.save();
+
+            close();
+
+            assert this.client != null;
+            this.client.setScreen(new ConfigManager(Text.empty(), this.parent));
 
         }
 
