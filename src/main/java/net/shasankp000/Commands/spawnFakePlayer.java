@@ -34,11 +34,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static net.shasankp000.OllamaClient.ollamaClient.initializeOllamaClient;
+import static net.shasankp000.OllamaClient.ollamaClient.*;
 import static net.shasankp000.PathFinding.PathFinder.*;
 import static net.minecraft.server.command.CommandManager.literal;
 import static net.shasankp000.PathFinding.PathTracer.tracePath;
-import static net.shasankp000.OllamaClient.ollamaClient.sendInitialResponse;
 
 public class spawnFakePlayer {
 
@@ -174,25 +173,31 @@ public class spawnFakePlayer {
 
             ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
 
-            initializeOllamaClient().thenRun(
-                    () -> {
+            initializeOllamaClient();
 
-                        sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+            new Thread( () -> {
 
+                while (!isInitialized) {
+                    try {
+                        Thread.sleep(500L); // Check every 500ms
+                    } catch (InterruptedException e) {
+                        LOGGER.error("Ollama client initialization failed.");
+                        throw new RuntimeException(e);
                     }
-            );
+                }
 
+                sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
 
+                try {
+                    Thread.sleep(1500);
+                    AutoFaceEntity.startAutoFace(bot);
 
-            try {
-                Thread.sleep(1500);
-                AutoFaceEntity.startAutoFace(bot);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
 
+            }).start();
 
-
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
 
         }
 

@@ -54,7 +54,7 @@ public class SQLiteDB {
                 String createTableQuery1 = "CREATE TABLE conversations (" +
                         "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                         "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                        "prompt TEXT, " +
+                        "prompt TEXT NOT NULL, " +
                         "response TEXT NOT NULL, " +
                         "prompt_embedding BLOB, " +
                         "response_embedding BLOB" +
@@ -103,21 +103,6 @@ public class SQLiteDB {
             pstmt.setString(4, responseEmbeddingString);
             pstmt.executeUpdate();
             System.out.println("SYSTEM: Conversation saved to database.");
-
-            dbEmpty = false;
-        }
-    }
-
-
-    public static void storeInitialResponseWithEmbedding(String DB_URL, String response) throws SQLException {
-
-
-        try (Connection connection = DriverManager.getConnection(DB_URL);
-             PreparedStatement pstmt = connection.prepareStatement(
-                     "INSERT INTO conversations (response) VALUES (?)")) {
-            pstmt.setString(1, response);
-            pstmt.executeUpdate();
-            System.out.println("SYSTEM: Initial response saved to database.");
 
             dbEmpty = false;
         }
