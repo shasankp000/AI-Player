@@ -103,7 +103,7 @@ public class helperMethods {
 
         queryConvo.add(queryMap1);
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
         OllamaChatRequestModel requestModel1 = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, queryConvo.toString())
                 .withMessage(OllamaChatMessageRole.USER, prompt)
@@ -131,7 +131,7 @@ public class helperMethods {
             }
 
         } catch (OllamaBaseException | IOException | InterruptedException e) {
-            LOGGER.error("Caught exception: {} ", (Object) e.getStackTrace());
+            LOGGER.error("Caught exception while creating queries: {} ", (Object) e.getStackTrace());
             System.out.println(response);
             throw new RuntimeException(e);
         }
@@ -139,92 +139,104 @@ public class helperMethods {
         return vectorDBQueries;
     }
 
-    public static boolean classify_conversations(String DateTime, String prompt, String retrieved_context) {
-
-        boolean isRelevant = false;
-
-        String sys_prompt = """
-                You are an conversation classification AI agent within the context of minecraft. Your inputs will be a prompt, the current date and time when the prompt was asked and a chunk of text that has the following parameters: \n
-                1. ID: This is just an ID pertaining to it's order in the database. If the id's number is small then it refers to early conversations.
-                2. Timestamp: This is the timestamp at which each conversation is recorded. This is useful for analysis if the current user prompt asks something related to "most recent conversation" or a conversation on a specific date.
-                3. Prompt: The question asked/statement made by the user.
-                4. Response: The response made by the language model in use at that time of recording the conversation.
-                5. Similarity: The similarity score which is obtained after a vector similarity calculation. The closer it is to 1, the better the chances of the conversation being similar to the current user input.
-              \n
-               \n
-               You will not respond as an AI assistant. You only respond "yes" or "no". \n
-               \n
-                Determine whether the context contains data that directly is related to the search query. \n
-               \n
-                If the context is seemingly exactly what the search query needs, respond "yes" if it is anything but directly 'related respond "no". Do not respond "yes" unless the content is highly relevant to the search query. \n
-               \n
-                Here's an example of the prompts you may receive: \n
-               \n
-               Example 1: Based on everything that you know about me so far, tell me about myself. \n
-               Example 2: What is the derivative of x^y with respect to y? \n
-               Example 3: What did we discuss last Tuesday? \n
-               Example 4: What is the weather in Bengaluru right now? \n
-               Example 5: How can I craft a shield? \n
-               Example 6: Tell me the recipe for the fire resistance potion. \n
-               Example 7: What is the best way to raid an ocean monument? \n
-               \n
-               And here's the type of context data you will receive: \n
-              \n
-               "\\n \\"ID: 1\\""
-               "\\n \\"Timestamp: 2024-xx-xx 23:35:36 \\""
-               "\\n \\"Prompt: Hi there! My name is John Doe. How is your day today?\\""
-               "\\n \\"Response: Hi John! I'm doing well, thank you for asking! It's great to be chatting with you again. Can you tell me more about what brings you here today? Are you working on a specific project or just looking for some general information?" +
-               "\\n \\"Similarity: 0.40820406249846664\\""
-      
-               "\\n \\"ID: 2 \\""
-               "\\n \\"Timestamp: 2024-xx-xx 00:35:36\\""
-               "\\n \\"Prompt: How can I craft a shield?\\""
-               "\\n \\"Response: To craft a shield, you'll need six planks of wood and one iron ingot. Arrange the planks in a Y shape with the iron ingot in the top-center slot."
-               "\\n \\"Similarity: 0.76855590124578\\""
-              \n
-           \n
-              Note how in this example the prompts and context are completely unrelated. That doesn't mean this will always be the case. You must analyse both the prompts and context data properly and return only a single word answer. Yes or No, irrespective of case. \n
-             \n
-              If you receive no such data, then it means there is no "probable relevant data" to classify. In that case simply say No, irrespective of case.
-             \n
-      \s
-           \s""";
-
-        String userEnd = "This is the user prompt: " + prompt;
-        String contextData = "This is the context data from the database: " + "\n" + retrieved_context;
-
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2);
-        OllamaChatRequestModel requestModel2 = builder
-                .withMessage(OllamaChatMessageRole.SYSTEM, sys_prompt)
-                .withMessage(OllamaChatMessageRole.USER, userEnd)
-                .withMessage(OllamaChatMessageRole.USER, contextData)
-                .withMessage(OllamaChatMessageRole.USER, "Current date and time: " + DateTime)
-                .build();
-
-        String response;
-
-
-        try {
-            OllamaChatResult chatResult1 = ollamaAPI.chat(requestModel2);
-
-            response = chatResult1.getResponse();
-
-            System.out.println("Conversation classifier: " + "\n" + response);
-
-            if (response.equalsIgnoreCase("yes") || response.startsWith("Yes") || response.startsWith("yes") || response.contains("Yes") || response.contains("yes")) {
-
-                isRelevant = true;
-
-            }
-
-
-        } catch (OllamaBaseException | IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
-
-        return isRelevant;
-    }
+//    public static boolean classify_conversations(String DateTime, String prompt, String retrieved_context) {
+//
+//        boolean isRelevant = false;
+//
+//        String sys_prompt = """
+//                You are an conversation classification AI agent within the context of minecraft. Your inputs will be a prompt, the current date and time when the prompt was asked and a chunk of text that has the following parameters: \n
+//                1. ID: This is just an ID pertaining to it's order in the database. If the id's number is small then it refers to early conversations.
+//                2. Timestamp: This is the timestamp at which each conversation is recorded. This is useful for analysis if the current user prompt asks something related to "most recent conversation" or a conversation on a specific date.
+//                3. Prompt: The question asked/statement made by the user.
+//                4. Response: The response made by the language model in use at that time of recording the conversation.
+//                5. Similarity: The similarity score which is obtained after a vector similarity calculation. The closer it is to 1, the better the chances of the conversation being similar to the current user input.
+//              \n
+//               \n
+//               You will not respond as an AI assistant. You only respond "yes" or "no". \n
+//               \n
+//                Determine whether the context contains data that directly is related to the search query. \n
+//               \n
+//                If the context is seemingly exactly what the search query needs, respond "yes" if it is anything but directly 'related respond "no". Do not respond "yes" unless the content is highly relevant to the search query. \n
+//               \n
+//                Here's an example of the prompts you may receive: \n
+//               \n
+//               Example 1: Based on everything that you know about me so far, tell me about myself. \n
+//               Example 2: What is the derivative of x^y with respect to y? \n
+//               Example 3: What did we discuss last Tuesday? \n
+//               Example 4: What is the weather in Bengaluru right now? \n
+//               Example 5: How can I craft a shield? \n
+//               Example 6: Tell me the recipe for the fire resistance potion. \n
+//               Example 7: What is the best way to raid an ocean monument? \n
+//               \n
+//               And here's the type of context data you will receive: \n
+//              \n
+//               "\\n \\"ID: 1\\""
+//               "\\n \\"Timestamp: 2024-xx-xx 23:35:36 \\""
+//               "\\n \\"Prompt: Hi there! My name is John Doe. How is your day today?\\""
+//               "\\n \\"Response: Hi John! I'm doing well, thank you for asking! It's great to be chatting with you again. Can you tell me more about what brings you here today? Are you working on a specific project or just looking for some general information?" +
+//               "\\n \\"Similarity: 0.40820406249846664\\""
+//
+//               "\\n \\"ID: 2 \\""
+//               "\\n \\"Timestamp: 2024-xx-xx 00:35:36\\""
+//               "\\n \\"Prompt: How can I craft a shield?\\""
+//               "\\n \\"Response: To craft a shield, you'll need six planks of wood and one iron ingot. Arrange the planks in a Y shape with the iron ingot in the top-center slot."
+//               "\\n \\"Similarity: 0.76855590124578\\""
+//              \n
+//           \n
+//           Sometimes you might end up receiving this in your context data:
+//           \n
+//           \\n \\"ID: 1\\""
+//           "\\n \\"Timestamp: 2024-xx-xx 23:35:36 \\""
+//           "\\n \\"Prompt: null\\""
+//           "\\n \\"Response: Hi John! I'm doing well, thank you for asking! It's great to be chatting with you again. Can you tell me more about what brings you here today? Are you working on a specific project or just looking for some general information?" +
+//           "\\n \\"Similarity: 0.0\\""
+//           \s
+//           When you receive a context with an exact similarity of 0.0, it is the first response you ever said when you were first called, and you must analyse the response part of it according to the user prompt and return it if it is relevant according to the prompt.
+//           \s
+//           \s
+//              Note how in this example the prompts and context are completely unrelated. That doesn't mean this will always be the case. You must analyse both the prompts and context data properly and return only a single word answer. Yes or No, irrespective of case. \n
+//             \n
+//              If you receive no such data, then it means there is no "probable relevant data" to classify. In that case simply say No, irrespective of case.
+//             \n
+//      \s
+//           \s""";
+//
+//        String userEnd = "This is the user prompt: " + prompt;
+//        String contextData = "This is the context data from the database: " + "\n" + retrieved_context;
+//
+//        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
+//        OllamaChatRequestModel requestModel2 = builder
+//                .withMessage(OllamaChatMessageRole.SYSTEM, sys_prompt)
+//                .withMessage(OllamaChatMessageRole.USER, userEnd)
+//                .withMessage(OllamaChatMessageRole.USER, contextData)
+//                .withMessage(OllamaChatMessageRole.USER, "Current date and time: " + DateTime)
+//                .build();
+//
+//        String response;
+//
+//
+//        try {
+//            OllamaChatResult chatResult1 = ollamaAPI.chat(requestModel2);
+//
+//            response = chatResult1.getResponse();
+//
+//            System.out.println("Conversation classifier: " + "\n" + response);
+//
+//            if (response.equalsIgnoreCase("yes") || response.startsWith("Yes") || response.startsWith("yes") || response.contains("Yes") || response.contains("yes")) {
+//
+//                isRelevant = true;
+//
+//            }
+//
+//
+//        } catch (OllamaBaseException | IOException | InterruptedException e) {
+//            LOGGER.error("Caught new exception while classifying conversations: {}", e.getMessage());
+//            throw new RuntimeException(e);
+//        }
+//
+//
+//        return isRelevant;
+//    }
 
     public static String classify_queries(List<String> QueryList, String prompt) {
 
@@ -262,7 +274,7 @@ public class helperMethods {
         String userEnd = "This is the user prompt: " + prompt;
         String queryData = "This is the generated query list: " + "\n" + QueryList.toString();
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
         OllamaChatRequestModel requestModel2 = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, sys_prompt)
                 .withMessage(OllamaChatMessageRole.USER, userEnd)
@@ -292,6 +304,7 @@ public class helperMethods {
 
 
         } catch (OllamaBaseException | IOException | InterruptedException e) {
+            LOGGER.error("Caught new exception while classifying queries: {}", e.getMessage());
             throw new RuntimeException(e);
         }
 
@@ -355,7 +368,7 @@ public class helperMethods {
         String userEnd = "This is the user prompt: " + prompt;
         String contextData = "This is the context data from the database: " + "\n" + retrieved_context;
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
         OllamaChatRequestModel requestModel2 = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, sys_prompt)
                 .withMessage(OllamaChatMessageRole.USER, userEnd)
@@ -381,6 +394,7 @@ public class helperMethods {
 
 
         } catch (OllamaBaseException | IOException | InterruptedException e) {
+            LOGGER.error("Caught new exception while classifying events: {}", e.getMessage());
             throw new RuntimeException(e);
         }
 
