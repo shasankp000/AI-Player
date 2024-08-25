@@ -111,9 +111,9 @@ Pair this with **function calling**. Which combines Natural Language processing 
 
 Save this data, i.e what the bot did just now to the database and you get even more improved memory!
 
-To top it all off, Llama 2 is the best performing model for this mod right now, so I will suggest y'all to use llama2.
+To top it all off, Gemma 2 8b is the best performing model for this mod right now, so I will suggest y'all to use gemma2.
 
-In fact some of the methods won't even run without llama2 like the RAG for example so it's a must.
+In fact some of the methods won't even run without gemma2 like the RAG for example so it's a must.
 
 ---
 
