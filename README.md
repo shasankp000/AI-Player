@@ -162,7 +162,7 @@ https://github.com/user-attachments/assets/d6cd7d86-9651-4e6f-b14a-56332206a440
 
 ## For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
 
-**For users who have used the mod before, transitioning to version 1.0.2-hotfix-2**
+**For users who have used the mod before, transitioning to version 1.0.2-hotfix-3**
 
 ```
 1. Go to your game folder (.minecraft)/config and you will find a settings.json5 file.
