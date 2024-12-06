@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.shasankp000.Commands.configCommand;
 import net.shasankp000.Commands.spawnFakePlayer;
 
+import net.shasankp000.Database.QTableStorage;
 import net.shasankp000.Database.SQLiteDB;
 import net.shasankp000.Entity.AutoFaceEntity;
 import net.shasankp000.FilingSystem.AIPlayerConfig;
@@ -25,6 +26,7 @@ public class AIPlayer implements ModInitializer {
 		spawnFakePlayer.register();
 		configCommand.register();
 		SQLiteDB.createDB();
+		QTableStorage.setupQTableStorage();
 
 		ServerLifecycleEvents.SERVER_STOPPED.register(AutoFaceEntity::onServerStopped);
 	}

@@ -288,6 +288,8 @@ public class RAGImplementation {
 
     private static String recall(String dateTime, String playerMessage) throws SQLException {
 
+        ollamaAPI.setRequestTimeoutSeconds(600);
+
         System.out.println("Recalling from memory.....");
 
         String tableType;
@@ -430,7 +432,7 @@ public class RAGImplementation {
 
         String systemPrompt = buildSystemPrompt();
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance("llama3.2:latest");
 
         OllamaChatRequestModel chatRequestModel = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, systemPrompt)

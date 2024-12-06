@@ -17,7 +17,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.Text;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.ChatUtils.Helper.RAGImplementation;
-import net.shasankp000.ChatUtils.InputIntentConversationClassifier;
+import net.shasankp000.ChatUtils.NLPProcessor;
 import net.shasankp000.Database.SQLiteDB;
 import net.shasankp000.FunctionCaller.FunctionCallerV2;
 import org.slf4j.Logger;
@@ -74,17 +74,17 @@ public class ollamaClient {
 
         try {
 
-            InputIntentConversationClassifier.Intent intent1;
+            NLPProcessor.Intent intent1;
 
-            intent1 = InputIntentConversationClassifier.getConversationIntent(message);
+            intent1 = NLPProcessor.getIntention(message);
 
-            if (intent1.equals(InputIntentConversationClassifier.Intent.GENERAL_CONVERSATION)) {
+            if (intent1.equals(NLPProcessor.Intent.GENERAL_CONVERSATION)) {
 
                 System.out.println("Execute General convo Intent: " + intent1.name());
                 RAGImplementation.runRagTask(dateTime, message, botSource);
             }
 
-            else if (intent1.equals(InputIntentConversationClassifier.Intent.ASK_INFORMATION) ) {
+            else if (intent1.equals(NLPProcessor.Intent.ASK_INFORMATION) ) {
 
                     System.out.println("Execute ASK_INFORMATION Intent: " + intent1.name());
 
@@ -92,7 +92,7 @@ public class ollamaClient {
 
             }
 
-            else if (intent1.equals(InputIntentConversationClassifier.Intent.REQUEST_ACTION)) {
+            else if (intent1.equals(NLPProcessor.Intent.REQUEST_ACTION)) {
                     System.out.println("Execute REQUEST_ACTION Intent: " + intent1.name());
 
 
@@ -195,7 +195,7 @@ public class ollamaClient {
                         LOGGER.info("Setting language model to {}", selectedLM);
 
 
-                        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(ModelNameManager.getModelType(selectedLM));
+                        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(selectedLM);
 
                         OllamaChatRequestModel requestModel = builder
                                 .withMessage(OllamaChatMessageRole.SYSTEM, generateSystemPrompt())

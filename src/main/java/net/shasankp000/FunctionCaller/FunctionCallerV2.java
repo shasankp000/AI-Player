@@ -367,7 +367,7 @@ public class FunctionCallerV2 {
                \s""";
 
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.LLAMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance("llama3.2:latest");
 
         try {
 
@@ -391,7 +391,8 @@ public class FunctionCallerV2 {
 
     public static void run(String userPrompt) {
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2); // LLAMA2 is surprisingly much less error-prone compared to phi3.
+        ollamaAPI.setRequestTimeoutSeconds(600);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance("llama3.2:latest"); // LLAMA2 is surprisingly much less error-prone compared to phi3.
 
         String systemPrompt = FunctionCallerV2.buildPrompt(toolBuilder());
         Gson ignored = new Gson();
@@ -424,57 +425,63 @@ public class FunctionCallerV2 {
 
 
 
-    private static void executeFunction(String userInput,String response) {
-
+    private static void executeFunction(String userInput, String response) {
         String executionDateTime = getCurrentDateandTime();
 
         try {
-
-            new Thread( () -> {
-
+            new Thread(() -> {
                 String cleanedResponse = cleanJsonString(response);
                 System.out.println("Cleaned JSON Response: " + cleanedResponse); // Log the cleaned JSON response for debugging
                 JsonReader reader = new JsonReader(new StringReader(cleanedResponse));
                 reader.setLenient(true);
                 JsonObject jsonObject = JsonParser.parseReader(reader).getAsJsonObject();
                 String functionName = jsonObject.get("functionName").getAsString();
-                JsonArray parameters = jsonObject.get("parameters").getAsJsonArray();
+
+                JsonElement parametersElement = jsonObject.get("parameters");
 
                 StringBuilder params = new StringBuilder();
                 Map<String, String> parameterMap = new ConcurrentHashMap<>();
 
-                for (JsonElement parameter : parameters) {
-                    JsonObject paramObj = parameter.getAsJsonObject();
-                    String paramName = paramObj.get("parameterName").getAsString();
-                    String paramValue = paramObj.get("parameterValue").getAsString();
-                    params.append(paramName).append("=").append(paramValue).append(", ");
-
-                    parameterMap.put(paramName, paramValue);
-
+                // Generalized handling for parameters
+                if (parametersElement.isJsonObject()) {
+                    // Handle parameters as a JSON object
+                    JsonObject parametersObject = parametersElement.getAsJsonObject();
+                    for (Map.Entry<String, JsonElement> entry : parametersObject.entrySet()) {
+                        String paramName = entry.getKey();
+                        String paramValue = entry.getValue().getAsString();
+                        params.append(paramName).append("=").append(paramValue).append(", ");
+                        parameterMap.put(paramName, paramValue);
+                    }
+                } else if (parametersElement.isJsonArray()) {
+                    // Handle parameters as a JSON array
+                    JsonArray parametersArray = parametersElement.getAsJsonArray();
+                    for (JsonElement parameter : parametersArray) {
+                        JsonObject paramObj = parameter.getAsJsonObject();
+                        String paramName = paramObj.get("parameterName").getAsString();
+                        String paramValue = paramObj.get("parameterValue").getAsString();
+                        params.append(paramName).append("=").append(paramValue).append(", ");
+                        parameterMap.put(paramName, paramValue);
+                    }
+                } else {
+                    throw new IllegalStateException("Unexpected parameters format: " + parametersElement);
                 }
 
                 System.out.println("Params: " + params);
                 System.out.println("Parameter Map: " + parameterMap);
 
-                // call the actual function
+                // Call the actual function
                 String result = "Executed " + functionName + " with parameters " + params;
 
                 callFunction(functionName, parameterMap).thenRun(() -> {
                     getFunctionResultAndSave(userInput, executionDateTime);
                 });
 
-
-
-
                 System.out.println(result);
 
-            } ).start();
-
-
-        } catch (JsonSyntaxException | NullPointerException e) {
+            }).start();
+        } catch (JsonSyntaxException | NullPointerException | IllegalStateException e) {
             System.err.println("Error processing JSON response: " + e.getMessage());
         }
-
     }
 
 

@@ -8,7 +8,6 @@ import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestBuilder;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestModel;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatResult;
-import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,7 +102,7 @@ public class helperMethods {
 
         queryConvo.add(queryMap1);
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance("llama3.2:latest");
         OllamaChatRequestModel requestModel1 = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, queryConvo.toString())
                 .withMessage(OllamaChatMessageRole.USER, prompt)
@@ -274,7 +273,7 @@ public class helperMethods {
         String userEnd = "This is the user prompt: " + prompt;
         String queryData = "This is the generated query list: " + "\n" + QueryList.toString();
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance("llama3.2:latest");
         OllamaChatRequestModel requestModel2 = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, sys_prompt)
                 .withMessage(OllamaChatMessageRole.USER, userEnd)
@@ -368,7 +367,7 @@ public class helperMethods {
         String userEnd = "This is the user prompt: " + prompt;
         String contextData = "This is the context data from the database: " + "\n" + retrieved_context;
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.GEMMA2);
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance("llama3.2:latest");
         OllamaChatRequestModel requestModel2 = builder
                 .withMessage(OllamaChatMessageRole.SYSTEM, sys_prompt)
                 .withMessage(OllamaChatMessageRole.USER, userEnd)

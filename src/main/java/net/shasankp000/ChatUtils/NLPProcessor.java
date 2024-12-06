@@ -7,7 +7,6 @@ import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestBuilder;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestModel;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatResult;
-import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -198,7 +197,9 @@ public class NLPProcessor {
 
     public static Intent getIntention(String userPrompt) {
 
-        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance(OllamaModelType.PHI3); // LLAMA2 is surprisingly much less error-prone compared to phi3.
+        ollamaAPI.setRequestTimeoutSeconds(600);
+
+        OllamaChatRequestBuilder builder = OllamaChatRequestBuilder.getInstance("llama3.2:latest"); // LLAMA2 is surprisingly much less error-prone compared to phi3.
 
         String systemPrompt = buildPrompt();
         String response;
