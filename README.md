@@ -52,6 +52,14 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 - More environment triggers for RL to work
 ---
 
+# Current bugs in this version :
+
+1. If the bot dies or is killed off while it was engaged in an action, the code might throw an error on the bot respawn. Temporary fix is a game restart (or server restart).
+
+Will be fixed in upcoming patch.
+
+2. The removeArmor command doesn't work (yet).
+
 
 # Download links
 
@@ -70,10 +78,18 @@ So after a lot of research and painful hours of coding here's the new update!
 # What's new :
 
 1. Fixed previous bugs.
-2. Introduced a much lighter model (llama3.2)
+
+2.  Switched to a much lighter model (llama3.2) for conversations, RAG and function calling
+  
 3. A whole lot of commands
+  
 4. Reinforcement Learning (Q-learning).
+  
 5. Mod no longer requires Java 21 to run. Can run on java 17.
+  
+6. **Theortically** Multiplayer compatible (just install the dependencies on server side), as carpet mod can run on servers too, but I have not tested it yet. Feedback is welcome from testers on this.
+ 
+7. **Theoretically** the mod **should not** require everyone to install it on multiplayer, it should be a server-sided one, haven't tested this one yet, feedback is welcome from testers.
 
 Bot can now interact with it's envrionment based on "triggers" and then learn about it's situation and try to adapt.
 
