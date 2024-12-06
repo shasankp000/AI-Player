@@ -79,11 +79,16 @@ Bot can now interact with it's envrionment based on "triggers" and then learn ab
 
 The learning process is not short, don't expect the bot to learn how to deal with a situation very quickly, in fact if you want intelligent results, you may need hours of training(Something I will focus on once I fix some more bugs, add some more triggers and get this version out of the alpha stage)
 
-To start the learning process
+To start the learning process:
 
 `/bot spawn <botName> training`
 
 Right now the bot only reacts to hostile mobs around it, will add more "triggers" so that the bot responds to more scenarios and learns how to deal with such scenarios in upcoming updates
+
+An old footage of how to bot learnt to deal with a hostile entity (that training data was sadly not saved at the time).
+
+
+https://github.com/user-attachments/assets/8c02bf85-8fbe-493a-af45-b9dab217f991
 
 ---
 
