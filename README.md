@@ -45,10 +45,11 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 # Upcoming features
 
-- Fully implemented pathfinding for the bot.
-- Collision and entity detection(detects entites around it and looks at it).
-- Interaction with the world environment in general.
-
+- ~~Fully implemented pathfinding for the bot~~.
+- ~~Collision and entity detection(detects entites around it and looks at it)~~.
+- ~~Interaction with the world environment in general~~.
+- ~~Reinforcement Learning~~.
+- More environment triggers for RL to work
 ---
 
 
@@ -60,7 +61,94 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 ---
 
-# Progress: 60%
+# Progress: 70%
+
+## Changelog v.1.0.3-alpha-1
+
+So after a lot of research and painful hours of coding here's the new update!
+
+# What's new :
+
+1. Fixed previous bugs.
+2. Introduced a much lighter model (llama3.2)
+3. A whole lot of commands
+4. Reinforcement Learning (Q-learning).
+5. Mod no longer requires Java 21 to run. Can run on java 17.
+
+Bot can now interact with it's envrionment based on "triggers" and then learn about it's situation and try to adapt.
+
+The learning process is not short, don't expect the bot to learn how to deal with a situation very quickly, in fact if you want intelligent results, you may need hours of training(Something I will focus on once I fix some more bugs, add some more triggers and get this version out of the alpha stage)
+
+To start the learning process
+
+`/bot spawn <botName> training`
+
+Right now the bot only reacts to hostile mobs around it, will add more "triggers" so that the bot responds to more scenarios and learns how to deal with such scenarios in upcoming updates
+
+---
+
+## # New commands :
+
+Spawn command changed.
+
+`/bot spawn <bot> <mode: training or play>`, if you type anything else in the mode parameter you will get a message in chat showing the correct usage of this command
+
+
+`/bot use-key <W,S, A, D, LSHIFT, SPRINT, UNSNEAK, UNSPRINT> <bot>`
+
+`/bot release-all-keys <bot> <botName>`
+
+`/bot look <north, south, east, west>`
+
+
+`/bot detectDangerZone` // Detects lava pools and cliffs nearby
+
+`/bot getHotBarItems` // returns a list of the items in it's hotbar
+
+`/bot getSelectedItem` // gets the currently selected item
+
+`/bot getHungerLevel` // gets it's hunger levels
+
+`/bot getOxygenLevel` // gets the oxygen level of the bot
+
+`/bot equipArmor` // gets the bot to put on the best armor in it's inventory
+
+`/bot removeArmor` // work in progress.
+
+---
+
+## What to do to setup this version before playing the game :
+
+```
+1. Make sure you still have ollama installed.
+2. In cmd or terminal type `ollama pull nomic-embed-text (if not already done).
+3. Type `ollama pull llama3.2`
+4. Type `ollama rm gemma2 (if you still have it installed)
+5. Type `ollama rm llama2 (if you still have it installed)
+6. If you have run the mod before go to your .minecraft folder, navigate to a folder called config, and delete a file called settings.json5
+```
+
+Then make sure you have turned on ollama server. After that launch the game.
+
+Type `/configMan` in chat and select llama3.2 as the language model, then hit save and exit.
+
+Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
+
+---
+
+For the nerds : How does the bot learn?
+
+It uses an algorithm called Q-learning which is a part of reinforcement learning.
+
+A very good video explanation on what Q-learning is :
+
+[Reinforcement learning 101](https://www.youtube.com/watch?v=vXtfdGphr3c)
+
+---
+
+# Below is older changelogs from the previous updates
+
+---
 
 ## For the nerds
 
@@ -182,9 +270,9 @@ Then spawn the bot and start talking!
 ---
 # Buidling the project from intellij
 
-Step 1. Download Java 21. 
+Step 1. Download Java 17. 
 
-This project is built on java 21 to support carpet mod's updated API.
+This project is built on java 17 to support carpet mod's updated API.
 
 Go to: https://bell-sw.com/pages/downloads/#jdk-21-lts
 
