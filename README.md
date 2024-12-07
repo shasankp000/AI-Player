@@ -101,10 +101,9 @@ To start the learning process:
 
 Right now the bot only reacts to hostile mobs around it, will add more "triggers" so that the bot responds to more scenarios and learns how to deal with such scenarios in upcoming updates
 
-An old footage of how to bot learnt to deal with a hostile entity (that training data was sadly not saved at the time).
+A recording of what this verison does : 
 
-
-https://github.com/user-attachments/assets/8c02bf85-8fbe-493a-af45-b9dab217f991
+[![YouTube](http://i.ytimg.com/vi/6zEORx1OKfA/hqdefault.jpg)](https://www.youtube.com/watch?v=6zEORx1OKfA)
 
 ---
 
