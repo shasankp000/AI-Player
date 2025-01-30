@@ -105,7 +105,7 @@ A recording of what this verison does :
 
 ---
 
-## # New commands :
+## New commands :
 
 Spawn command changed.
 
