@@ -8,244 +8,188 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.world.World;
 import net.shasankp000.DangerZoneDetector.DangerZoneDetector;
+import net.shasankp000.Database.QTable;
 import net.shasankp000.Database.QTableStorage;
+import net.shasankp000.Database.StateActionPair;
+import net.shasankp000.Database.StateActionTransition;
 import net.shasankp000.Entity.AutoFaceEntity;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.shasankp000.PlayerUtils.hotBarUtils;
-import net.shasankp000.PlayerUtils.getPlayerHunger;
-import net.shasankp000.PlayerUtils.getPlayerOxygen;
+import net.shasankp000.Entity.FaceClosestEntity;
+import net.shasankp000.PlayerUtils.*;
 import net.shasankp000.WorldUitls.GetTime;
+import net.shasankp000.Entity.EntityDetails;
+import net.shasankp000.WorldUitls.isBlockItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.*;
 
-import net.shasankp000.PlayerUtils.getArmorStack;
-import net.shasankp000.PlayerUtils.getOffHandStack;
+import static net.shasankp000.GameAI.State.isStateConsistent;
 
 
 public class BotEventHandler {
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
     private static MinecraftServer server = null;
-    private static ServerPlayerEntity bot = null;
+    public static ServerPlayerEntity bot = null;
     private static final String gameDir = MinecraftClient.getInstance().runDirectory.getAbsolutePath();
-    private static final String qTableDir = gameDir + "/qtable_storage/";
+    public static final String qTableDir = gameDir + "/qtable_storage/";
     private static final Object monitorLock = new Object();
     private static boolean isExecuting = false;
-    private static Map<State, Map<StateActions.Action, Double>> qTable;
-
+    private static final double DEFAULT_RISK_APPETITE = 0.5; // Default value upon respawn
+    public static boolean botDied = false; // Flag to track if the bot died
+    public static boolean hasRespawned = false; // flag to track if the bot has respawned before or not
+    public static int botSpawnCount = 0;
+    private static State currentState = null;
 
     public BotEventHandler(MinecraftServer server, ServerPlayerEntity bot) {
         BotEventHandler.server = server;
         BotEventHandler.bot = bot;
 
-        // Load Q-table from storage
-        try {
-            qTable = QTableStorage.loadQTable(qTableDir + "/qtable.bin");
-            System.out.println("Loaded Q-table from storage.");
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.err.println("No existing Q-table found. Starting fresh.");
-            qTable = new HashMap<>(); // Initialize an empty Q-table
-        }
-
     }
 
-    private static State initializeBotState(Map<State, Map<StateActions.Action, Double>> qTable) {
-
+    private static State initializeBotState(QTable qTable) {
         State initialState = null;
 
-        if (qTable == null || qTable.isEmpty()) {
+        if (qTable == null || qTable.getTable().isEmpty()) {
             System.out.println("No initial state available. Q-table is empty.");
-        }
+        } else {
+            System.out.println("Loaded Q-table: Total state-action pairs = " + qTable.getTable().size());
 
-        else {
-
-            // Get the most recent state-action pair (guaranteed to exist for non-empty qTable)
-            initialState = qTable.keySet().iterator().next();
+            // Get the most recent state from the Q-table
+            StateActionPair recentPair = qTable.getTable().keySet().iterator().next();
+            initialState = recentPair.getState();
 
             System.out.println("Setting initial state to: " + initialState);
-            // Perform any initialization logic using this state
-
         }
 
         return initialState;
     }
 
-
-
-
-    public void detectAndReact(RLAgent rlAgentHook, double distanceToHostileEntity) {
-        // one single function for all detection events (various States).
-
+    public void detectAndReact(RLAgent rlAgentHook, double distanceToHostileEntity, QTable qTable) throws IOException {
         synchronized (monitorLock) {
-            if(isExecuting) {
+            if (isExecuting) {
                 System.out.println("Executing detection code");
-
                 return; // Skip if already executing
             }
-
             isExecuting = true;
-
         }
 
         try {
             ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
 
+            System.out.println("Distance from danger zone: " + DangerZoneDetector.detectDangerZone(bot, 10, 10 , 10) + " blocks");
 
             List<Entity> nearbyEntities = AutoFaceEntity.detectNearbyEntities(bot, 10); // Example bounding box size
-
             List<Entity> hostileEntities = nearbyEntities.stream()
                     .filter(entity -> entity instanceof HostileEntity)
                     .toList();
 
-
             int timeofDay = GetTime.getTimeOfWorld(bot);
-
-            String time;
-
-            if (timeofDay >= 12000 && timeofDay < 24000) {
-                time = "night";
-            }
-            else {
-                time = "day";
-            }
+            String time = (timeofDay >= 12000 && timeofDay < 24000) ? "night" : "day";
 
             World world = bot.getCommandSource().getWorld();
-
             RegistryKey<World> dimType = world.getRegistryKey();
-
-            String dimension = dimType.getValue().toString(); // minecraft:overworld or any other dimension, including custom dimensions from other mods.
-
+            String dimension = dimType.getValue().toString();
 
             if (!hostileEntities.isEmpty()) {
-
-                List<ItemStack> hotBarItems;
-
-                String selectedItem;
-
-                double dangerDistance;
-
-                int botHungerLevel;
-
-                int botOxygenLevel;
-
-                Map<String, ItemStack> armorItems;
-
-                ItemStack offhandItem;
-
-
-
-                State currentState = initializeBotState(qTable);
-
-                if (currentState == null) {
-
-                    // Gather state information
-                    currentState = createInitialState(bot);
-
+                List<EntityDetails> nearbyEntitiesList = new ArrayList<>();
+                for (Entity entity : nearbyEntities) {
+                    String directionToBot = AutoFaceEntity.determineDirectionToBot(bot, entity);
+                    nearbyEntitiesList.add(new EntityDetails(
+                            entity.getName().getString(),
+                            entity.getX(),
+                            entity.getY(),
+                            entity.getZ(),
+                            entity instanceof HostileEntity,
+                            directionToBot
+                    ));
                 }
 
-                // Choose action
-                StateActions.Action chosenAction = rlAgentHook.chooseAction(currentState);
+                State currentState;
 
-                // Log chosen action for debugging
+                if (hasRespawned && botDied) {
+                    State lastKnownState = QTableStorage.loadLastKnownState(qTableDir + "/lastKnownState.bin");
+                    currentState = createInitialState(bot);
+                    BotEventHandler.botDied = false;
+
+                    if (isStateConsistent(lastKnownState, currentState)) {
+                        System.out.println("Merged values from last known state.");
+                        currentState.setRiskMap(lastKnownState.getRiskMap());
+                        currentState.setPodMap(lastKnownState.getPodMap());
+                    }
+                } else {
+                    currentState = initializeBotState(qTable);
+
+                    System.out.println("Created initial state");
+                }
+
+                if (botSpawnCount == 0) {
+                    currentState = createInitialState(bot);
+                }
+
+                double riskAppetite = rlAgentHook.calculateRiskAppetite(currentState);
+                List<StateActions.Action> potentialActionList = rlAgentHook.suggestPotentialActions(currentState);
+                Map<StateActions.Action, Double> riskMap = rlAgentHook.calculateRisk(currentState, potentialActionList);
+
+                Map<StateActions.Action, Double> chosenActionMap = rlAgentHook.chooseAction(currentState, riskAppetite, riskMap);
+                Map.Entry<StateActions.Action, Double> entry = chosenActionMap.entrySet().iterator().next();
+
+                StateActions.Action chosenAction = entry.getKey();
+                double risk = entry.getValue();
+
                 System.out.println("Chosen action: " + chosenAction);
 
-                // Execute action
                 switch (chosenAction) {
-                    case MOVE_FORWARD:
-                        performAction("moveForward", botSource);
-                        break;
-                    case MOVE_BACKWARD:
-                        performAction("moveBackward", botSource);
-                        break;
-                    case TURN_LEFT:
-                        performAction("turnLeft", botSource);
-                        break;
-                    case TURN_RIGHT:
-                        performAction("turnRight", botSource);
-                        break;
-                    case JUMP:
-                        performAction("jump", botSource);
-                        break;
-                    case SNEAK:
-                        performAction("sneak", botSource);
-                        break;
-                    case SPRINT:
-                        performAction("sprint", botSource);
-                        break;
-                    case STOP_SNEAKING:
-                        performAction("unsneak", botSource);
-                        break;
-                    case STOP_SPRINTING:
-                        performAction("unsprint", botSource);
-                        break;
-                    case STOP_MOVING:
-                        performAction("stopMoving", botSource);
-                        break;
-                    case USE_ITEM:
-                        performAction("useItem", botSource);
-                        break;
-                    case ATTACK:
-                        performAction("attack", botSource);
-                        break;
-                    case HOTBAR_1:
-                        performAction("hotbar1", botSource);
-                        break;
-                    case HOTBAR_2:
-                        performAction("hotbar2", botSource);
-                        break;
-                    case HOTBAR_3:
-                        performAction("hotbar3", botSource);
-                        break;
-                    case HOTBAR_4:
-                        performAction("hotbar4", botSource);
-                        break;
-                    case HOTBAR_5:
-                        performAction("hotbar5", botSource);
-                        break;
-                    case HOTBAR_6:
-                        performAction("hotbar6", botSource);
-                        break;
-                    case HOTBAR_7:
-                        performAction("hotbar7", botSource);
-                        break;
-                    case HOTBAR_8:
-                        performAction("hotbar8", botSource);
-                        break;
-                    case HOTBAR_9:
-                        performAction("hotbar9", botSource);
-                        break;
-                    case HOTBAR_10:
-                        performAction("hotbar10", botSource);
-                        break;
-                    case STAY:
-                        System.out.println("Performing action: Stay and do nothing");
-                        break;
+                    case MOVE_FORWARD -> performAction("moveForward", botSource);
+                    case MOVE_BACKWARD -> performAction("moveBackward", botSource);
+                    case TURN_LEFT -> performAction("turnLeft", botSource);
+                    case TURN_RIGHT -> performAction("turnRight", botSource);
+                    case JUMP -> performAction("jump", botSource);
+                    case SNEAK -> performAction("sneak", botSource);
+                    case SPRINT -> performAction("sprint", botSource);
+                    case STOP_SNEAKING -> performAction("unsneak", botSource);
+                    case STOP_SPRINTING -> performAction("unsprint", botSource);
+                    case STOP_MOVING -> performAction("stopMoving", botSource);
+                    case USE_ITEM -> performAction("useItem", botSource);
+                    case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
+                    case ATTACK -> performAction("attack", botSource);
+                    case HOTBAR_1 -> performAction("hotbar1", botSource);
+                    case HOTBAR_2 -> performAction("hotbar2", botSource);
+                    case HOTBAR_3 -> performAction("hotbar3", botSource);
+                    case HOTBAR_4 -> performAction("hotbar4", botSource);
+                    case HOTBAR_5 -> performAction("hotbar5", botSource);
+                    case HOTBAR_6 -> performAction("hotbar6", botSource);
+                    case HOTBAR_7 -> performAction("hotbar7", botSource);
+                    case HOTBAR_8 -> performAction("hotbar8", botSource);
+                    case HOTBAR_9 -> performAction("hotbar9", botSource);
+                    case STAY -> System.out.println("Performing action: Stay and do nothing");
                 }
 
-                // State after whatever action was taken
+                List<String> nearbyBlocks = BlockScanner.detectNearbyBlocks(bot, 10);
+                List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
+                SelectedItemDetails selectedItem = new SelectedItemDetails(
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
+                        hotBarUtils.getSelectedHotbarItemStack(bot).isFood(),
+                        isBlockItem.checkBlockItem(hotBarUtils.getSelectedHotbarItemStack(bot))
+                );
 
-                hotBarItems = hotBarUtils.getHotbarItems(bot);
-
-                selectedItem = hotBarUtils.getSelectedHotbarItemName(bot);
-
-                dangerDistance = DangerZoneDetector.detectDangerZone(bot, 10, 5, 5);
-
-                botHungerLevel = getPlayerHunger.getBotHungerLevel(bot);
-
-                botOxygenLevel = getPlayerOxygen.getBotOxygenLevel(bot);
-
-                armorItems = getArmorStack.getArmorItems(bot); // Get armor items from the helper method
-                offhandItem = getOffHandStack.getOffhandItem(bot); // Get offhand item
+                double dangerDistance = DangerZoneDetector.detectDangerZone(bot, 10, 5, 5);
+                int botHungerLevel = getPlayerHunger.getBotHungerLevel(bot);
+                int botOxygenLevel = getPlayerOxygen.getBotOxygenLevel(bot);
+                int botFrostLevel = getFrostLevel.calculateFrostLevel(bot);
+                Map<String, ItemStack> armorItems = getArmorStack.getArmorItems(bot);
+                ItemStack offhandItem = getOffHandStack.getOffhandItem(bot);
 
                 State nextState = new State(
                         (int) bot.getX(),
                         (int) bot.getY(),
                         (int) bot.getZ(),
-                        distanceToHostileEntity, // Distance to nearest hostile
+                        nearbyEntitiesList,
+                        nearbyBlocks,
+                        distanceToHostileEntity,
                         (int) bot.getHealth(),
                         dangerDistance,
                         hotBarItems,
@@ -254,18 +198,149 @@ public class BotEventHandler {
                         dimension,
                         botHungerLevel,
                         botOxygenLevel,
+                        botFrostLevel,
                         offhandItem,
                         armorItems,
-                        chosenAction
+                        chosenAction,
+                        riskMap,
+                        riskAppetite,
+                        currentState.getPodMap()
                 );
 
+                rlAgentHook.decayEpsilon();
+                Map<StateActions.Action, Double> actionPodMap = rlAgentHook.assessRiskOutcome(currentState, nextState, chosenAction);
+                nextState.setPodMap(actionPodMap);
 
-                // Calculate reward
-                double reward = RLAgent.calculateReward(
+                double reward = rlAgentHook.calculateReward(
                         (int) bot.getX(),
                         (int) bot.getY(),
                         (int) bot.getZ(),
-                        distanceToHostileEntity, // Distance to nearest hostile
+                        nearbyEntitiesList,
+                        nearbyBlocks,
+                        distanceToHostileEntity,
+                        (int) bot.getHealth(),
+                        dangerDistance,
+                        hotBarItems,
+                        selectedItem.getName(),
+                        time,
+                        dimension,
+                        botHungerLevel,
+                        botOxygenLevel,
+                        offhandItem,
+                        armorItems,
+                        chosenAction,
+                        risk,
+                        actionPodMap.getOrDefault(chosenAction, 0.0)
+                );
+
+                System.out.println("Reward: " + reward);
+
+                double qValue = rlAgentHook.calculateQValue(currentState, chosenAction, reward, nextState, qTable);
+                qTable.addEntry(currentState, chosenAction, qValue, nextState);
+
+
+                QTableStorage.saveQTable(qTable, qTableDir + "/qtable.bin");
+                QTableStorage.saveEpsilon(rlAgentHook.getEpsilon(), qTableDir + "/epsilon.bin");
+
+                BotEventHandler.currentState = nextState;
+
+            } else if( DangerZoneDetector.detectDangerZone(bot, 10, 10 , 10) <= 5.0 && DangerZoneDetector.detectDangerZone(bot, 10, 10 , 10) > 0.0 ) {
+
+                System.out.println("Triggered handler for danger zone case.");
+
+                List<EntityDetails> nearbyEntitiesList = new ArrayList<>();
+                for (Entity entity : nearbyEntities) {
+                    String directionToBot = AutoFaceEntity.determineDirectionToBot(bot, entity);
+                    nearbyEntitiesList.add(new EntityDetails(
+                            entity.getName().getString(),
+                            entity.getX(),
+                            entity.getY(),
+                            entity.getZ(),
+                            entity instanceof HostileEntity,
+                            directionToBot
+                    ));
+                }
+
+                State currentState;
+
+                if (hasRespawned && botDied) {
+                    State lastKnownState = QTableStorage.loadLastKnownState(qTableDir + "/lastKnownState.bin");
+                    currentState = createInitialState(bot);
+                    BotEventHandler.botDied = false;
+
+                    if (isStateConsistent(lastKnownState, currentState)) {
+                        System.out.println("Merged values from last known state.");
+                        currentState.setRiskMap(lastKnownState.getRiskMap());
+                        currentState.setPodMap(lastKnownState.getPodMap());
+                    }
+                } else {
+                    currentState = initializeBotState(qTable);
+                }
+
+                if (botSpawnCount == 0) {
+                    currentState = createInitialState(bot);
+                }
+
+                double riskAppetite = rlAgentHook.calculateRiskAppetite(currentState);
+                List<StateActions.Action> potentialActionList = rlAgentHook.suggestPotentialActions(currentState);
+                Map<StateActions.Action, Double> riskMap = rlAgentHook.calculateRisk(currentState, potentialActionList);
+
+                Map<StateActions.Action, Double> chosenActionMap = rlAgentHook.chooseAction(currentState, riskAppetite, riskMap);
+                Map.Entry<StateActions.Action, Double> entry = chosenActionMap.entrySet().iterator().next();
+
+                StateActions.Action chosenAction = entry.getKey();
+                double risk = entry.getValue();
+
+                System.out.println("Chosen action: " + chosenAction);
+
+                switch (chosenAction) {
+                    case MOVE_FORWARD -> performAction("moveForward", botSource);
+                    case MOVE_BACKWARD -> performAction("moveBackward", botSource);
+                    case TURN_LEFT -> performAction("turnLeft", botSource);
+                    case TURN_RIGHT -> performAction("turnRight", botSource);
+                    case JUMP -> performAction("jump", botSource);
+                    case SNEAK -> performAction("sneak", botSource);
+                    case SPRINT -> performAction("sprint", botSource);
+                    case STOP_SNEAKING -> performAction("unsneak", botSource);
+                    case STOP_SPRINTING -> performAction("unsprint", botSource);
+                    case STOP_MOVING -> performAction("stopMoving", botSource);
+                    case USE_ITEM -> performAction("useItem", botSource);
+                    case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
+                    case ATTACK -> performAction("attack", botSource);
+                    case HOTBAR_1 -> performAction("hotbar1", botSource);
+                    case HOTBAR_2 -> performAction("hotbar2", botSource);
+                    case HOTBAR_3 -> performAction("hotbar3", botSource);
+                    case HOTBAR_4 -> performAction("hotbar4", botSource);
+                    case HOTBAR_5 -> performAction("hotbar5", botSource);
+                    case HOTBAR_6 -> performAction("hotbar6", botSource);
+                    case HOTBAR_7 -> performAction("hotbar7", botSource);
+                    case HOTBAR_8 -> performAction("hotbar8", botSource);
+                    case HOTBAR_9 -> performAction("hotbar9", botSource);
+                    case STAY -> System.out.println("Performing action: Stay and do nothing");
+                }
+
+                List<String> nearbyBlocks = BlockScanner.detectNearbyBlocks(bot, 10);
+                List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
+                SelectedItemDetails selectedItem = new SelectedItemDetails(
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
+                        hotBarUtils.getSelectedHotbarItemStack(bot).isFood(),
+                        isBlockItem.checkBlockItem(hotBarUtils.getSelectedHotbarItemStack(bot))
+                );
+
+                double dangerDistance = DangerZoneDetector.detectDangerZone(bot, 10, 5, 5);
+                int botHungerLevel = getPlayerHunger.getBotHungerLevel(bot);
+                int botOxygenLevel = getPlayerOxygen.getBotOxygenLevel(bot);
+                int botFrostLevel = getFrostLevel.calculateFrostLevel(bot);
+                Map<String, ItemStack> armorItems = getArmorStack.getArmorItems(bot);
+                ItemStack offhandItem = getOffHandStack.getOffhandItem(bot);
+
+                State nextState = new State(
+                        (int) bot.getX(),
+                        (int) bot.getY(),
+                        (int) bot.getZ(),
+                        nearbyEntitiesList,
+                        nearbyBlocks,
+                        distanceToHostileEntity,
                         (int) bot.getHealth(),
                         dangerDistance,
                         hotBarItems,
@@ -274,62 +349,191 @@ public class BotEventHandler {
                         dimension,
                         botHungerLevel,
                         botOxygenLevel,
+                        botFrostLevel,
                         offhandItem,
                         armorItems,
-                        chosenAction
+                        chosenAction,
+                        riskMap,
+                        riskAppetite,
+                        currentState.getPodMap()
+                );
 
-                ); //
+                rlAgentHook.decayEpsilon();
+                Map<StateActions.Action, Double> actionPodMap = rlAgentHook.assessRiskOutcome(currentState, nextState, chosenAction);
+                nextState.setPodMap(actionPodMap);
 
+                double reward = rlAgentHook.calculateReward(
+                        (int) bot.getX(),
+                        (int) bot.getY(),
+                        (int) bot.getZ(),
+                        nearbyEntitiesList,
+                        nearbyBlocks,
+                        distanceToHostileEntity,
+                        (int) bot.getHealth(),
+                        dangerDistance,
+                        hotBarItems,
+                        selectedItem.getName(),
+                        time,
+                        dimension,
+                        botHungerLevel,
+                        botOxygenLevel,
+                        offhandItem,
+                        armorItems,
+                        chosenAction,
+                        risk,
+                        actionPodMap.getOrDefault(chosenAction, 0.0)
+                );
 
                 System.out.println("Reward: " + reward);
 
-                // Update Q-table
-                rlAgentHook.updateQValue(currentState, chosenAction, reward, nextState);
-
-                Map<StateActions.Action, Double> actionMap = new HashMap<>();
-
-                rlAgentHook.decayEpsilon();
-
-                actionMap.put(chosenAction, reward);
+                double qValue = rlAgentHook.calculateQValue(currentState, chosenAction, reward, nextState, qTable);
+                qTable.addEntry(currentState, chosenAction, qValue, nextState);
 
 
-                try {
-                    QTableStorage.saveStateActionPair(nextState, actionMap,qTableDir + "/qtable.bin");
-                    System.out.println("Q-table successfully saved to " + qTableDir + "/qtable.bin");
-                } catch (Exception e) {
-                    System.err.println("Failed to save Q-table: " + e.getMessage());
-                    LOGGER.error(e.getMessage());
-                }
+                QTableStorage.saveQTable(qTable, qTableDir + "/qtable.bin");
+                QTableStorage.saveEpsilon(rlAgentHook.getEpsilon(), qTableDir + "/epsilon.bin");
 
+                BotEventHandler.currentState = nextState;
             }
 
-        }
-        finally {
+
+        } finally {
             synchronized (monitorLock) {
-                System.out.println("Resetting handler trigger flag.");
                 isExecuting = false;
-                AutoFaceEntity.isHandlerTriggered = false; // reset the trigger flag.
+                AutoFaceEntity.isHandlerTriggered = false;
+                System.out.println("Resetting handler trigger flag to: " + false);
             }
         }
+    }
+
+
+    public static State getCurrentState() {
+
+        return BotEventHandler.currentState;
 
     }
 
+    public void detectAndReactPlayMode(RLAgent rlAgentHook, QTable qTable) {
+        synchronized (monitorLock) {
+            if (isExecuting) {
+                System.out.println("Already executing detection code, skipping...");
+                return; // Skip if already executing
+            }
+            isExecuting = true;
+        }
+
+        try {
+            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+
+            // Detect nearby hostile entities
+            List<Entity> nearbyEntities = AutoFaceEntity.detectNearbyEntities(bot, 10); // Example bounding box size
+            List<Entity> hostileEntities = nearbyEntities.stream()
+                    .filter(entity -> entity instanceof HostileEntity)
+                    .toList();
+
+            if (!hostileEntities.isEmpty()) {
+                // Gather state information
+                State currentState = createInitialState(bot);
+
+//                double riskAppetite = currentState.getRiskAppetite();
+//
+                Map<StateActions.Action, Double> riskMap = currentState.getRiskMap();
+
+                // Choose action
+                StateActions.Action chosenAction = rlAgentHook.chooseActionPlayMode(currentState, qTable, riskMap, "detectAndReactPlayMode");
+
+
+                // Log chosen action for debugging
+                System.out.println("Play Mode - Chosen action: " + chosenAction);
+
+                // Execute action
+                switch (chosenAction) {
+                    case MOVE_FORWARD -> performAction("moveForward", botSource);
+                    case MOVE_BACKWARD -> performAction("moveBackward", botSource);
+                    case TURN_LEFT -> performAction("turnLeft", botSource);
+                    case TURN_RIGHT -> performAction("turnRight", botSource);
+                    case JUMP -> performAction("jump", botSource);
+                    case SNEAK -> performAction("sneak", botSource);
+                    case SPRINT -> performAction("sprint", botSource);
+                    case STOP_SNEAKING -> performAction("unsneak", botSource);
+                    case STOP_SPRINTING -> performAction("unsprint", botSource);
+                    case STOP_MOVING -> performAction("stopMoving", botSource);
+                    case USE_ITEM -> performAction("useItem", botSource);
+                    case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
+                    case ATTACK -> performAction("attack", botSource);
+                    case HOTBAR_1 -> performAction("hotbar1", botSource);
+                    case HOTBAR_2 -> performAction("hotbar2", botSource);
+                    case HOTBAR_3 -> performAction("hotbar3", botSource);
+                    case HOTBAR_4 -> performAction("hotbar4", botSource);
+                    case HOTBAR_5 -> performAction("hotbar5", botSource);
+                    case HOTBAR_6 -> performAction("hotbar6", botSource);
+                    case HOTBAR_7 -> performAction("hotbar7", botSource);
+                    case HOTBAR_8 -> performAction("hotbar8", botSource);
+                    case HOTBAR_9 -> performAction("hotbar9", botSource);
+                    case STAY -> System.out.println("Performing action: Stay and do nothing");
+                }
+            }
+        } finally {
+            synchronized (monitorLock) {
+                System.out.println("Resetting handler trigger flag.");
+                isExecuting = false;
+                AutoFaceEntity.isHandlerTriggered = false; // Reset the trigger flag
+            }
+        }
+    }
+
+
     private static State createInitialState(ServerPlayerEntity bot) {
         List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
-        String selectedItem = hotBarUtils.getSelectedHotbarItemName(bot);
+        ItemStack selectedItemStack = hotBarUtils.getSelectedHotbarItemStack(bot);
+
+        List<String> nearbyBlocks = BlockScanner.detectNearbyBlocks(bot, 10);
+
+        SelectedItemDetails selectedItem = new SelectedItemDetails(
+                selectedItemStack.getItem().getName().getString(),
+                selectedItemStack.isFood(),
+                isBlockItem.checkBlockItem(selectedItemStack)
+        );
+
+        List<Entity> nearbyEntities = AutoFaceEntity.detectNearbyEntities(bot, 10);
+
+        List<EntityDetails> nearbyEntitiesList = new ArrayList<>();
+
+        String directionToBot = "";
+
+        for(Entity entity: nearbyEntities) {
+
+            directionToBot = AutoFaceEntity.determineDirectionToBot(bot, entity);
+
+            nearbyEntitiesList.add(new EntityDetails(
+                    entity.getName().getString(),
+                    entity.getX(),
+                    entity.getY(),
+                    entity.getZ(),
+                    entity instanceof HostileEntity,
+                    directionToBot
+            ));
+
+        }
+
         double dangerDistance = DangerZoneDetector.detectDangerZone(bot, 10, 5, 5);
         int botHungerLevel = getPlayerHunger.getBotHungerLevel(bot);
         int botOxygenLevel = getPlayerOxygen.getBotOxygenLevel(bot);
+        int botFrostLevel = getFrostLevel.calculateFrostLevel(bot);
         Map<String, ItemStack> armorItems = getArmorStack.getArmorItems(bot);
         ItemStack offhandItem = getOffHandStack.getOffhandItem(bot);
         String time = GetTime.getTimeOfWorld(bot) >= 12000 ? "night" : "day";
         String dimension = bot.getCommandSource().getWorld().getRegistryKey().getValue().toString();
+        Map<StateActions.Action, Double> riskMap = new HashMap<>();
 
+        Map<StateActions.Action, Double> podMap = new HashMap<>(); // blank pod map for now.
 
         return new State(
                 (int) bot.getX(),
                 (int) bot.getY(),
                 (int) bot.getZ(),
+                nearbyEntitiesList,
+                nearbyBlocks,
                 0.0, // Distance to hostile can be updated dynamically elsewhere
                 (int) bot.getHealth(),
                 dangerDistance,
@@ -339,9 +543,13 @@ public class BotEventHandler {
                 dimension,
                 botHungerLevel,
                 botOxygenLevel,
+                botFrostLevel,
                 offhandItem,
                 armorItems,
-                StateActions.Action.NONE
+                StateActions.Action.STAY,
+                riskMap,
+                DEFAULT_RISK_APPETITE,
+                podMap
         );
     }
 
@@ -355,10 +563,12 @@ public class BotEventHandler {
             case "moveForward":
                 System.out.println("Performing action: move forward");
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " move forward");
+                AutoFaceEntity.isBotMoving = true;
                 break;
             case "moveBackward":
                 System.out.println("Performing action: move backward");
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " move backward");
+                AutoFaceEntity.isBotMoving = true;
                 break;
             case "turnLeft":
                 System.out.println("Performing action: turn left");
@@ -391,6 +601,7 @@ public class BotEventHandler {
             case "stopMoving":
                 System.out.println("Performing action: stop moving");
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " stop");
+                AutoFaceEntity.isBotMoving = false;
                 break;
             case "useItem":
                 System.out.println("Performing action: use currently selected item");
@@ -398,6 +609,7 @@ public class BotEventHandler {
                 break;
             case "attack":
                 System.out.println("Performing action: attack");
+                FaceClosestEntity.faceClosestEntity(bot, AutoFaceEntity.hostileEntities);
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " attack");
                 break;
             case "hotbar1":
@@ -435,10 +647,6 @@ public class BotEventHandler {
             case "hotbar9":
                 System.out.println("Performing action: Select hotbar slot 9");
                 server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 9");
-                break;
-            case "hotbar10":
-                System.out.println("Performing action: Select hotbar slot 10");
-                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 0");
                 break;
 
             default:
