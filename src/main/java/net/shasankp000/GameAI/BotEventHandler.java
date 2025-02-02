@@ -73,6 +73,10 @@ public class BotEventHandler {
             if (isExecuting) {
                 System.out.println("Executing detection code");
                 return; // Skip if already executing
+            } else {
+                System.out.println("No immediate threats detected");
+                // Reset state when no threats are detected
+                BotEventHandler.currentState = createInitialState(bot);
             }
             isExecuting = true;
         }
@@ -244,7 +248,8 @@ public class BotEventHandler {
 
                 BotEventHandler.currentState = nextState;
 
-            } else if( DangerZoneDetector.detectDangerZone(bot, 10, 10 , 10) <= 5.0 && DangerZoneDetector.detectDangerZone(bot, 10, 10 , 10) > 0.0 ) {
+            } else if (DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) <= 5.0 && DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) > 0.0) {
+                System.out.println("Danger zone detected within 5 blocks");
 
                 System.out.println("Triggered handler for danger zone case.");
 
