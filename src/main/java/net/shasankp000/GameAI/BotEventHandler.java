@@ -7,6 +7,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.world.World;
+import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.DangerZoneDetector.DangerZoneDetector;
 import net.shasankp000.Database.QTable;
 import net.shasankp000.Database.QTableStorage;
@@ -91,6 +92,15 @@ public class BotEventHandler {
                     .filter(entity -> entity instanceof HostileEntity)
                     .toList();
 
+
+            BlockDistanceLimitedSearch blockDistanceLimitedSearch = new BlockDistanceLimitedSearch(bot, 3, 5);
+
+            List<String> nearbyBlocks = blockDistanceLimitedSearch.detectNearbyBlocks();
+
+            boolean hasSculkNearby = nearbyBlocks.stream()
+                    .anyMatch(block -> block.contains("Sculk Sensor") || block.contains("Sculk Shrieker"));
+            System.out.println("Nearby blocks: " + nearbyBlocks);
+
             int timeofDay = GetTime.getTimeOfWorld(bot);
             String time = (timeofDay >= 12000 && timeofDay < 24000) ? "night" : "day";
 
@@ -146,33 +156,9 @@ public class BotEventHandler {
 
                 System.out.println("Chosen action: " + chosenAction);
 
-                switch (chosenAction) {
-                    case MOVE_FORWARD -> performAction("moveForward", botSource);
-                    case MOVE_BACKWARD -> performAction("moveBackward", botSource);
-                    case TURN_LEFT -> performAction("turnLeft", botSource);
-                    case TURN_RIGHT -> performAction("turnRight", botSource);
-                    case JUMP -> performAction("jump", botSource);
-                    case SNEAK -> performAction("sneak", botSource);
-                    case SPRINT -> performAction("sprint", botSource);
-                    case STOP_SNEAKING -> performAction("unsneak", botSource);
-                    case STOP_SPRINTING -> performAction("unsprint", botSource);
-                    case STOP_MOVING -> performAction("stopMoving", botSource);
-                    case USE_ITEM -> performAction("useItem", botSource);
-                    case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
-                    case ATTACK -> performAction("attack", botSource);
-                    case HOTBAR_1 -> performAction("hotbar1", botSource);
-                    case HOTBAR_2 -> performAction("hotbar2", botSource);
-                    case HOTBAR_3 -> performAction("hotbar3", botSource);
-                    case HOTBAR_4 -> performAction("hotbar4", botSource);
-                    case HOTBAR_5 -> performAction("hotbar5", botSource);
-                    case HOTBAR_6 -> performAction("hotbar6", botSource);
-                    case HOTBAR_7 -> performAction("hotbar7", botSource);
-                    case HOTBAR_8 -> performAction("hotbar8", botSource);
-                    case HOTBAR_9 -> performAction("hotbar9", botSource);
-                    case STAY -> System.out.println("Performing action: Stay and do nothing");
-                }
+                executeAction(chosenAction, botSource);
 
-                List<String> nearbyBlocks = BlockScanner.detectNearbyBlocks(bot, 10);
+
                 List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
                 SelectedItemDetails selectedItem = new SelectedItemDetails(
                         hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
@@ -248,7 +234,7 @@ public class BotEventHandler {
 
                 BotEventHandler.currentState = nextState;
 
-            } else if (DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) <= 5.0 && DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) > 0.0) {
+            } else if ((DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) <= 5.0 && DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) > 0.0) || hasSculkNearby) {
                 System.out.println("Danger zone detected within 5 blocks");
 
                 System.out.println("Triggered handler for danger zone case.");
@@ -298,33 +284,10 @@ public class BotEventHandler {
 
                 System.out.println("Chosen action: " + chosenAction);
 
-                switch (chosenAction) {
-                    case MOVE_FORWARD -> performAction("moveForward", botSource);
-                    case MOVE_BACKWARD -> performAction("moveBackward", botSource);
-                    case TURN_LEFT -> performAction("turnLeft", botSource);
-                    case TURN_RIGHT -> performAction("turnRight", botSource);
-                    case JUMP -> performAction("jump", botSource);
-                    case SNEAK -> performAction("sneak", botSource);
-                    case SPRINT -> performAction("sprint", botSource);
-                    case STOP_SNEAKING -> performAction("unsneak", botSource);
-                    case STOP_SPRINTING -> performAction("unsprint", botSource);
-                    case STOP_MOVING -> performAction("stopMoving", botSource);
-                    case USE_ITEM -> performAction("useItem", botSource);
-                    case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
-                    case ATTACK -> performAction("attack", botSource);
-                    case HOTBAR_1 -> performAction("hotbar1", botSource);
-                    case HOTBAR_2 -> performAction("hotbar2", botSource);
-                    case HOTBAR_3 -> performAction("hotbar3", botSource);
-                    case HOTBAR_4 -> performAction("hotbar4", botSource);
-                    case HOTBAR_5 -> performAction("hotbar5", botSource);
-                    case HOTBAR_6 -> performAction("hotbar6", botSource);
-                    case HOTBAR_7 -> performAction("hotbar7", botSource);
-                    case HOTBAR_8 -> performAction("hotbar8", botSource);
-                    case HOTBAR_9 -> performAction("hotbar9", botSource);
-                    case STAY -> System.out.println("Performing action: Stay and do nothing");
-                }
+                executeAction(chosenAction, botSource);
 
-                List<String> nearbyBlocks = BlockScanner.detectNearbyBlocks(bot, 10);
+                nearbyBlocks = blockDistanceLimitedSearch.detectNearbyBlocks();
+
                 List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
                 SelectedItemDetails selectedItem = new SelectedItemDetails(
                         hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
@@ -430,53 +393,58 @@ public class BotEventHandler {
         try {
             ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
 
-            // Detect nearby hostile entities
-            List<Entity> nearbyEntities = AutoFaceEntity.detectNearbyEntities(bot, 10); // Example bounding box size
-            List<Entity> hostileEntities = nearbyEntities.stream()
-                    .filter(entity -> entity instanceof HostileEntity)
-                    .toList();
 
-            if (!hostileEntities.isEmpty()) {
-                // Gather state information
-                State currentState = createInitialState(bot);
+            if (qTable == null) {
+                ChatUtils.sendChatMessages(botSource, "I have no training data to work with! Please spawn me in training mode so that I can learn first!");
+            }
+
+            else {
+                // Detect nearby hostile entities
+                List<Entity> nearbyEntities = AutoFaceEntity.detectNearbyEntities(bot, 10); // Example bounding box size
+                List<Entity> hostileEntities = nearbyEntities.stream()
+                        .filter(entity -> entity instanceof HostileEntity)
+                        .toList();
+
+                if (!hostileEntities.isEmpty()) {
+                    // Gather state information
+                    State currentState = createInitialState(bot);
 
 //                double riskAppetite = currentState.getRiskAppetite();
 //
-                Map<StateActions.Action, Double> riskMap = currentState.getRiskMap();
-
-                // Choose action
-                StateActions.Action chosenAction = rlAgentHook.chooseActionPlayMode(currentState, qTable, riskMap, "detectAndReactPlayMode");
+                    Map<StateActions.Action, Double> riskMap = currentState.getRiskMap();
 
 
-                // Log chosen action for debugging
-                System.out.println("Play Mode - Chosen action: " + chosenAction);
 
-                // Execute action
-                switch (chosenAction) {
-                    case MOVE_FORWARD -> performAction("moveForward", botSource);
-                    case MOVE_BACKWARD -> performAction("moveBackward", botSource);
-                    case TURN_LEFT -> performAction("turnLeft", botSource);
-                    case TURN_RIGHT -> performAction("turnRight", botSource);
-                    case JUMP -> performAction("jump", botSource);
-                    case SNEAK -> performAction("sneak", botSource);
-                    case SPRINT -> performAction("sprint", botSource);
-                    case STOP_SNEAKING -> performAction("unsneak", botSource);
-                    case STOP_SPRINTING -> performAction("unsprint", botSource);
-                    case STOP_MOVING -> performAction("stopMoving", botSource);
-                    case USE_ITEM -> performAction("useItem", botSource);
-                    case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
-                    case ATTACK -> performAction("attack", botSource);
-                    case HOTBAR_1 -> performAction("hotbar1", botSource);
-                    case HOTBAR_2 -> performAction("hotbar2", botSource);
-                    case HOTBAR_3 -> performAction("hotbar3", botSource);
-                    case HOTBAR_4 -> performAction("hotbar4", botSource);
-                    case HOTBAR_5 -> performAction("hotbar5", botSource);
-                    case HOTBAR_6 -> performAction("hotbar6", botSource);
-                    case HOTBAR_7 -> performAction("hotbar7", botSource);
-                    case HOTBAR_8 -> performAction("hotbar8", botSource);
-                    case HOTBAR_9 -> performAction("hotbar9", botSource);
-                    case STAY -> System.out.println("Performing action: Stay and do nothing");
+                    // Choose action
+                    StateActions.Action chosenAction = rlAgentHook.chooseActionPlayMode(currentState, qTable, riskMap, "detectAndReactPlayMode");
+
+
+                    // Log chosen action for debugging
+                    System.out.println("Play Mode - Chosen action: " + chosenAction);
+
+                    // Execute action
+                    executeAction(chosenAction, botSource);
                 }
+                else if (DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) <= 5.0 && DangerZoneDetector.detectDangerZone(bot, 10, 10, 10) > 0.0) {
+
+                    // Gather state information
+                    State currentState = createInitialState(bot);
+
+                    Map<StateActions.Action, Double> riskMap = currentState.getRiskMap();
+
+
+                    // Choose action
+                    StateActions.Action chosenAction = rlAgentHook.chooseActionPlayMode(currentState, qTable, riskMap, "detectAndReactPlayMode");
+
+
+                    // Log chosen action for debugging
+                    System.out.println("Play Mode - Chosen action: " + chosenAction);
+
+                    // Execute action
+                    executeAction(chosenAction, botSource);
+                }
+
+
             }
         } finally {
             synchronized (monitorLock) {
@@ -487,12 +455,42 @@ public class BotEventHandler {
         }
     }
 
+    private static void executeAction(StateActions.Action chosenAction, ServerCommandSource botSource) {
+        switch (chosenAction) {
+            case MOVE_FORWARD -> performAction("moveForward", botSource);
+            case MOVE_BACKWARD -> performAction("moveBackward", botSource);
+            case TURN_LEFT -> performAction("turnLeft", botSource);
+            case TURN_RIGHT -> performAction("turnRight", botSource);
+            case JUMP -> performAction("jump", botSource);
+            case SNEAK -> performAction("sneak", botSource);
+            case SPRINT -> performAction("sprint", botSource);
+            case STOP_SNEAKING -> performAction("unsneak", botSource);
+            case STOP_SPRINTING -> performAction("unsprint", botSource);
+            case STOP_MOVING -> performAction("stopMoving", botSource);
+            case USE_ITEM -> performAction("useItem", botSource);
+            case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
+            case ATTACK -> performAction("attack", botSource);
+            case HOTBAR_1 -> performAction("hotbar1", botSource);
+            case HOTBAR_2 -> performAction("hotbar2", botSource);
+            case HOTBAR_3 -> performAction("hotbar3", botSource);
+            case HOTBAR_4 -> performAction("hotbar4", botSource);
+            case HOTBAR_5 -> performAction("hotbar5", botSource);
+            case HOTBAR_6 -> performAction("hotbar6", botSource);
+            case HOTBAR_7 -> performAction("hotbar7", botSource);
+            case HOTBAR_8 -> performAction("hotbar8", botSource);
+            case HOTBAR_9 -> performAction("hotbar9", botSource);
+            case STAY -> System.out.println("Performing action: Stay and do nothing");
+        }
+    }
+
 
     private static State createInitialState(ServerPlayerEntity bot) {
         List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
         ItemStack selectedItemStack = hotBarUtils.getSelectedHotbarItemStack(bot);
 
-        List<String> nearbyBlocks = BlockScanner.detectNearbyBlocks(bot, 10);
+        BlockDistanceLimitedSearch blockDistanceLimitedSearch = new BlockDistanceLimitedSearch(bot, 3, 5);
+
+        List<String> nearbyBlocks = blockDistanceLimitedSearch.detectNearbyBlocks();
 
         SelectedItemDetails selectedItem = new SelectedItemDetails(
                 selectedItemStack.getItem().getName().getString(),

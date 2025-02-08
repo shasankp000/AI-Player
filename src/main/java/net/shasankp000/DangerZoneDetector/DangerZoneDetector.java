@@ -29,14 +29,7 @@ public class DangerZoneDetector {
         }
 
         // Calculate the effective danger distance
-        double effectiveDangerDistance = lavaDistance + cliffDistance;
-
-        // Debug output (optional, for testing purposes)
-        System.out.println("Lava Distance: " + lavaDistance);
-        System.out.println("Cliff Distance: " + cliffDistance);
-        System.out.println("Effective Danger Distance: " + effectiveDangerDistance);
-
-        return effectiveDangerDistance;
+        return lavaDistance + cliffDistance;
     }
 }
 

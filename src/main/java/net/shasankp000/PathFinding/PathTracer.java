@@ -3,7 +3,7 @@ package net.shasankp000.PathFinding;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.util.math.BlockPos;
-import net.shasankp000.Commands.spawnFakePlayer;
+import net.shasankp000.Commands.modCommandRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +14,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static net.shasankp000.PathFinding.PathFinder.identifyPrimaryAxis;
-import static net.shasankp000.Commands.spawnFakePlayer.moveForward;
+import static net.shasankp000.Commands.modCommandRegistry.moveForward;
 
 
 public class PathTracer {
@@ -243,7 +243,7 @@ public class PathTracer {
 
         int roundedTravelTime = (int) Math.round(travelTime); // Round to the nearest whole number
         moveForward(server, botSource, botName);
-        scheduler.schedule(new spawnFakePlayer.BotMovementTask(server, botSource, botName), roundedTravelTime, TimeUnit.SECONDS);
+        scheduler.schedule(new modCommandRegistry.BotMovementTask(server, botSource, botName), roundedTravelTime, TimeUnit.SECONDS);
 
 
     }

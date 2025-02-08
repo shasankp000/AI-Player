@@ -19,7 +19,7 @@ public class hotBarUtils {
         return hotbarItems;
     }
 
-    public static String getSelectedHotbarItemName(ServerPlayerEntity bot) {
+    public static ItemStack getSelectedHotbarItemStack(ServerPlayerEntity bot) {
 
         // Ensure the client and player are not null
 
@@ -30,11 +30,12 @@ public class hotBarUtils {
         // Check if the slot is not empty
         if (!selectedStack.isEmpty()) {
             // Return the translation key of the item
-            return selectedStack.getItem().getName().getString();
+
+            return selectedStack;
         }
 
 
         // Return a placeholder if there's no item in the selected slot
-        return "empty";
+        return ItemStack.EMPTY;
     }
 }

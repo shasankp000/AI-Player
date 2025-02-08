@@ -36,7 +36,7 @@ public class getLanguageModels {
 
             for (Model model: models) {
 
-                modelSet.add(model.getModelName());
+                modelSet.add(model.getModel());
 
             }
         }

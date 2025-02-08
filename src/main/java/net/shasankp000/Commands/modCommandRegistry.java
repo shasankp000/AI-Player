@@ -24,11 +24,14 @@ import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.DangerZoneDetector.DangerZoneDetector;
+import net.shasankp000.Database.QTableExporter;
 import net.shasankp000.Entity.AutoFaceEntity;
 import net.shasankp000.Entity.RayCasting;
 import net.shasankp000.Entity.RespawnHandler;
 import net.shasankp000.Entity.createFakePlayer;
+import net.shasankp000.GameAI.BotEventHandler;
 import net.shasankp000.OllamaClient.ollamaClient;
+import net.shasankp000.WorldUitls.isFoodItem;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,9 +51,10 @@ import net.shasankp000.PlayerUtils.getPlayerHunger;
 import net.shasankp000.PlayerUtils.getPlayerOxygen;
 import net.shasankp000.PlayerUtils.armorUtils;
 
-public class spawnFakePlayer {
+public class modCommandRegistry {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    public static boolean isTrainingMode = false;
 
     public record BotMovementTask(MinecraftServer server, ServerCommandSource botSource,
                                    String botName) implements Runnable {
@@ -348,7 +352,7 @@ public class spawnFakePlayer {
 
                                             ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
 
-                                            String selectedItem = hotBarUtils.getSelectedHotbarItemName(bot);
+                                            String selectedItem = hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString();
 
                                             ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItem);
 
@@ -393,6 +397,51 @@ public class spawnFakePlayer {
                                         })
                                 )
                         )
+                        .then(literal("getHealth")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                        .executes(context -> {
+
+                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+
+                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+
+                                            int botHealthLevel = (int) bot.getHealth();
+
+                                            ChatUtils.sendChatMessages(botSource, "Health level: " + botHealthLevel);
+
+                                            return 1;
+                                        })
+                                )
+                        )
+
+                        .then(literal("isFoodItem")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                        .executes(context -> {
+
+                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+
+                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+
+                                            ItemStack selectedItemStack = hotBarUtils.getSelectedHotbarItemStack(bot);
+
+                                            if (isFoodItem.checkFoodItem(selectedItemStack)) {
+
+                                                ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItemStack.getItem().getName().getString() + " is a food item.");
+
+                                            }
+
+                                            else {
+
+                                                ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItemStack.getItem().getName().getString() + " is not a food item.");
+
+                                            }
+
+                                            return 1;
+                                        })
+                                )
+                        )
+
+
                         .then(literal("equipArmor")
                                 .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .executes(context -> {
@@ -418,6 +467,22 @@ public class spawnFakePlayer {
                                         })
 
                                 )
+                        )
+
+                        .then(literal("exportQTableToJSON")
+                                .executes(context -> {
+
+                                    MinecraftServer server = context.getSource().getServer(); // gets the minecraft server
+                                    ServerCommandSource serverSource = server.getCommandSource();
+
+                                    ChatUtils.sendChatMessages(serverSource, "Exporting Q-table to JSON. Please wait.... ");
+
+                                    QTableExporter.exportQTable(BotEventHandler.qTableDir + "/qtable.bin", BotEventHandler.qTableDir + "./fullQTable.json");
+
+                                    ChatUtils.sendChatMessages(serverSource, "Q-table has been successfully exported to a json file at: " + BotEventHandler.qTableDir + "./fullQTable.json" );
+
+                                    return 1;
+                                })
                         )
         ));
     }
@@ -454,6 +519,7 @@ public class spawnFakePlayer {
                     false
             );
 
+            isTrainingMode = true;
 
             LOGGER.info("Spawned new bot {}!", botName);
 

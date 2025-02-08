@@ -3,7 +3,6 @@ package net.shasankp000.GameAI;
 public class StateActions {
 
     public enum Action {
-        NONE, // Default value for uninitialized or no action
         MOVE_FORWARD,
         MOVE_BACKWARD,
         TURN_LEFT,
@@ -27,7 +26,6 @@ public class StateActions {
         HOTBAR_7,
         HOTBAR_8,
         HOTBAR_9,
-        HOTBAR_10
     }
 
 }

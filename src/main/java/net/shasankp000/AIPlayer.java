@@ -1,9 +1,13 @@
 package net.shasankp000;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.Commands.configCommand;
-import net.shasankp000.Commands.spawnFakePlayer;
+import net.shasankp000.Commands.modCommandRegistry;
+import net.shasankp000.GameAI.BotEventHandler;
 
 import net.shasankp000.Database.QTableStorage;
 import net.shasankp000.Database.SQLiteDB;
@@ -23,12 +27,40 @@ public class AIPlayer implements ModInitializer {
 
 		LOGGER.info("Hello Fabric world!");
 
-		spawnFakePlayer.register();
+		modCommandRegistry.register();
 		configCommand.register();
 		SQLiteDB.createDB();
 		QTableStorage.setupQTableStorage();
 
 		ServerLifecycleEvents.SERVER_STOPPED.register(AutoFaceEntity::onServerStopped);
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
+			if (entity instanceof ServerPlayerEntity serverPlayer) {
+
+				if (BotEventHandler.bot != null) {
+
+					if(serverPlayer.getName().getString().equals(BotEventHandler.bot.getName().getString())) {
+
+						QTableStorage.saveLastKnownState(BotEventHandler.getCurrentState(), BotEventHandler.qTableDir + "/lastKnownState.bin");
+
+						BotEventHandler.botDied = true; // set flag for bot's death.
+//						System.out.println("Set botDied flag to true");
+					}
+				}
+
+			}
+
+		});
+
+		ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+			// Check if the respawned player is the bot
+			if (oldPlayer instanceof ServerPlayerEntity && newPlayer instanceof ServerPlayerEntity && oldPlayer.getName().getString().equals(newPlayer.getName().getString())) {
+				System.out.println("Bot has respawned. Updating state...");
+				BotEventHandler.hasRespawned = true;
+				BotEventHandler.botSpawnCount++;
+
+			}
+		});
+
 	}
 
 

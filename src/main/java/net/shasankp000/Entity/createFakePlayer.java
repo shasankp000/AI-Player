@@ -132,11 +132,11 @@ public class createFakePlayer extends ServerPlayerEntity {
 
     private static void spawnFake(MinecraftServer server, ServerWorld worldIn, GameProfile gameprofile, Vec3d pos, double yaw, double pitch, GameMode gamemode, boolean flying, RegistryKey<World> dimensionId) {
         createFakePlayer instance = new createFakePlayer(server, worldIn, gameprofile, SyncedClientOptions.createDefault(), false);
-        instance.fixStartingPosition = () -> {
-            instance.refreshPositionAndAngles(pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
-            System.out.println("Fixed " + instance.getName().getString() + "'s starting position");
-            server.getPlayerManager().broadcast(Text.literal("Fixed " + instance.getName().getString() + "'s starting position"), true);
-        };
+//        instance.fixStartingPosition = () -> {
+//            instance.refreshPositionAndAngles(pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
+//            System.out.println("Fixed " + instance.getName().getString() + "'s starting position");
+//            server.getPlayerManager().broadcast(Text.literal("Fixed " + instance.getName().getString() + "'s starting position"), true);
+//        };
         server.getPlayerManager().onPlayerConnect(new FakeClientConnection(NetworkSide.SERVERBOUND), instance, new ConnectedClientData(gameprofile, 0, instance.getClientOptions()));
         instance.teleport(worldIn, pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
         instance.setHealth(20.0F);
