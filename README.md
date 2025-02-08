@@ -48,33 +48,48 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 ---
 
-# Upcoming features
-
-- ~~Fully implemented pathfinding for the bot~~.
-- ~~Collision and entity detection(detects entites around it and looks at it)~~.
-- ~~Interaction with the world environment in general~~.
-- ~~Reinforcement Learning~~.
-- More environment triggers for RL to work
----
-
 # Current bugs in this version :
 
-1. If the bot dies or is killed off while it was engaged in an action, the code might throw an error on the bot respawn. Temporary fix is a game restart (or server restart).
-
-Will be fixed in upcoming patch.
-
-2. The removeArmor command doesn't work (yet).
+1. The removeArmor command still doesn't work (yet).
 
 
 # Download links
 
 1. From this github page, just download from the releases section or follow the steps in usage section to build and test.
-2. Modrinth: https://modrinth.com/mod/ai-player/ [Recommended as the github version is often unstable]
+2. Modrinth: https://modrinth.com/mod/ai-player/ (Temporarily down as of the moment, use github)
 3. Curseforge: Will upload soon after a few more patches and updates.
 
 ---
 
-# Progress: 70%
+# Progress: 71%
+
+After a lot of time, here's the next patch of this mod!
+
+# Changelog v1.0.3-alpha-2
+
+1. Updated the qtable storage format (previous qtable is not comaptible with this version)
+2. Created a "risk taking" mechanism which greatly reduces training time by making actions taken during training more contextual based instead of random.
+3. Added more environment triggers for the bot to look up it's training data, now it also reacts to dangerous enviornment around it, typically lava, places where it might fall off, or sculk blocks.
+4. Created very detailed reward mechanisms for the bot during training for the best possible efficiency.
+5. Fixed the previous blockscanning code, now replaced using a DLS algorithm for better optimization.
+
+---
+
+# Upcoming changes.
+
+1. Introduce goal based reinforcement learning.
+2. Switch to Deep-Q learning instead of traditonal q-learning (TLDR: use a neural network instead of a table)
+3. Create custom movement code for the bot for precise movement instead of carpet's server sided movement code.
+4. Give the bot a sense of it's surroundings in more detail (like how we can see blocks around us in game) so that it can take more precise decisions. Right now it has knowledge of what blocks are around it, but it doesn't know how those blocks are placed around it, in what order/shape. I intend to fix that. 
+5. Implement human consciousness level reasoning??? (to some degree maybe) (BIG MAYBE)
+
+
+---
+
+# Below are the changelogs of older versions
+
+---
+
 
 ## Changelog v.1.0.3-alpha-1
 
@@ -167,9 +182,7 @@ A very good video explanation on what Q-learning is :
 
 [Reinforcement learning 101](https://www.youtube.com/watch?v=vXtfdGphr3c)
 
----
 
-# Below is older changelogs from the previous updates
 
 ---
 
