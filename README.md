@@ -1,3 +1,8 @@
+## Stargazers over time
+[![Stargazers over time](https://starchart.cc/shasankp000/AI-Player.svg?variant=adaptive)](https://starchart.cc/shasankp000/AI-Player)
+
+---
+
 # Read this section please.
 
 This project so far is the result of thousands of hours of endless reasearch, trials and errors, and just the simple goal of eliminating loneliness from minecraft as much as possible.
@@ -43,24 +48,155 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 ---
 
-# Upcoming features
+# Current bugs in this version :
 
-- Fully implemented pathfinding for the bot.
-- Collision and entity detection(detects entites around it and looks at it).
-- Interaction with the world environment in general.
-
----
+1. The removeArmor command still doesn't work (yet).
 
 
 # Download links
 
 1. From this github page, just download from the releases section or follow the steps in usage section to build and test.
-2. Modrinth: https://modrinth.com/mod/ai-player/ [Recommended as the github version is often unstable]
+2. Modrinth: https://modrinth.com/mod/ai-player/ (Temporarily down as of the moment, use github)
 3. Curseforge: Will upload soon after a few more patches and updates.
 
 ---
 
-# Progress: 60%
+# Progress: 71%
+
+After a lot of time, here's the next patch of this mod!
+
+# Changelog v1.0.3-alpha-2
+
+1. Updated the qtable storage format (previous qtable is not comaptible with this version)
+2. Created a "risk taking" mechanism which **greatly reduces training time** by making actions taken during training more contextual based instead of random.
+3. Added more environment triggers for the bot to look up it's training data, now it also reacts to dangerous enviornment around it, typically lava, places where it might fall off, or sculk blocks.
+4. Created very detailed reward mechanisms for the bot during training for the best possible efficiency.
+5. Fixed the previous blockscanning code, now replaced using a DLS algorithm for better optimization.
+
+---
+
+# Upcoming changes.
+
+1. Introduce goal based reinforcement learning.
+2. Switch to Deep-Q learning instead of traditonal q-learning (TLDR: use a neural network instead of a table)
+3. Create custom movement code for the bot for precise movement instead of carpet's server sided movement code.
+4. Give the bot a sense of it's surroundings in more detail (like how we can see blocks around us in game) so that it can take more precise decisions. Right now it has knowledge of what blocks are around it, but it doesn't know how those blocks are placed around it, in what order/shape. I intend to fix that. 
+5. Implement human consciousness level reasoning??? (to some degree maybe) (BIG MAYBE)
+
+---
+## Some video footage of this version
+
+`mob related reflex actions`
+
+https://github.com/user-attachments/assets/1700e1ff-234a-456f-ab37-6dac754b3a94
+
+
+`environment reaction`
+
+
+https://github.com/user-attachments/assets/786527d3-d400-4acd-94f0-3ad433557239
+
+---
+
+# Below are the changelogs of older versions
+
+---
+
+
+## Changelog v.1.0.3-alpha-1
+
+So after a lot of research and painful hours of coding here's the new update!
+
+# What's new :
+
+1. Fixed previous bugs.
+
+2.  Switched to a much lighter model (llama3.2) for conversations, RAG and function calling
+  
+3. A whole lot of commands
+  
+4. Reinforcement Learning (Q-learning).
+   
+5. **Theortically** Multiplayer compatible (just install the dependencies on server side), as carpet mod can run on servers too, but I have not tested it yet. Feedback is welcome from testers on this.
+ 
+6. **Theoretically** the mod **should not** require everyone to install it on multiplayer, it should be a server-sided one, haven't tested this one yet, feedback is welcome from testers.
+
+Bot can now interact with it's envrionment based on "triggers" and then learn about it's situation and try to adapt.
+
+The learning process is not short, don't expect the bot to learn how to deal with a situation very quickly, in fact if you want intelligent results, you may need hours of training(Something I will focus on once I fix some more bugs, add some more triggers and get this version out of the alpha stage)
+
+To start the learning process:
+
+`/bot spawn <botName> training`
+
+Right now the bot only reacts to hostile mobs around it, will add more "triggers" so that the bot responds to more scenarios and learns how to deal with such scenarios in upcoming updates
+
+A recording of what this verison does : 
+
+[![YouTube](http://i.ytimg.com/vi/6zEORx1OKfA/hqdefault.jpg)](https://www.youtube.com/watch?v=6zEORx1OKfA)
+
+---
+
+## New commands :
+
+Spawn command changed.
+
+`/bot spawn <bot> <mode: training or play>`, if you type anything else in the mode parameter you will get a message in chat showing the correct usage of this command
+
+
+`/bot use-key <W,S, A, D, LSHIFT, SPRINT, UNSNEAK, UNSPRINT> <bot>`
+
+`/bot release-all-keys <bot> <botName>`
+
+`/bot look <north, south, east, west>`
+
+
+`/bot detectDangerZone` // Detects lava pools and cliffs nearby
+
+`/bot getHotBarItems` // returns a list of the items in it's hotbar
+
+`/bot getSelectedItem` // gets the currently selected item
+
+`/bot getHungerLevel` // gets it's hunger levels
+
+`/bot getOxygenLevel` // gets the oxygen level of the bot
+
+`/bot equipArmor` // gets the bot to put on the best armor in it's inventory
+
+`/bot removeArmor` // work in progress.
+
+---
+
+## What to do to setup this version before playing the game :
+
+```
+1. Make sure you still have ollama installed.
+2. In cmd or terminal type `ollama pull nomic-embed-text (if not already done).
+3. Type `ollama pull llama3.2`
+4. Type `ollama rm gemma2 (if you still have it installed)
+5. Type `ollama rm llama2 (if you still have it installed)
+6. If you have run the mod before go to your .minecraft folder, navigate to a folder called config, and delete a file called settings.json5
+```
+
+Then make sure you have turned on ollama server. After that launch the game.
+
+Type `/configMan` in chat and select llama3.2 as the language model, then hit save and exit.
+
+Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
+
+---
+
+For the nerds : How does the bot learn?
+
+It uses an algorithm called Q-learning which is a part of reinforcement learning.
+
+A very good video explanation on what Q-learning is :
+
+[Reinforcement learning 101](https://www.youtube.com/watch?v=vXtfdGphr3c)
+
+
+
+---
 
 ## For the nerds
 
@@ -182,9 +318,9 @@ Then spawn the bot and start talking!
 ---
 # Buidling the project from intellij
 
-Step 1. Download Java 21. 
+Step 1. Download Java 17. 
 
-This project is built on java 21 to support carpet mod's updated API.
+This project is built on java 17 to support carpet mod's updated API.
 
 Go to: https://bell-sw.com/pages/downloads/#jdk-21-lts
 
