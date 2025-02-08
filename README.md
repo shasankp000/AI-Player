@@ -68,7 +68,7 @@ After a lot of time, here's the next patch of this mod!
 # Changelog v1.0.3-alpha-2
 
 1. Updated the qtable storage format (previous qtable is not comaptible with this version)
-2. Created a "risk taking" mechanism which greatly reduces training time by making actions taken during training more contextual based instead of random.
+2. Created a "risk taking" mechanism which **greatly reduces training time** by making actions taken during training more contextual based instead of random.
 3. Added more environment triggers for the bot to look up it's training data, now it also reacts to dangerous enviornment around it, typically lava, places where it might fall off, or sculk blocks.
 4. Created very detailed reward mechanisms for the bot during training for the best possible efficiency.
 5. Fixed the previous blockscanning code, now replaced using a DLS algorithm for better optimization.
