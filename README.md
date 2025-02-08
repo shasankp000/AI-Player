@@ -83,6 +83,21 @@ After a lot of time, here's the next patch of this mod!
 4. Give the bot a sense of it's surroundings in more detail (like how we can see blocks around us in game) so that it can take more precise decisions. Right now it has knowledge of what blocks are around it, but it doesn't know how those blocks are placed around it, in what order/shape. I intend to fix that. 
 5. Implement human consciousness level reasoning??? (to some degree maybe) (BIG MAYBE)
 
+`mob related reflex actions`
+
+https://github.com/user-attachments/assets/1700e1ff-234a-456f-ab37-6dac754b3a94
+
+
+`environment reaction`
+https://github.com/user-attachments/assets/786527d3-d400-4acd-94f0-3ad433557239
+
+
+---
+## Some video footage of this version
+
+
+
+
 
 ---
 
