@@ -318,7 +318,7 @@ Then spawn the bot and start talking!
 ---
 # Buidling the project from intellij
 
-Step 1. Download Java 17. 
+Step 1. Download Java 21. 
 
 This project is built on java 17 to support carpet mod's updated API.
 
