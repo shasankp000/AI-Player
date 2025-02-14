@@ -95,29 +95,13 @@ https://github.com/user-attachments/assets/1700e1ff-234a-456f-ab37-6dac754b3a94
 
 
 https://github.com/user-attachments/assets/786527d3-d400-4acd-94f0-3ad433557239
+
 ---
 # Usage
 
-## If you want to manually build and test this project, follow from step 1.
+If you want to manually build and test this project, follow from step 1.
 
-## For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
-
-**For users who have used the mod before, transitioning to version 1.0.2-hotfix-3**
-
-```
-1. Go to your game folder (.minecraft)/config and you will find a settings.json5 file.
-Delete that
-
-2.(If you have run the previous 1.0.2 version already then) again go back to your .minecraft. you will find a folder called "sqlite_databases". Inside that is a file called memory_agent.db
-
-3. Delete that as well.
-4. Install the models, mistral, llama2 and nomic-embed-text
-
-5.Then run the game
-6. Inside the game run /configMan to set the language model to llama2.
-
-Then spawn the bot and start talking!
-```
+For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
 
 ---
 # Buidling the project from intellij
@@ -177,6 +161,9 @@ Additionally you can go to the terminal icon on the bottom left
 
 And type `./graldew build`
 
+---
+
+**Below instructions are same irrespective of build from intellij or direct mod download.**
 
 Step 6. Setup ollama.
 
@@ -195,42 +182,23 @@ This can be accessed in your system tray
 
 Now open a command line client, on windows, search CMD or terminal and then open it.
 
-Depending on your specs, you can download a language model and then configure in the project to use it.
+```
+1. In cmd or terminal type `ollama pull nomic-embed-text (if not already done).
+2. Type `ollama pull llama3.2`
+3. Type `ollama rm gemma2 (if you still have it installed) (for previous users only)
+4. Type `ollama rm llama2 (if you still have it installed) (for previous users only)
+5. If you have run the mod before go to your .minecraft folder, navigate to a folder called config, and delete a file called settings.json5 (for previous users only)
+```
 
-For now, in the terminal, type ![image](https://github.com/user-attachments/assets/7ecf3eea-2a7c-481b-a914-53678081e60e)
+Then **make sure you have turned on ollama server**. 
 
-~~In this example we are going with the phi3 model.~~
+Step 7: Download the dependencies
 
-For the updated version 1.0.2, you will need to download the `llama2` model: `ollama pull llama2` 
-And another model `nomic-embed-text`: `ollama pull nomic-embed-text`
+Step 8: Launch the game.
 
-Without llama2, intelligence will be very low
-Without nomic-embed-text, the mod will crash.
+Step 9: Type `/configMan` in chat and select llama3.2 as the language model, then hit save and exit.
 
-
-I do intend to add an option in the mod to change and configure models within the game GUI.
-
-Once done. Go to the next step.
-
-Step 7. Go to the files section
-
-![image](https://github.com/user-attachments/assets/443b12ad-cb8c-4049-8fa3-01875023c42a)
-
-Click on the ollamaClient 
-
-Go to line 199.
-
-[recording1](https://github.com/user-attachments/assets/bd01e7a7-ef5f-4379-9157-965c97b85ce3)
-
-Remove the current model type, then follow the video and set it to `OllamaModelType.PHI3`
-
-Although intelliJ autosaves but press `CTRL+S` to save.
-
-Step 8. Finally click on the gradle icon again in the right sidebar.
-
-![image](https://github.com/user-attachments/assets/64b085c2-1624-4cfc-9b64-22fd293f1cfe)
-
-Fine the runClient task, and double click it to run minecraft with the mod.
+Step 10: Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
 
 ---
 # Mod usage
@@ -259,9 +227,29 @@ Sub commands:
 
 `detect_entities <bot> A command which is supposed to detect entities around the bot`
 
+`use-key <W,S, A, D, LSHIFT, SPRINT, UNSNEAK, UNSPRINT> <bot>`
+
+`release-all-keys <bot> <botName>`
+
+`look <north, south, east, west>`
+
+`detectDangerZone` // Detects lava pools and cliffs nearby
+
+`getHotBarItems` // returns a list of the items in it's hotbar
+
+`getSelectedItem` // gets the currently selected item
+
+`getHungerLevel` // gets it's hunger levels
+
+`getOxygenLevel` // gets the oxygen level of the bot
+
+`equipArmor` // gets the bot to put on the best armor in it's inventory
+
+`removeArmor` // work in progress.
+
 **Example Usage:**
 
-`/bot spawn Steve`
+`/bot spawn Steve training`
 
 The above command changes credits go to [Mr. Álvaro Carvalho](https://github.com/A11v1r15)
 
