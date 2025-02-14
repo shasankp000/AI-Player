@@ -213,8 +213,7 @@ This section is to describe the usage of the mod in-game
 
 Sub commands: 
 
-`spawm <bot>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
-
+`spawm <bot>` This command is used to spawn a bot with the desired name.
 `walk <bot> <till>` This command will make the bot walk forward for a specific amount of seconds.
 
 `go_to <bot> <x> <y> <z>` This command is supposed to make the bot go to the specified co-ordinates, by finding the shortest path to it. It is still a work in progress as of the moment.
