@@ -56,8 +56,8 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 # Download links
 
 1. From this github page, just download from the releases section or follow the steps in usage section to build and test.
-2. Modrinth: https://modrinth.com/mod/ai-player/ (Temporarily down as of the moment, use github)
-3. Curseforge: Will upload soon after a few more patches and updates.
+2. Modrinth: https://modrinth.com/mod/ai-player/
+3. Curseforge: https://www.curseforge.com/minecraft/mc-mods/ai-player
 
 ---
 
