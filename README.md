@@ -56,8 +56,8 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 # Download links
 
 1. From this github page, just download from the releases section or follow the steps in usage section to build and test.
-2. Modrinth: https://modrinth.com/mod/ai-player/ (Temporarily down as of the moment, use github)
-3. Curseforge: Will upload soon after a few more patches and updates.
+2. Modrinth: https://modrinth.com/mod/ai-player/
+3. Curseforge: https://www.curseforge.com/minecraft/mc-mods/ai-player
 
 ---
 
@@ -97,228 +97,16 @@ https://github.com/user-attachments/assets/1700e1ff-234a-456f-ab37-6dac754b3a94
 https://github.com/user-attachments/assets/786527d3-d400-4acd-94f0-3ad433557239
 
 ---
-
-# Below are the changelogs of older versions
-
----
-
-
-## Changelog v.1.0.3-alpha-1
-
-So after a lot of research and painful hours of coding here's the new update!
-
-# What's new :
-
-1. Fixed previous bugs.
-
-2.  Switched to a much lighter model (llama3.2) for conversations, RAG and function calling
-  
-3. A whole lot of commands
-  
-4. Reinforcement Learning (Q-learning).
-   
-5. **Theortically** Multiplayer compatible (just install the dependencies on server side), as carpet mod can run on servers too, but I have not tested it yet. Feedback is welcome from testers on this.
- 
-6. **Theoretically** the mod **should not** require everyone to install it on multiplayer, it should be a server-sided one, haven't tested this one yet, feedback is welcome from testers.
-
-Bot can now interact with it's envrionment based on "triggers" and then learn about it's situation and try to adapt.
-
-The learning process is not short, don't expect the bot to learn how to deal with a situation very quickly, in fact if you want intelligent results, you may need hours of training(Something I will focus on once I fix some more bugs, add some more triggers and get this version out of the alpha stage)
-
-To start the learning process:
-
-`/bot spawn <botName> training`
-
-Right now the bot only reacts to hostile mobs around it, will add more "triggers" so that the bot responds to more scenarios and learns how to deal with such scenarios in upcoming updates
-
-A recording of what this verison does : 
-
-[![YouTube](http://i.ytimg.com/vi/6zEORx1OKfA/hqdefault.jpg)](https://www.youtube.com/watch?v=6zEORx1OKfA)
-
----
-
-## New commands :
-
-Spawn command changed.
-
-`/bot spawn <bot> <mode: training or play>`, if you type anything else in the mode parameter you will get a message in chat showing the correct usage of this command
-
-
-`/bot use-key <W,S, A, D, LSHIFT, SPRINT, UNSNEAK, UNSPRINT> <bot>`
-
-`/bot release-all-keys <bot> <botName>`
-
-`/bot look <north, south, east, west>`
-
-
-`/bot detectDangerZone` // Detects lava pools and cliffs nearby
-
-`/bot getHotBarItems` // returns a list of the items in it's hotbar
-
-`/bot getSelectedItem` // gets the currently selected item
-
-`/bot getHungerLevel` // gets it's hunger levels
-
-`/bot getOxygenLevel` // gets the oxygen level of the bot
-
-`/bot equipArmor` // gets the bot to put on the best armor in it's inventory
-
-`/bot removeArmor` // work in progress.
-
----
-
-## What to do to setup this version before playing the game :
-
-```
-1. Make sure you still have ollama installed.
-2. In cmd or terminal type `ollama pull nomic-embed-text (if not already done).
-3. Type `ollama pull llama3.2`
-4. Type `ollama rm gemma2 (if you still have it installed)
-5. Type `ollama rm llama2 (if you still have it installed)
-6. If you have run the mod before go to your .minecraft folder, navigate to a folder called config, and delete a file called settings.json5
-```
-
-Then make sure you have turned on ollama server. After that launch the game.
-
-Type `/configMan` in chat and select llama3.2 as the language model, then hit save and exit.
-
-Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
-
----
-
-For the nerds : How does the bot learn?
-
-It uses an algorithm called Q-learning which is a part of reinforcement learning.
-
-A very good video explanation on what Q-learning is :
-
-[Reinforcement learning 101](https://www.youtube.com/watch?v=vXtfdGphr3c)
-
-
-
----
-
-## For the nerds
-
-Sucessfully implemented the intellgence update.
-
-So, for the tech savvy people, I have implemented the following features.
-
-**LONG TERM MEMORY**: This mod now features concepts used in the field AI like Natural Language Processing (much better now) and something called
-
-**Retrieval Augmented Generation (RAG)**.
-
-How does it work?
-
-Well:
-
-![Retrieval Augmented Generation process outline](https://cdn.modrinth.com/data/cached_images/f4f51461946d8fb02be131d6ea53db238cdbd8c4.png)
-
-![Vectors](https://media.geeksforgeeks.org/wp-content/uploads/20200911171455/UntitledDiagram2.png)
-
-
-We convert the user input, to a set of vector embeddings which is a list of numbers.
-
-Then **physics 101!**
-
-A vector is a representation of 3 coordinates in the XYZ plane. It has two parts, a direction and a magnitude.
-
-If you have two vectors, you can check their similarity by checking the angle between them.
-
-The closer the vectors are to each other, the more **similar** they are!
-
-Now if you have two sentences, converted to vectors, you can find out whether they are similar to each other using this process.
-
-In this particular instance I have used a method called **cosine similarity**
-
-[Cosine similarity](https://www.geeksforgeeks.org/cosine-similarity/)
-
-Where you find the similarity using the formula
-
-`(x, y) = x . y / |x| . |y|`
-
-where |x| and |y| are the magnitudes of the vectors.
-
-
-So we use this technique to fetch a bunch of stored conversation and event data from an SQL database, generate their vector embeddings, and then run that against the user's prompt. We get then further sort on the basis on let's say timestamps and we get the most relevant conversation for what the player said.
-
-
-Pair this with **function calling**. Which combines Natural Language processing to understand what the player wants the bot to do, then call a pre-coded method, for example movement and block check, to get the bot to do the task.
-
-Save this data, i.e what the bot did just now to the database and you get even more improved memory!
-
-To top it all off, Gemma 2 8b is the best performing model for this mod right now, so I will suggest y'all to use gemma2.
-
-In fact some of the methods won't even run without gemma2 like the RAG for example so it's a must.
-
----
-
-![image](https://github.com/shasankp000/AI-Player/assets/46317225/6b8e22e2-cf00-462a-936b-d5b6f14fb228)
-
-Successfully managed to spawn a "second player" bot.
-
-Added basic bot movement.
-
-[botmovement.webm](https://github.com/user-attachments/assets/c9062a42-b914-403b-b44a-19fad1663bc8)
-
-
-Implemented basic bot conversation 
-
-[bandicam 2024-07-19 11-12-07-431.webm](https://github.com/user-attachments/assets/556d8d87-826a-4477-9717-74f38c9059e9)
-
-
-Added a mod configuration menu (Still a work in progress)
-
-
-https://github.com/user-attachments/assets/5ed6d6cf-2516-4a2a-8cd2-25c0c1eacbae
-
-**Implemented intermediate XZ pathfinding for the bot**
-
-
-https://github.com/user-attachments/assets/687b72a2-a4a8-4ab7-8b77-7373d414bb28
-
-**Implemented Natural Language Processing for the bot to understand the intention and context of the user input and execute methods**
-Can only understand if you want the bot to go some coordinates.
-
-https://vimeo.com/992051891?share=copy
-
-**Implemented nearby entity detection**
-
-
-
-https://github.com/user-attachments/assets/d6cd7d86-9651-4e6f-b14a-56332206a440
-
-
-
-
----
 # Usage
 
-## If you want to manually build and test this project, follow from step 1.
+If you want to manually build and test this project, follow from step 1.
 
-## For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
-
-**For users who have used the mod before, transitioning to version 1.0.2-hotfix-3**
-
-```
-1. Go to your game folder (.minecraft)/config and you will find a settings.json5 file.
-Delete that
-
-2.(If you have run the previous 1.0.2 version already then) again go back to your .minecraft. you will find a folder called "sqlite_databases". Inside that is a file called memory_agent.db
-
-3. Delete that as well.
-4. Install the models, mistral, llama2 and nomic-embed-text
-
-5.Then run the game
-6. Inside the game run /configMan to set the language model to llama2.
-
-Then spawn the bot and start talking!
-```
+For playing the game, download the jar file either from modrinth or the releases section and go directly to step 6.
 
 ---
 # Buidling the project from intellij
 
-Step 1. Download Java 17. 
+Step 1. Download Java 21. 
 
 This project is built on java 17 to support carpet mod's updated API.
 
@@ -373,6 +161,9 @@ Additionally you can go to the terminal icon on the bottom left
 
 And type `./graldew build`
 
+---
+
+**Below instructions are same irrespective of build from intellij or direct mod download.**
 
 Step 6. Setup ollama.
 
@@ -391,42 +182,23 @@ This can be accessed in your system tray
 
 Now open a command line client, on windows, search CMD or terminal and then open it.
 
-Depending on your specs, you can download a language model and then configure in the project to use it.
+```
+1. In cmd or terminal type `ollama pull nomic-embed-text (if not already done).
+2. Type `ollama pull llama3.2`
+3. Type `ollama rm gemma2 (if you still have it installed) (for previous users only)
+4. Type `ollama rm llama2 (if you still have it installed) (for previous users only)
+5. If you have run the mod before go to your .minecraft folder, navigate to a folder called config, and delete a file called settings.json5 (for previous users only)
+```
 
-For now, in the terminal, type ![image](https://github.com/user-attachments/assets/7ecf3eea-2a7c-481b-a914-53678081e60e)
+Then **make sure you have turned on ollama server**. 
 
-~~In this example we are going with the phi3 model.~~
+Step 7: Download the dependencies
 
-For the updated version 1.0.2, you will need to download the `llama2` model: `ollama pull llama2` 
-And another model `nomic-embed-text`: `ollama pull nomic-embed-text`
+Step 8: Launch the game.
 
-Without llama2, intelligence will be very low
-Without nomic-embed-text, the mod will crash.
+Step 9: Type `/configMan` in chat and select llama3.2 as the language model, then hit save and exit.
 
-
-I do intend to add an option in the mod to change and configure models within the game GUI.
-
-Once done. Go to the next step.
-
-Step 7. Go to the files section
-
-![image](https://github.com/user-attachments/assets/443b12ad-cb8c-4049-8fa3-01875023c42a)
-
-Click on the ollamaClient 
-
-Go to line 199.
-
-[recording1](https://github.com/user-attachments/assets/bd01e7a7-ef5f-4379-9157-965c97b85ce3)
-
-Remove the current model type, then follow the video and set it to `OllamaModelType.PHI3`
-
-Although intelliJ autosaves but press `CTRL+S` to save.
-
-Step 8. Finally click on the gradle icon again in the right sidebar.
-
-![image](https://github.com/user-attachments/assets/64b085c2-1624-4cfc-9b64-22fd293f1cfe)
-
-Fine the runClient task, and double click it to run minecraft with the mod.
+Step 10: Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
 
 ---
 # Mod usage
@@ -441,7 +213,7 @@ This section is to describe the usage of the mod in-game
 
 Sub commands: 
 
-`spawm <bot>` This command is used to spawn a bot with the desired name. ==For testing purposes, please keep the bot name to Steve==.
+`spawm <bot>` This command is used to spawn a bot with the desired name.
 
 `walk <bot> <till>` This command will make the bot walk forward for a specific amount of seconds.
 
@@ -455,9 +227,29 @@ Sub commands:
 
 `detect_entities <bot> A command which is supposed to detect entities around the bot`
 
+`use-key <W,S, A, D, LSHIFT, SPRINT, UNSNEAK, UNSPRINT> <bot>`
+
+`release-all-keys <bot> <botName>`
+
+`look <north, south, east, west>`
+
+`detectDangerZone` // Detects lava pools and cliffs nearby
+
+`getHotBarItems` // returns a list of the items in it's hotbar
+
+`getSelectedItem` // gets the currently selected item
+
+`getHungerLevel` // gets it's hunger levels
+
+`getOxygenLevel` // gets the oxygen level of the bot
+
+`equipArmor` // gets the bot to put on the best armor in it's inventory
+
+`removeArmor` // work in progress.
+
 **Example Usage:**
 
-`/bot spawn Steve`
+`/bot spawn Steve training`
 
 The above command changes credits go to [Mr. Álvaro Carvalho](https://github.com/A11v1r15)
 
