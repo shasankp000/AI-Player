@@ -68,6 +68,15 @@ After a lot of time, here's the next patch of this mod!
 # Changelog v1.0.3-alpha-2-hotfix-1
 
 
+Introduced Server sided compatability for training mode.
+
+Play mode for some reason fails to connect to ollama server so I am still working it out, will be done in the next hotfix.
+
+# Fixed
+
+- removeArmor command now works.
+- will be updated in the decision making logic accordingly in next hotfix.
+
 
 ---
 
