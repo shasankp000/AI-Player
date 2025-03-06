@@ -18,6 +18,9 @@
 		"main": [
 			"net.shasankp000.AIPlayer"
 		],
+		"client": [
+			"net.shasankp000.AIPlayerClient"
+		],
 		"fabric-datagen": [
 			"net.shasankp000.AIPlayerDataGenerator"
 		]
@@ -27,7 +30,7 @@
 	],
 	"depends": {
 		"fabricloader": ">=0.15.11",
-		"minecraft": "~1.20.1",
+		"minecraft": "~1.20.4",
 		"java": ">=21",
 		"fabric-api": "*"
 	},

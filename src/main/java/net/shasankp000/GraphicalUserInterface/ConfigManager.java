@@ -1,5 +1,6 @@
 package net.shasankp000.GraphicalUserInterface;
 
+
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -10,6 +11,7 @@ import net.shasankp000.AIPlayer;
 import net.shasankp000.FilingSystem.AIPlayerConfigModel;
 import net.shasankp000.GraphicalUserInterface.Widgets.DropdownMenuWidget;
 import net.shasankp000.FilingSystem.getLanguageModels;
+import net.shasankp000.Network.configNetworkManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,12 +107,15 @@ public class ConfigManager extends Screen {
         private void saveToFile() {
 
             String modelName = this.dropdownMenuWidget.getSelectedOption();
+
             System.out.println(modelName);
 
             aiPlayerConfigModel.setSelectedLanguageModel(modelName);
 
             AIPlayer.CONFIG.selectedLanguageModel(modelName);
-            AIPlayer.CONFIG.save();
+            AIPlayer.CONFIG.save(); // save to client first
+
+            configNetworkManager.sendSaveConfigPacket(modelName); // send save packet to server
 
             close();
 

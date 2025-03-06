@@ -7,10 +7,8 @@ import net.minecraft.util.math.BlockPos;
 /**
  * Represents an internal 3D map of the blocks surrounding the bot.
  * The map is centered on the bot's current position.
- *
  * The map array is indexed as:
  *   map[dy + verticalRange][dx + horizontalRange][dz + horizontalRange]
- *
  * where:
  *   - dx and dz are the horizontal offsets (east-west and north-south, respectively)
  *   - dy is the vertical offset (relative to the bot's Y coordinate)
@@ -84,9 +82,12 @@ public class InternalMap {
                 for (int dx = -horizontalRange; dx <= horizontalRange; dx++) {
                     Block block = getBlockAt(dx, dy, dz);
                     if (block != null) {
-                        // Use the first character of the block's name as a simple identifier.
-                        String blockName = block.getName().getString();
-                        System.out.print(blockName.charAt(0) + " ");
+                        // Use the block's translation key (e.g., "block.minecraft.stone")
+                        String key = block.getName().getString();
+                        // Extract the short name (after the last '.')
+                        String shortName = key.contains(".") ? key.substring(key.lastIndexOf('.') + 1) : key;
+                        // Print the first character of the short name as a simple identifier.
+                        System.out.print(shortName + " ");
                     } else {
                         System.out.print("? ");
                     }
@@ -96,4 +97,5 @@ public class InternalMap {
             System.out.println();
         }
     }
+
 }

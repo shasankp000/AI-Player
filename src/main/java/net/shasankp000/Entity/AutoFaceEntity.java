@@ -121,7 +121,6 @@ public class AutoFaceEntity {
 
                 hasSculkNearby = nearbyBlocks.stream()
                         .anyMatch(block -> block.contains("Sculk Sensor") || block.contains("Sculk Shrieker"));
-                System.out.println("Nearby blocks: " + nearbyBlocks);
 
 
                 if (!hostileEntities.isEmpty()) {

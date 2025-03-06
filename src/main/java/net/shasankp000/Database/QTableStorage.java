@@ -1,22 +1,13 @@
 package net.shasankp000.Database;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import net.minecraft.client.MinecraftClient;
+
+import net.fabricmc.loader.api.FabricLoader;
 import net.shasankp000.GameAI.State;
-import net.shasankp000.GameAI.StateActions;
-
 import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
 
-import java.util.Map;
-import java.util.Objects;
 
 public class QTableStorage {
-    private static final String gameDir = MinecraftClient.getInstance().runDirectory.getAbsolutePath();
+    private static final String gameDir = FabricLoader.getInstance().getGameDir().toString();
 
 
     public static void setupQTableStorage() {

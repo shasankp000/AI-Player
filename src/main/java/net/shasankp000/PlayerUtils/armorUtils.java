@@ -34,6 +34,8 @@ public class armorUtils {
 
                 // Add this update to the list for notifying clients
                 equipmentUpdates.add(new Pair<>(slot, bestArmor)); // Use com.mojang.datafixers.util.Pair
+
+                bot.getInventory().armor.set(slot.getEntitySlotId(), bestArmor.copy()); // update the armor slots data for the server for the bot.
             }
         }
 
@@ -87,6 +89,8 @@ public class armorUtils {
 
         // Prepare a list of equipment updates to notify clients
         List<Pair<EquipmentSlot, ItemStack>> equipmentUpdates = new ArrayList<>();
+
+
 
         // Iterate through all armor slots
         for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {

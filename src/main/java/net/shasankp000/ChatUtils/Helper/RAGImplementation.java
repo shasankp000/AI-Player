@@ -14,7 +14,7 @@ import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestBuilde
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestModel;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatResult;
 import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
-import net.minecraft.client.MinecraftClient;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.command.ServerCommandSource;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.Database.SQLiteDB;
@@ -26,7 +26,7 @@ import static net.shasankp000.ChatUtils.Helper.helperMethods.classify_events;
 
 public class RAGImplementation {
     private static final Logger logger = LoggerFactory.getLogger("ai-player");
-    private static final String gameDir = MinecraftClient.getInstance().runDirectory.getAbsolutePath();
+    private static final String gameDir = FabricLoader.getInstance().getGameDir().toString();
     private static final String host = "http://localhost:11434";
     private static final OllamaAPI ollamaAPI = new OllamaAPI(host);
 

@@ -31,6 +31,7 @@ import net.shasankp000.Entity.RespawnHandler;
 import net.shasankp000.Entity.createFakePlayer;
 import net.shasankp000.GameAI.BotEventHandler;
 import net.shasankp000.OllamaClient.ollamaClient;
+import net.shasankp000.PlayerUtils.*;
 import net.shasankp000.WorldUitls.isFoodItem;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -46,10 +47,6 @@ import static net.shasankp000.PathFinding.PathFinder.*;
 import static net.minecraft.server.command.CommandManager.literal;
 import static net.shasankp000.PathFinding.PathTracer.tracePath;
 import net.shasankp000.PacketHandler.InputPacketHandler;
-import net.shasankp000.PlayerUtils.hotBarUtils;
-import net.shasankp000.PlayerUtils.getPlayerHunger;
-import net.shasankp000.PlayerUtils.getPlayerOxygen;
-import net.shasankp000.PlayerUtils.armorUtils;
 
 public class modCommandRegistry {
 
@@ -140,18 +137,37 @@ public class modCommandRegistry {
                         )
                         .then(literal("detect_entities")
                                 .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("bot_name", StringArgumentType.string())
-                                                .executes(context -> {
-                                                    String botName = StringArgumentType.getString(context,"bot_name");
-                                                    ServerPlayerEntity bot = context.getSource().getServer().getPlayerManager().getPlayer(botName);
-                                                    if (bot != null) {
-                                                        RayCasting.detect(bot);
-                                                    }
-                                                    return 1;
-                                                })
-                                        )
+                                        .executes(context -> {
+                                            ServerPlayerEntity bot = context.getSource().getServer().getPlayerManager().getPlayer(botName);
+                                            if (bot != null) {
+                                                RayCasting.detect(bot);
+                                            }
+                                            return 1;
+                                        })
                                 )
                         )
+                        .then(literal("detect_blocks")
+                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                        .then(CommandManager.argument("vertical", IntegerArgumentType.integer())
+                                                .then(CommandManager.argument("horizontal", IntegerArgumentType.integer())
+                                                        .executes(context -> {
+                                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                            int y = IntegerArgumentType.getInteger(context, "vertical");
+                                                            int x = IntegerArgumentType.getInteger(context, "horizontal");
+
+                                                            InternalMap internalMap = new InternalMap(bot, y, x);
+                                                            internalMap.updateMap();
+                                                            internalMap.printMap();
+                                                            return 1;
+                                                        })
+                                                )
+                                        )
+
+                                )
+
+                        )
+
+
                         .then(literal("use-key")
                                 .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .then(CommandManager.argument("key", StringArgumentType.string())
@@ -558,15 +574,21 @@ public class modCommandRegistry {
 
             ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
 
+            System.out.println("Preparing for connection to language model....");
+
             if (bot!=null) {
 
+                System.out.println("Registering respawn listener....");
+
                 RespawnHandler.registerRespawnListener(bot);
+
+                System.out.println("Setting gamemode of bot to " + mode);
 
                 bot.changeGameMode(mode);
 
                 ollamaClient.botName = botName; // set the bot's name.
 
-                ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
+              //  ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
 
                 initializeOllamaClient();
 

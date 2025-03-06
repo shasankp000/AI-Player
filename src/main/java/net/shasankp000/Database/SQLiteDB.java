@@ -1,6 +1,6 @@
 package net.shasankp000.Database;
 
-import net.minecraft.client.MinecraftClient;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +17,7 @@ public class SQLiteDB {
 
     public static void createDB() {
 
-        String gameDir = MinecraftClient.getInstance().runDirectory.getAbsolutePath();
+        String gameDir = FabricLoader.getInstance().getGameDir().toString();
 
         File dbDir = new File(gameDir + "/sqlite_databases");
         if (!dbDir.exists()) {

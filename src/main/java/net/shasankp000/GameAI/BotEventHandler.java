@@ -1,6 +1,6 @@
 package net.shasankp000.GameAI;
 
-import net.minecraft.client.MinecraftClient;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.item.ItemStack;
@@ -12,7 +12,6 @@ import net.shasankp000.DangerZoneDetector.DangerZoneDetector;
 import net.shasankp000.Database.QTable;
 import net.shasankp000.Database.QTableStorage;
 import net.shasankp000.Database.StateActionPair;
-import net.shasankp000.Database.StateActionTransition;
 import net.shasankp000.Entity.AutoFaceEntity;
 
 import net.minecraft.server.MinecraftServer;
@@ -35,7 +34,7 @@ public class BotEventHandler {
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
     private static MinecraftServer server = null;
     public static ServerPlayerEntity bot = null;
-    private static final String gameDir = MinecraftClient.getInstance().runDirectory.getAbsolutePath();
+    private static final String gameDir = FabricLoader.getInstance().getGameDir().toString();
     public static final String qTableDir = gameDir + "/qtable_storage/";
     private static final Object monitorLock = new Object();
     private static boolean isExecuting = false;

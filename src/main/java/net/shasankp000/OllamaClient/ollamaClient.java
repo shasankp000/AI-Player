@@ -10,7 +10,8 @@ import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
 
 import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
-import net.minecraft.client.MinecraftClient;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
@@ -45,7 +46,7 @@ public class ollamaClient {
     public static boolean isInitialized = false;
     public static String initialResponse = "";
     public static final OllamaAPI ollamaAPI = new OllamaAPI("http://localhost:11434/");
-    private static final String gameDir = MinecraftClient.getInstance().runDirectory.getAbsolutePath();
+    private static final String gameDir = FabricLoader.getInstance().getGameDir().toString();
     private static final String DB_URL = "jdbc:sqlite:" + gameDir + "/sqlite_databases/memory_agent.db";
 
 
@@ -171,21 +172,34 @@ public class ollamaClient {
 
     public static void initializeOllamaClient() {
             if (!isInitialized) {
-                LOGGER.info("Initializing Ollama Client");
+                System.out.println("Initializing Ollama Client");
 
-                MinecraftServer server = MinecraftClient.getInstance().getServer();
+                MinecraftServer server;
+
+                if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
+                    // In an integrated server, you can get the server from the client.
+                    server = net.minecraft.client.MinecraftClient.getInstance().getServer();
+                } else {
+                    // On a dedicated server, use the stored server instance.
+                    server = AIPlayer.serverInstance.getNetworkIo().getServer();
+
+                    System.out.println("Set Dedicated server instance to " + server);
+                }
+
+
                 if (server == null) {
                     LOGGER.error("MinecraftServer is null.");
+                    System.out.println("Server Instance is null!");
                     return;
                 }
 
-                LOGGER.info("MinecraftServer is not null. Proceeding to find player...");
+                System.out.println("MinecraftServer is not null. Proceeding to find player...");
 
                 int maxRetries = 3;
                 int retryCount = 0;
                 boolean initialized = false;
 
-                LOGGER.info("Connecting to ollama server....");
+                System.out.println("Connecting to ollama server....");
 
                 ollamaAPI.setRequestTimeoutSeconds(90); // Set timeout to 90 seconds
 
