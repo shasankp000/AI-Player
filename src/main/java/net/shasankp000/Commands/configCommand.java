@@ -21,6 +21,13 @@ public class configCommand {
                             // On a dedicated server, send a packet to the client to open the config GUI.
                             configNetworkManager.sendOpenConfigPacket(player);
                         }
+                        else {
+                            // we are on client, send packet to the client to open the config GUI
+
+                            configNetworkManager.sendOpenConfigPacket(player);
+
+                        }
+                        
                         return 1;
                     })
             );
