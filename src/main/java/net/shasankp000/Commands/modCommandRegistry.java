@@ -543,6 +543,8 @@ public class modCommandRegistry {
 
             if (bot!=null) {
 
+                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+                
                 RespawnHandler.registerRespawnListener(bot);
 
                 AutoFaceEntity.startAutoFace(bot);
@@ -578,40 +580,37 @@ public class modCommandRegistry {
 
             if (bot!=null) {
 
+                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+
                 System.out.println("Registering respawn listener....");
 
                 RespawnHandler.registerRespawnListener(bot);
 
                 System.out.println("Setting gamemode of bot to " + mode);
 
-                bot.changeGameMode(mode);
-
                 ollamaClient.botName = botName; // set the bot's name.
 
-              //  ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
+                ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
 
                 initializeOllamaClient();
 
-                new Thread( () -> {
-
-                    while (!isInitialized) {
+                new Thread(() -> {
+                    while (!ollamaClient.isInitialized) {
                         try {
                             Thread.sleep(500L); // Check every 500ms
                         } catch (InterruptedException e) {
-                            LOGGER.error("Ollama client initialization failed.");
-                            throw new RuntimeException(e);
+                            LOGGER.error("Ollama client initialization interrupted.");
+                            Thread.currentThread().interrupt();
+                            break;
                         }
                     }
 
-                    sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+                    //initialization succeeded, continue:
+                    ollamaClient.sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+                    AutoFaceEntity.startAutoFace(bot);
 
-                    try {
-                        Thread.sleep(1500);
-                        AutoFaceEntity.startAutoFace(bot);
+                    Thread.currentThread().interrupt(); // close this thread.
 
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                 }).start();
 
             }
