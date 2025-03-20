@@ -176,15 +176,19 @@ public class ollamaClient {
 
                 MinecraftServer server;
 
-                if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
-                    // In an integrated server, you can get the server from the client.
-                    server = net.minecraft.client.MinecraftClient.getInstance().getServer();
-                } else {
-                    // On a dedicated server, use the stored server instance.
-                    server = AIPlayer.serverInstance.getNetworkIo().getServer();
+                // if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
+                //     // In an integrated server, you can get the server from the client.
+                //     server = net.minecraft.client.MinecraftClient.getInstance().getServer();
+                // } else {
+                //     // On a dedicated server, use the stored server instance.
+                //     server = AIPlayer.serverInstance.getNetworkIo().getServer();
 
-                    System.out.println("Set Dedicated server instance to " + server);
-                }
+                //     System.out.println("Set Dedicated server instance to " + server);
+                // }
+
+                // use a unified approach to get the server instance.
+
+                MinecraftServer server = AIPlayer.serverInstance;
 
 
                 if (server == null) {
