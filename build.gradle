@@ -39,7 +39,7 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	modImplementation 'com.github.gnembon:fabric-carpet:1.4.128'
+	modImplementation 'com.github.gnembon:fabric-carpet:1.4.141'
 	implementation 'com.github.amithkoujalgi:ollama4j:1.0.77'
 	implementation 'com.github.FasterXML:jackson-core:jackson-core-2.17.2'
 	implementation 'com.github.FasterXML:jackson-databind:jackson-databind-2.17.2'

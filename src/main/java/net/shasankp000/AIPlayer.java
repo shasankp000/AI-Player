@@ -1,9 +1,13 @@
 package net.shasankp000;
 
+
+import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.Commands.configCommand;
@@ -14,6 +18,8 @@ import net.shasankp000.Database.QTableStorage;
 import net.shasankp000.Database.SQLiteDB;
 import net.shasankp000.Entity.AutoFaceEntity;
 import net.shasankp000.FilingSystem.AIPlayerConfig;
+import net.shasankp000.Network.OpenConfigPayload;
+import net.shasankp000.Network.SaveConfigPayload;
 import net.shasankp000.Network.configNetworkManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +35,14 @@ public class AIPlayer implements ModInitializer {
 	public void onInitialize() {
 
 		LOGGER.info("Hello Fabric world!");
+
+
+		// registering the packets on the global entrypoint to recognise them
+
+
+		PayloadTypeRegistry.playC2S().register(SaveConfigPayload.ID, SaveConfigPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(OpenConfigPayload.ID, OpenConfigPayload.CODEC);
+
 
 		modCommandRegistry.register();
 		configCommand.register();

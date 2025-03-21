@@ -1,6 +1,7 @@
 package net.shasankp000.GameAI;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.item.ItemStack;
@@ -161,7 +162,7 @@ public class BotEventHandler {
                 List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
                 SelectedItemDetails selectedItem = new SelectedItemDetails(
                         hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
-                        hotBarUtils.getSelectedHotbarItemStack(bot).isFood(),
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getComponents().contains(DataComponentTypes.FOOD), // as per 1.20.6 changes.
                         isBlockItem.checkBlockItem(hotBarUtils.getSelectedHotbarItemStack(bot))
                 );
 
@@ -290,7 +291,7 @@ public class BotEventHandler {
                 List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
                 SelectedItemDetails selectedItem = new SelectedItemDetails(
                         hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
-                        hotBarUtils.getSelectedHotbarItemStack(bot).isFood(),
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getComponents().contains(DataComponentTypes.FOOD), // as per 1.20.6 changes.,
                         isBlockItem.checkBlockItem(hotBarUtils.getSelectedHotbarItemStack(bot))
                 );
 
@@ -493,7 +494,7 @@ public class BotEventHandler {
 
         SelectedItemDetails selectedItem = new SelectedItemDetails(
                 selectedItemStack.getItem().getName().getString(),
-                selectedItemStack.isFood(),
+                selectedItemStack.getComponents().contains(DataComponentTypes.FOOD),
                 isBlockItem.checkBlockItem(selectedItemStack)
         );
 

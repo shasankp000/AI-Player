@@ -137,11 +137,10 @@ public class createFakePlayer extends ServerPlayerEntity {
 //            System.out.println("Fixed " + instance.getName().getString() + "'s starting position");
 //            server.getPlayerManager().broadcast(Text.literal("Fixed " + instance.getName().getString() + "'s starting position"), true);
 //        };
-        server.getPlayerManager().onPlayerConnect(new FakeClientConnection(NetworkSide.SERVERBOUND), instance, new ConnectedClientData(gameprofile, 0, instance.getClientOptions()));
+        server.getPlayerManager().onPlayerConnect(new FakeClientConnection(NetworkSide.SERVERBOUND), instance, new ConnectedClientData(gameprofile, 0, instance.getClientOptions(), false));
         instance.teleport(worldIn, pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
         instance.setHealth(20.0F);
         instance.unsetRemoved();
-        instance.setStepHeight(0.6F);
         instance.interactionManager.changeGameMode(gamemode);
         server.getPlayerManager().sendToDimension(new EntitySetHeadYawS2CPacket(instance, (byte) (instance.headYaw * 256 / 360)), dimensionId);
         server.getPlayerManager().sendToDimension(new EntityPositionS2CPacket(instance), dimensionId);
@@ -175,33 +174,6 @@ public class createFakePlayer extends ServerPlayerEntity {
 
     // Code copied over from carpet.
 
-    public static createFakePlayer respawnFake(MinecraftServer server, ServerWorld level, GameProfile profile, SyncedClientOptions cli) {
-        return new createFakePlayer(server, level, profile, cli, false);
-    }
-
-    public static createFakePlayer createShadow(MinecraftServer server, ServerPlayerEntity player)  {
-        Objects.requireNonNull(player.getServer()).getPlayerManager().remove(player);
-        player.networkHandler.disconnect(Text.translatable("multiplayer.disconnect.duplicate_login"));
-        ServerWorld worldIn = player.getServerWorld();//.getWorld(player.dimension);
-        GameProfile gameprofile = player.getGameProfile();
-        createFakePlayer playerShadow = new createFakePlayer(server, worldIn, gameprofile, player.getClientOptions(), true);
-        playerShadow.setSession(player.getSession());
-        server.getPlayerManager().onPlayerConnect(new FakeClientConnection(NetworkSide.SERVERBOUND), playerShadow, new ConnectedClientData(gameprofile, 0, player.getClientOptions()));
-
-        playerShadow.setHealth(player.getHealth());
-        playerShadow.networkHandler.requestTeleport(player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch());
-        playerShadow.interactionManager.changeGameMode(player.interactionManager.getGameMode());
-        ((ServerPlayerInterface) playerShadow).getActionPack().copyFrom(((ServerPlayerInterface) player).getActionPack());
-        playerShadow.setStepHeight(0.6F);
-        playerShadow.dataTracker.set(PLAYER_MODEL_PARTS, player.getDataTracker().get(PLAYER_MODEL_PARTS));
-
-
-        server.getPlayerManager().sendToDimension(new EntitySetHeadYawS2CPacket(playerShadow, (byte) (player.headYaw * 256 / 360)), playerShadow.getWorld().getRegistryKey());
-        server.getPlayerManager().sendToAll(new PlayerListS2CPacket(PlayerListS2CPacket.Action.ADD_PLAYER, playerShadow));
-        //player.world.getChunkManager().updatePosition(playerShadow);
-        playerShadow.getAbilities().flying = player.getAbilities().flying;
-        return playerShadow;
-    }
 
 
     @Override

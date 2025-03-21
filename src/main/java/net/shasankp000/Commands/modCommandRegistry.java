@@ -6,9 +6,12 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.fabricmc.api.EnvType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
@@ -33,6 +36,7 @@ import net.shasankp000.GameAI.BotEventHandler;
 import net.shasankp000.OllamaClient.ollamaClient;
 import net.shasankp000.PlayerUtils.*;
 import net.shasankp000.WorldUitls.isFoodItem;
+import net.shasankp000.Exception.ollamaNotReachableException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static net.shasankp000.OllamaClient.ollamaClient.*;
+
 import static net.shasankp000.PathFinding.PathFinder.*;
 import static net.minecraft.server.command.CommandManager.literal;
 import static net.shasankp000.PathFinding.PathTracer.tracePath;
@@ -131,14 +135,24 @@ public class modCommandRegistry {
                         .then(literal("send_message_to")
                                 .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .then(CommandManager.argument("message", StringArgumentType.greedyString())
-                                                .executes(context -> { execute(context); return 1; })
+                                                .executes(context -> {
+
+                                                if (FabricLoader.getInstance().getEnvironmentType().equals(EnvType.CLIENT)) {
+
+                                                    ollamaClient.execute(context);
+
+                                                }
+
+                                                     return 1;
+
+                                                })
                                         )
                                 )
                         )
                         .then(literal("detect_entities")
                                 .then(CommandManager.argument("bot", EntityArgumentType.player())
                                         .executes(context -> {
-                                            ServerPlayerEntity bot = context.getSource().getServer().getPlayerManager().getPlayer(botName);
+                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
                                             if (bot != null) {
                                                 RayCasting.detect(bot);
                                             }
@@ -543,6 +557,8 @@ public class modCommandRegistry {
 
             if (bot!=null) {
 
+                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+
                 RespawnHandler.registerRespawnListener(bot);
 
                 AutoFaceEntity.startAutoFace(bot);
@@ -578,43 +594,40 @@ public class modCommandRegistry {
 
             if (bot!=null) {
 
+                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+
                 System.out.println("Registering respawn listener....");
 
                 RespawnHandler.registerRespawnListener(bot);
 
-                System.out.println("Setting gamemode of bot to " + mode);
-
-                bot.changeGameMode(mode);
-
                 ollamaClient.botName = botName; // set the bot's name.
 
-              //  ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
+                System.out.println("Set bot's username to " + botName);
 
-                initializeOllamaClient();
+                ChatUtils.sendChatMessages(serverSource, "Please wait while " + botName + " connects to the language model.");
 
-                new Thread( () -> {
+                ollamaClient.initializeOllamaClient();
 
-                    while (!isInitialized) {
+                new Thread(() -> {
+                    while (!ollamaClient.isInitialized) {
                         try {
                             Thread.sleep(500L); // Check every 500ms
                         } catch (InterruptedException e) {
-                            LOGGER.error("Ollama client initialization failed.");
-                            throw new RuntimeException(e);
+                            LOGGER.error("Ollama client initialization interrupted.");
+                            Thread.currentThread().interrupt();
+                            break;
                         }
                     }
 
-                    sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+                    //initialization succeeded, continue:
+                    ollamaClient.sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
+                    AutoFaceEntity.startAutoFace(bot);
 
-                    try {
-                        Thread.sleep(1500);
-                        AutoFaceEntity.startAutoFace(bot);
+                    Thread.currentThread().interrupt(); // close this thread.
 
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                 }).start();
-
             }
+
 
             else {
                 ChatUtils.sendChatMessages(serverSource, "Error: " + botName + " cannot be spawned");

@@ -4,20 +4,24 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.PacketByteBuf;
+
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.command.ServerCommandSource;
+
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.AIPlayer;
+import net.shasankp000.ChatUtils.ChatUtils;
+
 
 public class configNetworkManager {
-    public static final Identifier OPEN_CONFIG_PACKET = new Identifier("ai-player", "open_config");
-    public static final Identifier SAVE_CONFIG_PACKET = new Identifier("ai-player", "save_config");
-
 
     // Called on the server side: sends a packet to the specified player.
     public static void sendOpenConfigPacket(ServerPlayerEntity player) {
+        String configData = ConfigJsonUtil.configToJson();
         PacketByteBuf buf = PacketByteBufs.create();
-        ServerPlayNetworking.send(player, OPEN_CONFIG_PACKET, buf);
+        buf.writeString(configData);
+        OpenConfigPayload payload = new OpenConfigPayload(configData); // initialize the config data onto the payload
+        ServerPlayNetworking.send(player, payload);
     }
 
 
@@ -26,27 +30,30 @@ public class configNetworkManager {
     public static void sendSaveConfigPacket(String configData) {
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeString(configData);
-        ClientPlayNetworking.send(SAVE_CONFIG_PACKET, buf);
+        SaveConfigPayload payload = new SaveConfigPayload(configData);
+        ClientPlayNetworking.send(payload);
     }
 
     // On the server side: register a receiver for the save config packet.
+    @SuppressWarnings("resource")
     public static void registerServerSaveReceiver(MinecraftServer server) {
-        ServerPlayNetworking.registerGlobalReceiver(SAVE_CONFIG_PACKET, (server1, player, handler, buf, responseSender) -> {
-            // Read the configuration data sent by the client.
-            String newModelName = buf.readString(32767); // Adjust max length as needed.
-            server1.execute(() -> {
-                // Now that we are on the server thread, update your config and save it.
+        ServerPlayNetworking.registerGlobalReceiver(SaveConfigPayload.ID, (payload, context) -> {
+            // Retrieve the configuration data from the payload
+            String newConfigData = payload.configData();
+            System.out.println("Config data to save: ");
+            System.out.println(newConfigData);
 
-                // Update the config using your static instance
-                // Update the config using your static instance
-                AIPlayer.CONFIG.selectedLanguageModel(newModelName);
+            // Run the config update on the server thread
+            context.server().execute(() -> {
+                AIPlayer.CONFIG.selectedLanguageModel(newConfigData);
                 AIPlayer.CONFIG.save();
-
-
-                player.sendMessage(net.minecraft.text.Text.literal("Configuration updated on server end!"), false);
+                ServerCommandSource serverCommandSource = server.getCommandSource().withSilent().withMaxLevel(4);
+                ChatUtils.sendChatMessages(serverCommandSource, "Config saved to server successfully!");
             });
         });
     }
+
+
 
 
 

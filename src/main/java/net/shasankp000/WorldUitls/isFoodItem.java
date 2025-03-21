@@ -1,5 +1,7 @@
 package net.shasankp000.WorldUitls;
 
+import net.minecraft.component.ComponentMap;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.item.ItemStack;
 
 
@@ -7,9 +9,12 @@ public class isFoodItem {
 
     // Check if the given item is a food item
     public static boolean checkFoodItem(ItemStack selectedItemStack) {
-        // Get the Item instance from the item registry
+        // 1.20.6, get the Item's component map, run it against DataComponentTypes to check if it's a food
 
-        return selectedItemStack.getItem().isFood();
+        ComponentMap componentMap = selectedItemStack.getComponents();
+
+        return componentMap.contains(DataComponentTypes.FOOD);
+
     }
 
 
