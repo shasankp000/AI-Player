@@ -90,7 +90,7 @@ public class ConfigManager extends Screen {
             int green = 0xFF00FF00;
             int red = 0xFFFF0000;
 
-            context.drawText(this.textRenderer, "AI-Player Mod configuration Menu v1.0.4-beta-1",140, 20 - this.textRenderer.fontHeight - 10, white, true);
+            context.drawText(this.textRenderer, "AI-Player Mod configuration Menu v1.0.4-beta-1",95, 20 - this.textRenderer.fontHeight - 10, white, true);
             context.drawText(this.textRenderer, "Select Language Model",5, this.dropdownMenuWidget.getY() + 5, yellow, true);
             context.drawText(this.textRenderer, "Currently selected language model: " + AIPlayer.CONFIG.selectedLanguageModel(),100, this.dropdownMenuWidget.getY() + 30, green, true);
             context.drawText(this.textRenderer, "No need to restart the game after changing/selecting a language model!",20, this.dropdownMenuWidget.getY() + 60, red, true);
