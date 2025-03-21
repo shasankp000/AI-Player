@@ -174,7 +174,6 @@ public class ollamaClient {
             if (!isInitialized) {
                 System.out.println("Initializing Ollama Client");
 
-                MinecraftServer server;
 
                 // if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
                 //     // In an integrated server, you can get the server from the client.
