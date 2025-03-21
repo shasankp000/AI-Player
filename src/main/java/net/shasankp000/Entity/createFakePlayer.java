@@ -1,7 +1,6 @@
 package net.shasankp000.Entity;
 
 import carpet.CarpetSettings;
-import carpet.fakes.ServerPlayerInterface;
 import carpet.patches.FakeClientConnection;
 import carpet.utils.Messenger;
 import com.google.gson.Gson;
@@ -18,7 +17,6 @@ import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
 import net.minecraft.network.packet.c2s.play.ClientStatusC2SPacket;
 import net.minecraft.network.packet.s2c.play.EntityPositionS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntitySetHeadYawS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTask;
@@ -48,7 +46,6 @@ import net.shasankp000.AIPlayer;
 
 public class createFakePlayer extends ServerPlayerEntity {
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
-    public Runnable fixStartingPosition = () -> {};
     public boolean isAShadow;
 
 
