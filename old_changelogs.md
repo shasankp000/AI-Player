@@ -1,5 +1,13 @@
 # Below are the changelogs of older versions
 ---
+# Changelog v1.0.4-release+1.20.6
+
+- Updated codebase for 1.20.6 compatibility.
+- Optimized codebase by removing redundant codes and unused imports.
+
+(previous version 1.0.4-beta-1 fixed server sided compatibility fully)
+
+---
 # Changelog v1.0.3-alpha-2-hotfix-1
 
 
