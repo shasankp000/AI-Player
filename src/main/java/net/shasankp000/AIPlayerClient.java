@@ -19,9 +19,6 @@ public class AIPlayerClient implements ClientModInitializer {
 
         ClientPlayNetworking.registerGlobalReceiver(OpenConfigPayload.ID, (client, handler) -> {
 
-            String configData = client.configData();
-            System.out.println(configData);
-
             // Open the config screen on the client.
             // Adjust ConfigManager and the Text as needed.
             net.minecraft.client.gui.screen.Screen currentScreen = net.minecraft.client.MinecraftClient.getInstance().currentScreen;
