@@ -63,15 +63,15 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 # Progress: 71%
 
-After a lot of time, here's the next patch of this mod!
+The 1.20.6 port is out now!
 
-# Changelog v1.0.3-alpha-2
+# Changelog v1.0.4-release+1.20.6
 
-1. Updated the qtable storage format (previous qtable is not comaptible with this version)
-2. Created a "risk taking" mechanism which **greatly reduces training time** by making actions taken during training more contextual based instead of random.
-3. Added more environment triggers for the bot to look up it's training data, now it also reacts to dangerous enviornment around it, typically lava, places where it might fall off, or sculk blocks.
-4. Created very detailed reward mechanisms for the bot during training for the best possible efficiency.
-5. Fixed the previous blockscanning code, now replaced using a DLS algorithm for better optimization.
+- Updated codebase for 1.20.6 compatibility.
+- Optimized codebase by removing redundant codes and unused imports.
+
+(previous version 1.0.4-beta-1 fixed server sided compatibility fully)
+
 
 ---
 
