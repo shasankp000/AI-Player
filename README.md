@@ -63,19 +63,14 @@ This mod also relies on the ollama4j project. https://github.com/amithkoujalgi/o
 
 # Progress: 71%
 
-After a lot of time, here's the next patch of this mod!
+The 1.20.6 port is out now!
 
-# Changelog v1.0.3-alpha-2-hotfix-1
+# Changelog v1.0.4-release+1.20.6
 
+- Updated codebase for 1.20.6 compatibility.
+- Optimized codebase by removing redundant codes and unused imports.
 
-Introduced Server sided compatability for training mode.
-
-Play mode for some reason fails to connect to ollama server so I am still working it out, will be done in the next hotfix.
-
-# Fixed
-
-- removeArmor command now works.
-- will be updated in the decision making logic accordingly in next hotfix.
+(previous version 1.0.4-beta-1 fixed server sided compatibility fully)
 
 
 ---
