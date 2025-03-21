@@ -1,4 +1,11 @@
 # Below are the changelogs of older versions
+---
+# Changelog v1.0.3-alpha-2-hotfix-1
+
+
+Introduced Server sided compatability for training mode.
+
+Play mode for some reason fails to connect to ollama server so I am still working it out, will be done in the next hotfix.
 
 ---
 ## Changelog v.1.0.3-alpha-2
