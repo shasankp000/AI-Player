@@ -502,7 +502,7 @@ public class BotEventHandler {
 
         List<EntityDetails> nearbyEntitiesList = new ArrayList<>();
 
-        String directionToBot = "";
+        String directionToBot;
 
         for(Entity entity: nearbyEntities) {
 
