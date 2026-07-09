@@ -50,30 +50,7 @@ public class NLPProcessor {
 
 
 
-    public static void ensureLocalNLPModel() {
-        Path configDir = FabricLoader.getInstance().getConfigDir();
-        Path modelDir = configDir.resolve("ai-player/NLPModels");
-        Path torchZipFile = modelDir.resolve("distilbert-finetuned-intent-torchscript.zip");
-        Path torchModelDir = modelDir.resolve("distilbert-finetuned-intent-torchscript/");
-        Path LidsNetModelDir = modelDir.resolve("LIDSNet_torchscript/");
-        Path LidsNETZipFile = modelDir.resolve("LIDSNet_torchscript.zip");
-        Path cartZipFile = modelDir.resolve("cart.zip");
-        Path cartDir = modelDir.resolve("cart_files");
-        Path openNlpModelsDir = modelDir.resolve("OpenNLPModels");
 
-        int maxRetries = 2;
-        int currentRetry = 0;
-
-        // Check if all models already exist - skip download if so
-        boolean allModelsExist = Files.exists(torchModelDir) &&
-                                 Files.exists(cartDir) &&
-                                 Files.exists(openNlpModelsDir) &&
-                                 Files.exists(LidsNetModelDir);
-
-        if (allModelsExist) {
-            LOGGER.info("✅ All NLP models already downloaded - skipping download");
-            return;
-        }
 
         // Calculate total steps for progress reporting
         int totalSteps = 0;

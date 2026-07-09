@@ -27,6 +27,7 @@ import net.minecraft.world.World;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.DangerZoneDetector.DangerZoneDetector;
 import net.shasankp000.Database.QTableExporter;
+import net.shasankp000.Database.SQLiteDB;
 import net.shasankp000.Entity.*;
 import net.shasankp000.FilingSystem.LLMClientFactory;
 import net.shasankp000.GameAI.BotEventHandler;
@@ -896,6 +897,16 @@ public class modCommandRegistry {
 
                                     ChatUtils.sendSystemMessage(serverSource, "Q-table has been successfully exported to a json file at: " + BotEventHandler.qTableDir + "./fullQTable.json" );
 
+                                    return 1;
+                                })
+                        )
+
+                        // Feature 4.x: /bot resetmemories — wipes the RAG memory DB (memory_agent.db)
+                        .then(literal("resetmemories")
+                                .executes(context -> {
+                                    ServerCommandSource source = context.getSource();
+                                    SQLiteDB.clearMemories();
+                                    ChatUtils.sendSystemMessage(source, "All RAG memories cleared from memory_agent.db.");
                                     return 1;
                                 })
                         )

@@ -112,7 +112,7 @@ public class AIPlayer implements ModInitializer {
 
 			System.out.println("Server instance is " + serverInstance);
 
-			LOGGER.info("Local PyTorch intent models (BERT/LIDSNet) are disabled — intent classification runs via the cloud LLM (Gemini API).");
+			LOGGER.info("Local PyTorch intent models (BERT/LIDSNet) are disabled — intent classification runs via the cloud LLM (Provider).");
 
 
 		});
