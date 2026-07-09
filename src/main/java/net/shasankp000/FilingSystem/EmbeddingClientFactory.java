@@ -81,8 +81,12 @@ public class EmbeddingClientFactory {
                 );
             }
             default -> {
-                LOGGER.info("Using Ollama embeddings (nomic-embed-text)");
-                yield createOllamaClient();
+                if (AIPlayer.CONFIG.getGeminiKey().isEmpty()) {
+                    LOGGER.error("Gemini API key not set - embeddings require Google Gemini (text-embedding-004)");
+                    yield null;
+                }
+                LOGGER.info("Using Gemini embeddings (text-embedding-004)");
+                yield new GeminiEmbeddingClient(AIPlayer.CONFIG.getGeminiKey());
             }
         };
 

@@ -1,6 +1,5 @@
 package net.shasankp000.ChatUtils;
 
-import ai.djl.modality.Classifications;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
@@ -8,9 +7,10 @@ import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
 
 import net.fabricmc.loader.api.FabricLoader;
 import net.shasankp000.AIPlayer;
+import net.shasankp000.FilingSystem.LLMClientFactory;
+import net.shasankp000.ServiceLLMClients.LLMClient;
 import net.shasankp000.ChatUtils.CART.CartClassifier;
 import net.shasankp000.ChatUtils.DecisionResolver.DecisionResolver;
-import net.shasankp000.ChatUtils.LIDSNetModel.LIDSNetModelManager;
 import net.shasankp000.ChatUtils.PreProcessing.NLPModelSetup;
 import net.shasankp000.ChatUtils.PreProcessing.OpenNLPProcessor;
 import org.slf4j.Logger;
@@ -435,158 +435,65 @@ public class NLPProcessor {
     // Primary local prediction entry
     // -------------------------------
 
+    /**
+     * Primary intent classification entry point.
+     *
+     * Local PyTorch classifiers (BERT / LIDSNet) have been disabled to keep the
+     * build lightweight and cloud-only. Intent is now resolved directly through
+     * the cloud LLM (Gemini API) via {@link #getIntentionFromLLM}.
+     */
     public static Intent getIntention(String userPrompt) {
-        Path configDir = FabricLoader.getInstance().getConfigDir();
-        Path modelDir = configDir.resolve("ai-player/NLPModels");
-        Path cartDir = modelDir.resolve("cart_files");
-        Path vocabFilePath = cartDir.resolve("cart_vectorizer_vocab.json");
-        Path labelsFilePath = cartDir.resolve("cart_class_labels.json");
-        Path treeFilePath = cartDir.resolve("cart_tree.json");
-        Path openNlpModelsDir = modelDir.resolve("OpenNLPModels");
-        Path LidsNetModelDir = modelDir.resolve("LIDSNet_torchscript/");
-
-        double bertClassificationConfidence = 0;
-        double cartClassificationConfidence = 0;
-        double LIDSNetClassificationConfidence = 0;
-
-        CartClassifier cartClassifier = null;
-
-        try {
-            File vocabFile = vocabFilePath.toFile();
-            File labelFile = labelsFilePath.toFile();
-            File treeFile = treeFilePath.toFile();
-
-            cartClassifier = new CartClassifier(treeFile, labelFile, vocabFile);
-        } catch (IOException e) {
-            LOGGER.error("Error initializing CART classifier! {}", e.getMessage());
-        }
-
-
-        String bertLabel = null;
-        String cartLabel = null;
-        String LIDSNetLabel = null;
-        String decision = null;
-
-        try {
-            Classifications intent = AIPlayer.modelManager.predict(userPrompt);
-            if (intent != null) {
-                bertLabel = intent.best().getClassName();
-                bertClassificationConfidence = intent.best().getProbability();
-
-                LOGGER.info("BERT predicted: {} with confidence: {}", bertLabel, bertClassificationConfidence);
-            }
-        } catch (Exception e) {
-            LOGGER.error("Error predicting intent using BERT: {}", e.getMessage());
-        }
-
-        try {
-            if (cartClassifier != null) {
-                CartClassifier.ClassificationResult result = cartClassifier.classify(userPrompt);
-                cartLabel = result.label;
-                cartClassificationConfidence = result.confidence;
-
-                LOGGER.info("CART predicted: {} with confidence: {}", cartLabel, cartClassificationConfidence);
-            }
-            else {
-                throw new Exception("CART classifier is null!");
-            }
-
-        } catch (Exception e) {
-            LOGGER.error("Error predicting intent using CART: {}", e.getMessage());
-        }
-
-        try {
-
-            // --- 1. Load Feature Map JSON ---
-            ObjectMapper mapper = new ObjectMapper();
-            Path actualLidsNetModelDir = LidsNetModelDir.resolve("LIDSNet_torchscript/");
-            JsonNode root = mapper.readTree(new File(actualLidsNetModelDir.resolve("lidsnet_feature_map.json").toString()));
-
-            // Class label index map
-            TreeMap<Integer, String> classIdxMap = new TreeMap<>();
-            root.get("idx2label").fields().forEachRemaining(entry ->
-                    classIdxMap.put(Integer.parseInt(entry.getKey()), entry.getValue().asText())
-            );
-            List<String> classNames = new ArrayList<>(classIdxMap.values());
-
-            // Feature names
-            List<String> featureNames = new ArrayList<>();
-            root.get("features").forEach(f -> featureNames.add(f.asText()));
-
-            // --- 2. Initialize NLP processor ---
-            OpenNLPProcessor openNLP = new OpenNLPProcessor(openNlpModelsDir.toString());
-
-            // --- 3. Analyze user input ---
-            List<OpenNLPProcessor.TokenInfo> tokens = openNLP.analyze(userPrompt);
-
-            // --- 4. Build symbolic feature set ---
-            Set<String> presentFeatures = new HashSet<>();
-            for (OpenNLPProcessor.TokenInfo token : tokens) {
-                presentFeatures.add("POS=" + token.posTag);
-                presentFeatures.add("lemma=" + token.lemma);
-            }
-
-            // --- 5. Construct input vector ---
-            float[] inputVector = new float[featureNames.size()];
-            for (int i = 0; i < featureNames.size(); i++) {
-                inputVector[i] = presentFeatures.contains(featureNames.get(i)) ? 1.0f : 0.0f;
-            }
-
-            // --- 6. Classify ---
-            LIDSNetModelManager lidsNet = LIDSNetModelManager.getInstance(actualLidsNetModelDir);
-            lidsNet.loadModel(classNames);
-            LIDSNetModelManager.PredictionResult pred = lidsNet.predictWithConfidence(inputVector, classNames);
-
-            // --- 7. Output
-            System.out.printf("[LIDSNet Classifier] Sentence: \"%s\"\nPredicted intent: %s (Confidence: %.2f%%)\n",
-                    userPrompt, pred.getClassName(), pred.getConfidencePercentage());
-
-            LIDSNetLabel = pred.getClassName();
-            LIDSNetClassificationConfidence = pred.getConfidencePercentage();
-
-
-        }
-        catch (Exception e) {
-            LOGGER.error("Error while running inference: {}", e.getMessage());
-        }
-
-
-
-        try {
-            DecisionResolver resolver = new DecisionResolver();
-            decision = resolver.resolveIntent(
-                    // Player message
-                    userPrompt,
-                    // BERT model
-                    bertLabel, bertClassificationConfidence,
-                    // Main CART
-                    cartLabel, cartClassificationConfidence,
-                    // LIDSNet
-                    LIDSNetLabel, LIDSNetClassificationConfidence
-            );
-        } catch (Exception e) {
-            LOGGER.error("Error while resolving the final decision: {}", e.getMessage());
-        }
-
-        return Intent.valueOf(decision);
-
+        return getIntentionFromLLM(userPrompt);
     }
 
 
 
     // -------------------------------
-    // Fallback LLM method
+    // Cloud LLM intent method — follows the configured llmMode provider
     // -------------------------------
     public static Intent getIntentionFromLLM(String userPrompt) {
-        ollamaAPI.setRequestTimeoutSeconds(600);
         String systemPrompt = buildPrompt();
-
+        String mode = System.getProperty("aiplayer.llmMode", "ollama").toLowerCase();
         try {
+            LLMClient llmClient = LLMClientFactory.createClient(mode);
+            if (llmClient == null) {
+                // The factory has no client for this mode (e.g. "ollama") — fall
+                // back to the original Ollama classifier path so Ollama still works.
+                if ("ollama".equals(mode)) {
+                    return classifyWithOllama(userPrompt, systemPrompt);
+                }
+                LOGGER.error("Intent LLM client unavailable for provider '{}' — check the API key in config.", mode);
+                return Intent.UNSPECIFIED;
+            }
+            if (!llmClient.isReachable()) {
+                LOGGER.error("Intent LLM client ('{}') is unreachable — check the API key / network.", mode);
+                return Intent.UNSPECIFIED;
+            }
+
+            String response = llmClient.sendPrompt(systemPrompt, userPrompt).trim();
+
+            if (response.contains("REQUEST_ACTION")) return Intent.REQUEST_ACTION;
+            if (response.contains("ASK_INFORMATION")) return Intent.ASK_INFORMATION;
+            if (response.contains("GENERAL_CONVERSATION")) return Intent.GENERAL_CONVERSATION;
+            if (response.contains("UNSPECIFIED")) return Intent.UNSPECIFIED;
+        } catch (Exception e) {
+            LOGGER.error("LLM intent classification failed: {}", e.getMessage(), e);
+        }
+        return Intent.UNSPECIFIED;
+    }
+
+    /**
+     * Legacy Ollama-based intent classification, kept as a fallback for
+     * {@code llmMode=ollama} (the LLMClientFactory has no Ollama LLMClient).
+     */
+    private static Intent classifyWithOllama(String userPrompt, String systemPrompt) {
+        try {
+            ollamaAPI.setRequestTimeoutSeconds(600);
             List<io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage> messages = new java.util.ArrayList<>();
             messages.add(new io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage(
-                    OllamaChatMessageRole.SYSTEM, systemPrompt));
+                    io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole.SYSTEM, systemPrompt));
             messages.add(new io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage(
-                    OllamaChatMessageRole.USER, userPrompt));
+                    io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole.USER, userPrompt));
 
             net.shasankp000.OllamaClient.OllamaThinkingResponse thinkingResponse =
                     net.shasankp000.OllamaClient.OllamaAPIHelper.smartChat(
@@ -597,18 +504,11 @@ public class NLPProcessor {
                     );
 
             String response = thinkingResponse.getContent().trim();
-            // No need to strip think tags anymore - they're handled separately
-            // response = stripThinkTags(response);
-
-            if (response.equalsIgnoreCase("REQUEST_ACTION") || response.contains("REQUEST_ACTION")) {
-                return Intent.REQUEST_ACTION;
-            } else if (response.equalsIgnoreCase("ASK_INFORMATION") || response.contains("ASK_INFORMATION")) {
-                return Intent.ASK_INFORMATION;
-            } else if (response.equalsIgnoreCase("GENERAL_CONVERSATION") || response.contains("GENERAL_CONVERSATION")) {
-                return Intent.GENERAL_CONVERSATION;
-            }
+            if (response.contains("REQUEST_ACTION")) return Intent.REQUEST_ACTION;
+            if (response.contains("ASK_INFORMATION")) return Intent.ASK_INFORMATION;
+            if (response.contains("GENERAL_CONVERSATION")) return Intent.GENERAL_CONVERSATION;
         } catch (Exception e) {
-            LOGGER.error("LLM fallback failed: {}", e.getMessage(), e);
+            LOGGER.error("Ollama intent classification failed: {}", e.getMessage(), e);
         }
         return Intent.UNSPECIFIED;
     }

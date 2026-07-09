@@ -26,26 +26,13 @@ public class SQLiteDB {
             logger.info("✅ Database directory created: {}", dbDir);
         }
 
-        // Configure SQLite to allow extensions
+        // Pure-Java vector search: register the cosine_distance UDF (no native
+        // sqlite-vec / sqlite-vss extension is loaded or required).
         SQLiteConfig config = new SQLiteConfig();
-        config.enableLoadExtension(true);
+        config.enableLoadExtension(false);
 
         try (Connection conn = DriverManager.getConnection(DB_URL, config.toProperties())) {
-            Path extPath = VectorExtensionHelper.ensureSqliteVecPresent();
-            VectorExtensionHelper.loadSqliteVecExtension(conn, extPath);
-
-            String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-            if (!osName.contains("win")) {
-                logger.info("✅ Detected Linux/MacOS — using sqlite-vss native extension");
-                Path extPath2 = VectorExtensionHelper.ensureSqliteVssPresent();
-                // vector0 must be loaded before vss0
-                Path vssDir = FabricLoader.getInstance().getConfigDir().resolve("sqlite_vector/sqlite-vss");
-                VectorExtensionHelper.loadSqliteVector0Extension(conn, vssDir);
-                VectorExtensionHelper.loadSqliteVssExtension(conn, extPath2);
-            } else {
-                logger.info("✅ Detected Windows — using fallback cosine_distance UDF");
-                VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
-            }
+            VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
 
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("PRAGMA foreign_keys = ON;");
@@ -118,11 +105,8 @@ public class SQLiteDB {
 
         try (Connection conn = DriverManager.getConnection(DB_URL, config.toProperties())) {
 
-            // ✅ Register fallback cosine_distance BEFORE prepareStatement
-            String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-            if (osName.contains("win")) {
-                VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
-            }
+            // ✅ Register the pure-Java cosine_distance UDF (all platforms)
+            VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
 
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setString(1, vectorToLiteral(queryEmbedding));
@@ -180,6 +164,17 @@ public class SQLiteDB {
         }
 
         return results;
+    }
+
+    public static void clearMemories() {
+        String sql = "DELETE FROM memories;";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             Statement stmt = conn.createStatement()) {
+            int deleted = stmt.executeUpdate(sql);
+            logger.info("🧹 Cleared {} memory rows from the database.", deleted);
+        } catch (SQLException e) {
+            logger.error("❌ Failed to clear memories: {}", e.getMessage(), e);
+        }
     }
 
     private static String vectorToLiteral(List<Double> vec) {

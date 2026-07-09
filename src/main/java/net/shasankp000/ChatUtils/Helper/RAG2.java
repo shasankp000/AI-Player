@@ -35,10 +35,13 @@ public class RAG2 {
         if (embeddingProvider == null) {
             try {
                 embeddingProvider = EmbeddingProviderFactory.createEmbeddingProvider(ollamaAPI);
-                logger.info("✅ Embedding provider initialized successfully");
+                if (embeddingProvider != null) {
+                    logger.info("✅ Embedding provider initialized successfully");
+                } else {
+                    logger.warn("⚠ Embedding provider not configured — memory/embedding features disabled.");
+                }
             } catch (Exception e) {
                 logger.error("❌ Failed to initialize embedding provider: {}", e.getMessage(), e);
-                throw new RuntimeException("Failed to initialize embedding provider", e);
             }
         }
     }
@@ -113,7 +116,9 @@ public class RAG2 {
         String webAnswer = WebSearchTool.search(userPrompt).trim();
         logger.info("🌐 Web search result: {}", webAnswer);
 
-        List<SQLiteDB.Memory> localMemories = SQLiteDB.findRelevantMemories(queryEmbedding, "conversation", 1);
+        List<SQLiteDB.Memory> localMemories = (queryEmbedding != null)
+                ? SQLiteDB.findRelevantMemories(queryEmbedding, "conversation", 1)
+                : java.util.Collections.emptyList();
         boolean hasLocal = !localMemories.isEmpty();
         String localAnswer = hasLocal ? localMemories.get(0).response() : "";
         double localSimilarity = hasLocal ? localMemories.get(0).similarity() : 0.0;
@@ -143,14 +148,26 @@ public class RAG2 {
     }
 
 
+    private static void appendSimilarMemories(StringBuilder contextBuilder, List<Double> queryEmbedding, String type) {
+        String label = "conversation".equals(type) ? "conversations" : type + "s";
+        contextBuilder.append("Relevant ").append(label).append(":\n");
+        if (queryEmbedding != null) {
+            List<SQLiteDB.Memory> memories = SQLiteDB.findRelevantMemories(queryEmbedding, type, TOP_K);
+            for (SQLiteDB.Memory m : memories) {
+                contextBuilder.append("- Prompt: ").append(m.prompt()).append("\n");
+                contextBuilder.append("  Response: ").append(m.response()).append("\n");
+                contextBuilder.append("  Similarity: ").append(m.similarity()).append("\n\n");
+            }
+        }
+    }
+
     public static void run(String userPrompt, ServerCommandSource botSource, NLPProcessor.Intent intent, LLMClient client) {
         ollamaAPI.setRequestTimeoutSeconds(120);
         logger.info("⚡ RAG v2: Running with intent = {} and using provider: {}", intent, client);
 
         try {
             ensureEmbeddingProvider();
-
-            List<Double> queryEmbedding = embeddingProvider.generateEmbeddings(userPrompt);
+            List<Double> queryEmbedding = embeddingProvider != null ? embeddingProvider.generateEmbeddings(userPrompt) : null;
 
             StringBuilder contextBuilder = new StringBuilder();
 
@@ -160,8 +177,7 @@ public class RAG2 {
 
                 if (bestAnswer.equalsIgnoreCase("❌ No relevant info found.")) {
                     ChatUtils.sendChatMessages(botSource, "No info found. Either there is no info on this topic or my web search tool is not working properly. Please report this to developer!");
-                }
-                else {
+                } else {
                     ChatUtils.sendChatMessages(botSource, "Web search complete.");
                 }
 
@@ -169,23 +185,11 @@ public class RAG2 {
 
             } else {
                 // 🤝 Just normal local vector recall
-                List<SQLiteDB.Memory> localMemories = SQLiteDB.findRelevantMemories(queryEmbedding, "conversation", TOP_K);
-                contextBuilder.append("Relevant conversations:\n");
-                for (SQLiteDB.Memory m : localMemories) {
-                    contextBuilder.append("- Prompt: ").append(m.prompt()).append("\n");
-                    contextBuilder.append("  Response: ").append(m.response()).append("\n");
-                    contextBuilder.append("  Similarity: ").append(m.similarity()).append("\n\n");
-                }
+                appendSimilarMemories(contextBuilder, queryEmbedding, "conversation");
             }
 
             // 🗃️ Add relevant events in all cases
-            List<SQLiteDB.Memory> events = SQLiteDB.findRelevantMemories(queryEmbedding, "event", TOP_K);
-            contextBuilder.append("Relevant events:\n");
-            for (SQLiteDB.Memory m : events) {
-                contextBuilder.append("- Prompt: ").append(m.prompt()).append("\n");
-                contextBuilder.append("  Response: ").append(m.response()).append("\n");
-                contextBuilder.append("  Similarity: ").append(m.similarity()).append("\n\n");
-            }
+            appendSimilarMemories(contextBuilder, queryEmbedding, "event");
 
             // ✨ Final LLM prompt
             String systemPrompt = buildPrompt();
@@ -195,8 +199,10 @@ public class RAG2 {
 
             processLLMOutput(finalResponse, botSource.getName(), botSource);
 
-            // 🔒 Always store final response
-            SQLiteDB.storeMemory("conversation", userPrompt, finalResponse, queryEmbedding);
+            // 🔒 Always store final response (only when embeddings are available)
+            if (queryEmbedding != null) {
+                SQLiteDB.storeMemory("conversation", userPrompt, finalResponse, queryEmbedding);
+            }
 
             logger.info("✅ RAG v2 finished with intent-aware strategy.");
 
@@ -216,10 +222,92 @@ public class RAG2 {
 
 
         try {
-            // Initialize embedding provider if not already done
-            if (embeddingProvider == null) {
-                embeddingProvider = EmbeddingProviderFactory.createEmbeddingProvider(ollamaAPI);
+            ensureEmbeddingProvider();
+            List<Double> queryEmbedding = embeddingProvider != null ? embeddingProvider.generateEmbeddings(userPrompt) : null;
+
+            StringBuilder contextBuilder = new StringBuilder();
+
+
+            if (intent == NLPProcessor.Intent.ASK_INFORMATION) {
+
+                ChatUtils.sendChatMessages(botSource, "Running web search....");
+
+                String bestAnswer = getBestContextAnswer(userPrompt, queryEmbedding);
+
+
+                if (bestAnswer.equalsIgnoreCase("❌ No relevant info found.")) {
+
+                    ChatUtils.sendChatMessages(botSource, "No info found. Either there is no info on this topic or my web search tool is not working properly. Please report this to developer!");
+
+                }
+
+                else {
+
+                    ChatUtils.sendChatMessages(botSource, "Web search complete.");
+
+                }
+
+
+                contextBuilder.append("Web/Local best answer:\n").append(bestAnswer).append("\n\n");
+
+
+            } else {
+
+            // 🤝 Just normal local vector recall
+
+                appendSimilarMemories(contextBuilder, queryEmbedding, "conversation");
+
             }
+
+
+             // 🗃️ Add relevant events in all cases
+
+            appendSimilarMemories(contextBuilder, queryEmbedding, "event");
+
+
+            // ✨ Final LLM prompt
+
+            // Use new API helper for thinking mode support
+            List<io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage> messages = new java.util.ArrayList<>();
+            messages.add(new io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage(
+                    OllamaChatMessageRole.SYSTEM, buildPrompt()));
+            messages.add(new io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage(
+                    OllamaChatMessageRole.USER, "Context:\n" + contextBuilder));
+            messages.add(new io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage(
+                    OllamaChatMessageRole.USER, "User prompt:\n" + userPrompt));
+
+            net.shasankp000.OllamaClient.OllamaThinkingResponse response =
+                    net.shasankp000.OllamaClient.OllamaAPIHelper.smartChat(
+                            ollamaAPI,
+                            "http://localhost:11434",
+                            net.shasankp000.AIPlayer.CONFIG.getSelectedLanguageModel(),
+                            messages
+                    );
+
+            String finalResponse = response.getFullResponse();
+
+            ollamaClient.processLLMOutput(finalResponse, botSource.getName(), botSource);
+
+
+            // 🔒 Always store final response (only when embeddings are available)
+
+            if (queryEmbedding != null) {
+                SQLiteDB.storeMemory("conversation", userPrompt, finalResponse, queryEmbedding);
+            }
+
+
+            logger.info("✅ RAG v2 finished with intent-aware strategy.");
+
+
+        } catch (Exception e) {
+
+            logger.error("❌ RAG v2 failed: {}", e.getMessage(), e);
+
+            ChatUtils.sendChatMessages(botSource, "Sorry, I couldn't find enough context. Please try again!");
+
+        }
+
+    }
 
             List<Double> queryEmbedding = embeddingProvider.generateEmbeddings(userPrompt);
 

@@ -40,6 +40,10 @@ public class ManualConfig {
     private String grokKey = "";
     private String customApiKey = "";
     private String customApiUrl = "";
+    // --- Optional, self-hosted / private embedding endpoint (OpenAI-compatible /v1/embeddings) ---
+    private String embeddingApiUrl = "";
+    private String embeddingApiKey = "";
+    private String embeddingModel = "local-embedding";
     private Map<String, String> botGameProfile = new HashMap<>();
 
     /**
@@ -289,6 +293,30 @@ public class ManualConfig {
 
     public void setCustomApiUrl(String customApiUrl) {
         this.customApiUrl = customApiUrl != null ? customApiUrl.trim() : "";
+    }
+
+    public String getEmbeddingApiUrl() {
+        return embeddingApiUrl;
+    }
+
+    public void setEmbeddingApiUrl(String embeddingApiUrl) {
+        this.embeddingApiUrl = embeddingApiUrl != null ? embeddingApiUrl.trim() : "";
+    }
+
+    public String getEmbeddingApiKey() {
+        return embeddingApiKey;
+    }
+
+    public void setEmbeddingApiKey(String embeddingApiKey) {
+        this.embeddingApiKey = embeddingApiKey != null ? embeddingApiKey.trim() : "";
+    }
+
+    public String getEmbeddingModel() {
+        return embeddingModel;
+    }
+
+    public void setEmbeddingModel(String embeddingModel) {
+        this.embeddingModel = embeddingModel != null ? embeddingModel.trim() : "local-embedding";
     }
 
     public List<String> getModelList() {

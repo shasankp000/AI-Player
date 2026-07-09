@@ -263,9 +263,8 @@ public class VectorExtensionHelper {
     // =========================================================================
 
     public static void registerCosineDistanceIfNeeded(Connection conn) throws SQLException {
-        String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-        if (!osName.contains("win")) return;
-
+        // Registered on every platform: the cosine_distance UDF is implemented in
+        // pure Java and does not require the native sqlite-vec / sqlite-vss extension.
         try {
             Function.create(conn, "cosine_distance", new Function() {
                 @Override

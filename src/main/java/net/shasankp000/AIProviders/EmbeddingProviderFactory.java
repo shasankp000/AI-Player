@@ -21,98 +21,37 @@ public class EmbeddingProviderFactory {
      * @return Configured EmbeddingProvider
      */
     public static EmbeddingProvider createEmbeddingProvider(OllamaAPI ollamaAPI) {
-        try {
-            // Get provider from JVM argument
-            String provider = System.getProperty("aiplayer.llmMode", "ollama");
-            LOGGER.info("🔍 Creating embedding provider for: {}", provider);
-
-            String embeddingModel = getDefaultEmbeddingModel(provider);
-            String apiKey;
-            String endpoint;
-
-            switch (provider.toLowerCase()) {
-                case "ollama":
-                    LOGGER.info("✅ Using Ollama embedding model: {}", embeddingModel);
-                    return new EmbeddingProvider(ollamaAPI, embeddingModel);
-
-                case "openai":
-                    apiKey = AIPlayer.CONFIG.getOpenAIKey();
-                    if (apiKey == null || apiKey.isEmpty()) {
-                        LOGGER.warn("⚠ OpenAI API key not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
-                    }
-                    LOGGER.info("✅ Using OpenAI embedding model: {}", embeddingModel);
-                    return new EmbeddingProvider(
-                            "https://api.openai.com",
-                            apiKey,
-                            embeddingModel,
-                            EmbeddingProvider.AIProviderType.OPENAI_COMPATIBLE
-                    );
-
-                case "gemini":
-                    apiKey = AIPlayer.CONFIG.getGeminiKey();
-                    if (apiKey == null || apiKey.isEmpty()) {
-                        LOGGER.warn("⚠ Gemini API key not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
-                    }
-                    LOGGER.info("✅ Using Gemini embedding model: {}", embeddingModel);
-                    return new EmbeddingProvider(
-                            "https://generativelanguage.googleapis.com",
-                            apiKey,
-                            embeddingModel,
-                            EmbeddingProvider.AIProviderType.GEMINI
-                    );
-
-                case "grok":
-                    apiKey = AIPlayer.CONFIG.getGrokKey();
-                    if (apiKey == null || apiKey.isEmpty()) {
-                        LOGGER.warn("⚠ Grok API key not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
-                    }
-                    LOGGER.info("✅ Using Grok (OpenAI-compatible) embedding model: {}", embeddingModel);
-                    return new EmbeddingProvider(
-                            "https://api.x.ai",
-                            apiKey,
-                            embeddingModel,
-                            EmbeddingProvider.AIProviderType.OPENAI_COMPATIBLE
-                    );
-
-                case "custom":
-                    endpoint = AIPlayer.CONFIG.getCustomApiUrl();
-                    apiKey = AIPlayer.CONFIG.getCustomApiKey();
-
-                    if (endpoint == null || endpoint.isEmpty()) {
-                        LOGGER.warn("⚠ Custom endpoint not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
-                    }
-
-                    // If no API key is required for custom endpoint (e.g., LM Studio, local VLLM)
-                    if (apiKey == null) {
-                        apiKey = "";
-                    }
-
-                    LOGGER.info("✅ Using custom OpenAI-compatible embedding endpoint: {}", endpoint);
-                    LOGGER.info("✅ Using embedding model: {}", embeddingModel);
-                    return new EmbeddingProvider(
-                            endpoint,
-                            apiKey,
-                            embeddingModel,
-                            EmbeddingProvider.AIProviderType.OPENAI_COMPATIBLE
-                    );
-
-                case "claude":
-                case "anthropic":
-                    LOGGER.warn("⚠ Anthropic/Claude does not provide embedding endpoints, falling back to Ollama");
-                    return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
-
-                default:
-                    LOGGER.warn("⚠ Unknown provider '{}', falling back to Ollama", provider);
-                    return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
-            }
-        } catch (Exception e) {
-            LOGGER.error("❌ Failed to create embedding provider, falling back to Ollama", e);
-            return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+        // Optional, self-hosted / private embedding endpoint (OpenAI-compatible
+        // /v1/embeddings). Keeps RAG memory embeddings fully private — nothing is
+        // sent to Google/Gemini. Configure EMBEDDING_API_URL (and optionally
+        // EMBEDDING_API_KEY / EMBEDDING_MODEL) in settings.json5.
+        String embeddingUrl = AIPlayer.CONFIG.getEmbeddingApiUrl();
+        if (embeddingUrl == null || embeddingUrl.trim().isEmpty()) {
+            LOGGER.warn("⚠ No private EMBEDDING_API_URL configured — embeddings are disabled (RAG memory search will not run).");
+            return null;
         }
+
+        String apiKey = AIPlayer.CONFIG.getEmbeddingApiKey();
+        String model = AIPlayer.CONFIG.getEmbeddingModel();
+        if (model == null || model.trim().isEmpty()) {
+            model = "local-embedding";
+        }
+
+        LOGGER.info("✅ Using private embedding endpoint: {} (model: {})", embeddingUrl, model);
+        return new EmbeddingProvider(
+                embeddingUrl.trim().replaceAll("/+$", ""),
+                apiKey == null ? "" : apiKey,
+                model,
+                EmbeddingProvider.AIProviderType.OPENAI_COMPATIBLE
+        );
+    }
+
+        return new EmbeddingProvider(
+                "https://generativelanguage.googleapis.com",
+                apiKey,
+                "text-embedding-004",
+                EmbeddingProvider.AIProviderType.GEMINI
+        );
     }
 
     /**

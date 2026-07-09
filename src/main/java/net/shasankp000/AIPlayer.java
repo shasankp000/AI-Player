@@ -1,6 +1,5 @@
 package net.shasankp000;
 
-import ai.djl.ModelException;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
@@ -9,7 +8,6 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.shasankp000.ChatUtils.BERTModel.BertModelManager;
 import net.shasankp000.ChatUtils.NLPProcessor;
 import net.shasankp000.Commands.configCommand;
 import net.shasankp000.Commands.modCommandRegistry;
@@ -43,8 +41,6 @@ public class AIPlayer implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
 	public static final ManualConfig CONFIG = ManualConfig.load();
 	public static MinecraftServer serverInstance = null; // default for now
-	public static BertModelManager modelManager;
-	public static boolean loadedBERTModelIntoMemory = false;
 
 
 	@Override
@@ -53,16 +49,6 @@ public class AIPlayer implements ModInitializer {
 		LOGGER.info("Hello Fabric world!");
 
 		LOGGER.debug("Running on environment type: {}", FabricLoader.getInstance().getEnvironmentType());
-
-		// Fix DJL cache directory path on Windows (Issue #33)
-		// DJL constructs paths incorrectly on Windows, missing backslash after username
-		// Explicitly set the cache directory to avoid path construction bugs
-		String userHome = System.getProperty("user.home");
-		if (userHome != null && !userHome.isEmpty()) {
-			String djlCacheDir = userHome + "/.djl.ai";
-			System.setProperty("DJL_CACHE_DIR", djlCacheDir);
-			LOGGER.info("Set DJL cache directory to: {}", djlCacheDir);
-		}
 
 		String llmProvider = System.getProperty("aiplayer.llmMode", "ollama");
 
@@ -107,7 +93,6 @@ public class AIPlayer implements ModInitializer {
 		CompletableFuture.runAsync(() -> {
 
 			AISearchConfig.setupIfMissing();
-			NLPProcessor.ensureLocalNLPModel();
 			try {
 				Thread.sleep(2000);
 				System.out.println("NLP model deployment task complete");
@@ -116,9 +101,6 @@ public class AIPlayer implements ModInitializer {
 			}
 
 		});
-
-
-		modelManager = BertModelManager.getInstance();
 
 		// Inside AIPlayer.onInitialize()
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
@@ -130,15 +112,7 @@ public class AIPlayer implements ModInitializer {
 
 			System.out.println("Server instance is " + serverInstance);
 
-			LOGGER.info("Proceeding to load BERT model into memory");
-
-			try {
-				modelManager.loadModel();
-				loadedBERTModelIntoMemory = true;
-				LOGGER.info("BERT model loaded into memory. It will stay in memory as long as any bot stays active in game.");
-			} catch (IOException | ModelException e) {
-				LOGGER.error("BERT Model loading failed! {}", e.getMessage());
-			}
+			LOGGER.info("Local PyTorch intent models (BERT/LIDSNet) are disabled — intent classification runs via the cloud LLM (Gemini API).");
 
 
 		});
@@ -149,19 +123,6 @@ public class AIPlayer implements ModInitializer {
 
 			// Gracefully shut down all autonomous goal engines
 			AutonomousManager.getInstance().stopAll();
-
-			try {
-				if (modelManager.isModelLoaded() || loadedBERTModelIntoMemory) {
-					modelManager.unloadModel();
-					System.out.println("Unloaded BERT Model from memory");
-				}
-				else {
-					System.out.println("BERT Model was not loaded, skipping unloading...");
-				}
-
-			} catch (IOException e) {
-				LOGGER.error("BERT Model unloading failed!", e);
-			}
 
 		});
 
