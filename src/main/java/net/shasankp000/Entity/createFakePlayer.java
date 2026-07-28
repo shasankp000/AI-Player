@@ -11,12 +11,14 @@ import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.HungerManager;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerPosition;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
 import net.minecraft.network.packet.c2s.play.ClientStatusC2SPacket;
 import net.minecraft.network.packet.s2c.play.EntityPositionS2CPacket;
 import net.minecraft.network.packet.s2c.play.EntitySetHeadYawS2CPacket;
+import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTask;
@@ -129,16 +131,19 @@ public class createFakePlayer extends ServerPlayerEntity {
     private static void spawnFake(MinecraftServer server, ServerWorld worldIn, GameProfile gameprofile, Vec3d pos, double yaw, double pitch, GameMode gamemode, boolean flying, RegistryKey<World> dimensionId) {
         createFakePlayer instance = new createFakePlayer(server, worldIn, gameprofile, SyncedClientOptions.createDefault(), false);
         server.getPlayerManager().onPlayerConnect(new FakeClientConnection(NetworkSide.SERVERBOUND), instance, new ConnectedClientData(gameprofile, 0, instance.getClientOptions(), false));
-        instance.teleport(worldIn, pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
+        Set<PositionFlag> flags = Set.of();
+        boolean dismount = false;
+        instance.teleport((ServerWorld) worldIn, pos.x, pos.y, pos.z, flags, (float) yaw, (float) pitch, dismount);
         instance.setHealth(20.0F);
         instance.unsetRemoved();
         instance.interactionManager.changeGameMode(gamemode);
         server.getPlayerManager().sendToDimension(new EntitySetHeadYawS2CPacket(instance, (byte) (instance.headYaw * 256 / 360)), dimensionId);
-        server.getPlayerManager().sendToDimension(new EntityPositionS2CPacket(instance), dimensionId);
+        PlayerPosition posRecord = new PlayerPosition(pos, Vec3d.ZERO, (float) yaw, (float) pitch);
+        EntityPositionS2CPacket posPacket = EntityPositionS2CPacket.create(instance.getId(), posRecord, Set.of(), instance.isOnGround());
+        server.getPlayerManager().sendToDimension(posPacket, dimensionId);
         instance.dataTracker.set(PLAYER_MODEL_PARTS, (byte) 0x7f);
         instance.getAbilities().flying = flying;
     }
-
 
     private static CompletableFuture<Optional<GameProfile>> fetchGameProfile(final String name) {
         return CompletableFuture.supplyAsync(() -> {
@@ -173,7 +178,6 @@ public class createFakePlayer extends ServerPlayerEntity {
         if (!isUsingItem()) super.onEquipStack(slot, previous, stack);
     }
 
-    @Override
     public void kill()
     {
         kill(Messenger.s("Killed"));
@@ -250,7 +254,7 @@ public class createFakePlayer extends ServerPlayerEntity {
     }
 
     @Override
-    public Entity teleportTo(TeleportTarget target)
+    public ServerPlayerEntity teleportTo(TeleportTarget target)
     {
         Entity entity = super.teleportTo(target);
         if (notInAnyWorld) {

@@ -70,9 +70,6 @@ import net.shasankp000.PathFinding.GoTo;
 import net.shasankp000.PathFinding.PathTracer;
 
 import net.shasankp000.PlayerUtils.*;
-
-import net.shasankp000.PlayerUtils.BlockPlacementTool;
-
 import net.shasankp000.ServiceLLMClients.LLMClient;
 
 import net.shasankp000.WebSearch.WebSearchTool;

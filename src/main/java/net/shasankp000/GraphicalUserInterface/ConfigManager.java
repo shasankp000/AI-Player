@@ -96,7 +96,7 @@ public class ConfigManager extends Screen {
         this.renderBackground(context, mouseX, mouseY, delta);
 
         int centerX = this.width / 2;
-        String title = "AI-Player Mod Configuration Menu v1.0.5.4-release+1.21.1";
+        String title = "AI-Player Mod Configuration Menu v1.0.5.4-release+1.21.4";
         context.drawText(this.textRenderer, title, centerX - (this.textRenderer.getWidth(title) / 2), 20, 0xFFFFFFFF, true);
 
         context.drawText(this.textRenderer, "Search Models:", centerX - 150, searchField.getY() - 15, 0xFFFFD700, true);

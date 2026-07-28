@@ -14,6 +14,7 @@ base {
 repositories {
 	mavenCentral()
 	maven { url 'https://jitpack.io' }
+	maven { url 'https://masa.dy.fi/maven' }
 	maven { url 'https://maven.wispforest.io/releases/' }
 	flatDir {
 		dirs "./lib"
@@ -39,7 +40,7 @@ dependencies {
 	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	modImplementation 'com.github.gnembon:fabric-carpet:1.4.147'
+	modImplementation 'carpet:fabric-carpet:1.21.4-1.4.161+v241203'
 
 	// Core application dependencies
 	implementation 'com.github.amithkoujalgi:ollama4j:1.0.77'
@@ -89,7 +90,7 @@ dependencies {
 shadowJar {
 	dependencies {
 		include(dependency('com.fasterxml.jackson.core:jackson-databind'))
-		include(dependency("io.wispforest:owo-sentinel:0.12.15.4+1.21"))
+		include(dependency("io.wispforest:owo-sentinel:0.12.20+1.21.4"))
 		include(dependency("com.github.amithkoujalgi:ollama4j:1.0.77"))
 	}
 	relocate 'com.fasterxml.jackson', 'net.shasankp000.relocated.com.fasterxml.jackson'

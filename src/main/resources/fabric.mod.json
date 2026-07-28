@@ -30,13 +30,13 @@
 	],
 	"depends": {
 		"fabricloader": ">=0.16.10",
-		"minecraft": "~1.21.1",
+		"minecraft": "~1.21.4",
 		"java": ">=21",
 		"fabric-api": "*"
 	},
 	"suggests": {
-		"carpet": "1.4.147",
-		"owo-lib": "0.12.15.4+1.21"
+		"carpet": "1.4.161",
+		"owo-lib": "0.12.20+1.21.4"
 	}
 
 }

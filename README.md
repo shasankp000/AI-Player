@@ -450,4 +450,3 @@ The above command changes credits go to [Mr. Álvaro Carvalho](https://github.co
 
 And yes since this mod relies on carpet mod, you can spawn a bot using carpet mod's commands too and try the mod. But if you happen to be playing in offline mode, then I recommend using the mod's in built spawn command.
 
-

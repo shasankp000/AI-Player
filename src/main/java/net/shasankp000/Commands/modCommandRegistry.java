@@ -1159,7 +1159,7 @@ public class modCommandRegistry {
 
             if (bot!=null) {
 
-                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
 
                 RespawnHandler.registerRespawnListener(bot);
 
@@ -1192,7 +1192,7 @@ public class modCommandRegistry {
 
             if (bot!=null) {
 
-                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
 
                 System.out.println("Registering respawn listener....");
 
@@ -1373,8 +1373,8 @@ public class modCommandRegistry {
             String botName = bot.getName().getLiteralString();
 
             BlockPos currentPosition = bot.getBlockPos();
-            BlockPos newPosition = currentPosition.add(1, 0, 0);
-            bot.teleport(bot.getServerWorld(), newPosition.getX(), newPosition.getY(), newPosition.getZ(), Set.of(), bot.getYaw(), bot.getPitch());
+            BlockPos newPosition = currentPosition.add(1, 0, 0); // Move one block forward
+            bot.teleport(bot.getServerWorld(), (double)newPosition.getX(), (double)newPosition.getY(), (double)newPosition.getZ(), java.util.Collections.emptySet(), bot.getYaw(), bot.getPitch(), true);
 
             LOGGER.info("Teleported {} 1 positive block ahead", botName);
 

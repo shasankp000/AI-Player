@@ -9,8 +9,7 @@
 	],
 	"client": [
 		"ScreenMixin",
-		"InGameHudMixin",
-		"WorldRendererMixin"
+		"InGameHudMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

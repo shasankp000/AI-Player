@@ -11,12 +11,14 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.shasankp000.ChatUtils.ChatContextManager;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.ChatUtils.ClarificationState;
 import net.shasankp000.FilingSystem.LLMClientFactory;
 import net.shasankp000.FilingSystem.ManualConfig;
+import net.shasankp000.GraphicalUserInterface.ThreatDebugRenderer;
 import net.shasankp000.LauncherDetection.LauncherEnvironment;
 import net.shasankp000.Network.OpenConfigPayload;
 import net.shasankp000.OllamaClient.ollamaClient;
@@ -303,8 +305,9 @@ public class AIPlayerClient implements ClientModInitializer {
             }
         });
 
-
-
+        WorldRenderEvents.LAST.register(context -> {
+            ThreatDebugRenderer.renderThreatOverlays(context.camera());
+        });
 
     }
 }
