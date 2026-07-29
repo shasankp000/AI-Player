@@ -4,8 +4,15 @@ https://shasankp000.github.io/AI-Player-Website/
 
 ---
 
-## Stargazers over time
-[![Stargazers over time](https://starchart.cc/shasankp000/AI-Player.svg?variant=adaptive)](https://starchart.cc/shasankp000/AI-Player)
+## Star History
+
+<a href="https://www.star-history.com/?repos=shasankp000%2FAI-Player&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shasankp000/AI-Player&type=date&theme=dark&legend=top-left&sealed_token=NHxEX7xorfiwx4C0j3yqbODkU0soNOMoSoiPFcOSXU-vXuriAf78CDQNHLeUpWseX3nJ6letJNCgXvW5FSSWus_3fMM_vDAMDA1d9i94C7hy--YsZ2h-uUPM5M-OONUZp7K7Jip98dknD-tpaZvc3IhE54JxF8qcFWi-8w4I-q9-3Q_aojkERbOlfqkM" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shasankp000/AI-Player&type=date&legend=top-left&sealed_token=NHxEX7xorfiwx4C0j3yqbODkU0soNOMoSoiPFcOSXU-vXuriAf78CDQNHLeUpWseX3nJ6letJNCgXvW5FSSWus_3fMM_vDAMDA1d9i94C7hy--YsZ2h-uUPM5M-OONUZp7K7Jip98dknD-tpaZvc3IhE54JxF8qcFWi-8w4I-q9-3Q_aojkERbOlfqkM" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shasankp000/AI-Player&type=date&legend=top-left&sealed_token=NHxEX7xorfiwx4C0j3yqbODkU0soNOMoSoiPFcOSXU-vXuriAf78CDQNHLeUpWseX3nJ6letJNCgXvW5FSSWus_3fMM_vDAMDA1d9i94C7hy--YsZ2h-uUPM5M-OONUZp7K7Jip98dknD-tpaZvc3IhE54JxF8qcFWi-8w4I-q9-3Q_aojkERbOlfqkM" />
+ </picture>
+</a>
 
 ---
 
