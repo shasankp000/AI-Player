@@ -8,14 +8,18 @@ import ai.djl.repository.zoo.Criteria;
 import ai.djl.repository.zoo.ZooModel;
 import ai.djl.training.util.ProgressBar;
 import net.fabricmc.loader.api.FabricLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class BertModelManager {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger("BertModelManager");
     private static BertModelManager instance;
 
     // Thread-safe locks for concurrent access
@@ -25,6 +29,7 @@ public class BertModelManager {
     private Predictor<String, Classifications> predictor;
     private boolean isModelLoaded = false;
     private volatile boolean isLoadingInProgress = false;  // Add this flag
+    private volatile String unavailableReason = null;
 
     private BertModelManager() {}
 
@@ -46,6 +51,12 @@ public class BertModelManager {
     public void loadModel() throws IOException, ModelException, MalformedModelException {
         // Quick check without locking
         if (isModelLoaded) {
+            return;
+        }
+
+        if (isCurrentPlatformUnsupported()) {
+            unavailableReason = "DJL PyTorch 0.33.0 no longer provides native libraries for macOS x86_64.";
+            LOGGER.warn("Skipping BERT model load: {}", unavailableReason);
             return;
         }
 
@@ -86,7 +97,8 @@ public class BertModelManager {
             System.out.println("Model loaded successfully and ready for inference.");
 
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            unavailableReason = e.getMessage();
+            throw new RuntimeException("BERT model load failed", e);
         } finally {
             isLoadingInProgress = false;
             lock.writeLock().unlock();
@@ -124,6 +136,9 @@ public class BertModelManager {
                 loadModel(); // This will acquire write lock
                 lock.readLock().lock();
             }
+            if (predictor == null) {
+                throw new IllegalStateException("BERT model is unavailable: " + getUnavailableReason());
+            }
             return predictor;
         } finally {
             lock.readLock().unlock();
@@ -141,10 +156,29 @@ public class BertModelManager {
                 loadModel(); // This will acquire write lock
                 lock.readLock().lock();
             }
+            if (predictor == null) {
+                throw new IllegalStateException("BERT model is unavailable: " + getUnavailableReason());
+            }
             return predictor.predict(text);
         } finally {
             lock.readLock().unlock();
         }
+    }
+
+    public boolean isModelAvailable() {
+        return unavailableReason == null;
+    }
+
+    public String getUnavailableReason() {
+        return unavailableReason == null ? "unknown reason" : unavailableReason;
+    }
+
+    private static boolean isCurrentPlatformUnsupported() {
+        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        String osArch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
+        boolean isMac = osName.contains("mac") || osName.contains("darwin");
+        boolean isX86_64 = osArch.equals("x86_64") || osArch.equals("amd64");
+        return isMac && isX86_64;
     }
 
     /**
