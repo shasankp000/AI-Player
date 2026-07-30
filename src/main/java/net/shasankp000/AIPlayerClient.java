@@ -1,6 +1,10 @@
 package net.shasankp000;
 
 
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.toast.SystemToast;
+import net.minecraft.text.Text;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import net.fabricmc.api.ClientModInitializer;
@@ -8,9 +12,6 @@ import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.toasts.SystemToast;
-import net.minecraft.network.chat.Component;
 import net.shasankp000.ChatUtils.ChatContextManager;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.ChatUtils.ClarificationState;
@@ -18,6 +19,7 @@ import net.shasankp000.FilingSystem.LLMClientFactory;
 import net.shasankp000.FilingSystem.ManualConfig;
 import net.shasankp000.LauncherDetection.LauncherEnvironment;
 import net.shasankp000.Network.OpenConfigPayload;
+import net.shasankp000.OllamaClient.ollamaClient;
 import net.shasankp000.ServiceLLMClients.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,25 +105,25 @@ public class AIPlayerClient implements ClientModInitializer {
 
         LOGGER.debug("Running on environment type: {}", FabricLoader.getInstance().getEnvironmentType());
 
-        String llmProvider = System.getProperty("aiplayer.llmMode", "custom");
+        String llmProvider = System.getProperty("aiplayer.llmMode", "ollama");
 
         LOGGER.debug("Using provider: {}", llmProvider);
 
 
         ClientPlayNetworking.registerGlobalReceiver(OpenConfigPayload.ID, (client, handler) -> {
-            net.minecraft.client.gui.screens.Screen currentScreen = net.minecraft.client.Minecraft.getInstance().gui.screen();
-            net.minecraft.client.Minecraft.getInstance().gui.setScreen(
-                    new net.shasankp000.GraphicalUserInterface.ConfigManager(net.minecraft.network.chat.Component.empty(), currentScreen)
+            net.minecraft.client.gui.screen.Screen currentScreen = net.minecraft.client.MinecraftClient.getInstance().currentScreen;
+            net.minecraft.client.MinecraftClient.getInstance().setScreen(
+                    new net.shasankp000.GraphicalUserInterface.ConfigManager(net.minecraft.text.Text.empty(), currentScreen)
             );
         });
 
 
         // Register real-time chat scanner with loop protection
         ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, receptionTimestamp) -> {
-            Minecraft client = Minecraft.getInstance();
+            MinecraftClient client = MinecraftClient.getInstance();
 
             String rawMessage = message.getString();
-            UUID playerUUID = sender != null ? sender.id() : null;
+            UUID playerUUID = sender != null ? sender.getId() : null;
 
 
 
@@ -181,10 +183,10 @@ public class AIPlayerClient implements ClientModInitializer {
                                 LLMServiceHandler.runFromChat(combinedContext, finalBotName, finalPlayerUUID, llmClient);
                             } else {
                                 LOGGER.error("LLM client is null for provider: {}", llmProvider);
-                                client.gui.toastManager().addToast(
-                                        new SystemToast(SystemToast.SystemToastId.CHUNK_LOAD_FAILURE,
-                                                Component.nullToEmpty("LLM Client factory error."),
-                                                Component.nullToEmpty("Error! Returned client is null! Cannot proceed!"))
+                                client.getToastManager().add(
+                                        SystemToast.create(client, SystemToast.Type.CHUNK_LOAD_FAILURE,
+                                                Text.of("LLM Client factory error."),
+                                                Text.of("Error! Returned client is null! Cannot proceed!"))
                                 );
                             }
                             break;
@@ -202,13 +204,17 @@ public class AIPlayerClient implements ClientModInitializer {
                             }
                             break;
                         }
+                        case "ollama":
+                            ollamaClient.runFromChat(finalBotName, combinedContext, finalPlayerUUID);
+                            break;
                         default:
-                            LOGGER.warn("Unsupported provider detected: {}", llmProvider);
-                            client.gui.toastManager().addToast(
-                                    new SystemToast(SystemToast.SystemToastId.NARRATOR_TOGGLE,
-                                            Component.nullToEmpty("Invalid LLM Client."),
-                                            Component.nullToEmpty("Set a supported OpenAI-compatible provider."))
+                            LOGGER.warn("Unsupported provider detected. Defaulting to Ollama client");
+                            client.getToastManager().add(
+                                    SystemToast.create(client, SystemToast.Type.NARRATOR_TOGGLE,
+                                            Text.of("Invalid LLM Client."),
+                                            Text.of("Unsupported provider detected. Defaulting to Ollama client"))
                             );
+                            ollamaClient.runFromChat(finalBotName, combinedContext, finalPlayerUUID);
                             break;
                     }
                 }
@@ -221,11 +227,11 @@ public class AIPlayerClient implements ClientModInitializer {
 
         // Listen to player send messages event
         ClientSendMessageEvents.CHAT.register((message) -> {
-            Minecraft client = Minecraft.getInstance();
+            MinecraftClient client = MinecraftClient.getInstance();
 
             System.out.println("Outgoing message: " + message);
 
-            UUID playerUUID = net.minecraft.client.Minecraft.getInstance().player.getUUID();
+            UUID playerUUID = net.minecraft.client.MinecraftClient.getInstance().player.getUuid();
 
             if (message.startsWith("/")) {
                 System.out.println("Outgoing command detected, skipping NLP...");
@@ -254,16 +260,16 @@ public class AIPlayerClient implements ClientModInitializer {
                 final String finalBotName  = botName;
 
                 switch (llmProvider) {
-                    case "openai", "gpt", "google", "gemini", "anthropic", "claude", "xAI", "xai", "grok", "custom": {
+                    case "openai", "gpt", "google", "gemini", "anthropic", "claude", "xAI", "xai", "grok": {
                         LLMClient llmClient = LLMClientFactory.createClient(llmProvider);
                         if (llmClient != null) {
                             LLMServiceHandler.runFromChat(message, finalBotName, finalPlayerUUID, llmClient);
                         } else {
                             LOGGER.error("Error! Returned client is null! Cannot proceed!");
-                            client.gui.toastManager().addToast(
-                                    new SystemToast(SystemToast.SystemToastId.CHUNK_LOAD_FAILURE,
-                                            Component.nullToEmpty("LLM Client factory error."),
-                                            Component.nullToEmpty("Error! Returned client is null! Cannot proceed!"))
+                            client.getToastManager().add(
+                                    SystemToast.create(client, SystemToast.Type.CHUNK_LOAD_FAILURE,
+                                            Text.of("LLM Client factory error."),
+                                            Text.of("Error! Returned client is null! Cannot proceed!"))
                             );
                         }
                         break;
@@ -281,13 +287,17 @@ public class AIPlayerClient implements ClientModInitializer {
                         }
                         break;
                     }
+                    case "ollama":
+                        ollamaClient.runFromChat(finalBotName, message, finalPlayerUUID);
+                        break;
                     default:
-                        LOGGER.warn("Unsupported provider detected: {}", llmProvider);
-                        client.gui.toastManager().addToast(
-                                new SystemToast(SystemToast.SystemToastId.NARRATOR_TOGGLE,
-                                        Component.nullToEmpty("Invalid LLM Client."),
-                                        Component.nullToEmpty("Set a supported OpenAI-compatible provider."))
+                        LOGGER.warn("Unsupported provider detected. Defaulting to Ollama client");
+                        client.getToastManager().add(
+                                SystemToast.create(client, SystemToast.Type.NARRATOR_TOGGLE,
+                                        Text.of("Invalid LLM Client."),
+                                        Text.of("Unsupported provider detected. Defaulting to Ollama client"))
                         );
+                        ollamaClient.runFromChat(finalBotName, message, finalPlayerUUID);
                         break;
                 }
             }

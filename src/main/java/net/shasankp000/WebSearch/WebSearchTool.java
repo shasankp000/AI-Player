@@ -3,6 +3,8 @@ package net.shasankp000.WebSearch;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
+import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.FilingSystem.LLMClientFactory;
@@ -10,6 +12,7 @@ import net.shasankp000.ServiceLLMClients.LLMClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +30,9 @@ public class WebSearchTool {
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
             .build();
-    private static String llmMode = System.getProperty("aiplayer.llmMode", "custom");
+    private static final OllamaAPI ollamaAPI = new OllamaAPI("http://localhost:11434/");
+    private static String selectedLM = AIPlayer.CONFIG.getSelectedLanguageModel();
+    private static String llmMode = System.getProperty("aiplayer.llmMode", "ollama");
     private static final Path CACHE_DIR = Paths.get("web_cache");
 
     static {
@@ -173,7 +178,7 @@ public class WebSearchTool {
         String response = "";
 
         switch (llmMode) {
-            case "openai", "gpt", "gemini", "google", "claude", "anthropic", "grok", "xai", "xAI", "custom":
+            case "openai", "gemini", "claude", "grok":
                 LLMClient client = LLMClientFactory.createClient(llmMode);
 
                 if (client != null)  {
@@ -188,6 +193,31 @@ public class WebSearchTool {
                     logger.error("Error! {} client is null!", llmMode);
                 }
                 break;
+
+            case "ollama":
+                ollamaAPI.setRequestTimeoutSeconds(120);
+
+                try {
+                    List<OllamaChatMessage> messages = new java.util.ArrayList<>();
+                    messages.add(new OllamaChatMessage(OllamaChatMessageRole.SYSTEM, queryConvo.toString()));
+                    messages.add(new OllamaChatMessage(OllamaChatMessageRole.USER, prompt));
+
+                    net.shasankp000.OllamaClient.OllamaThinkingResponse thinkingResponse =
+                            net.shasankp000.OllamaClient.OllamaAPIHelper.smartChat(
+                                    ollamaAPI,
+                                    "http://localhost:11434",
+                                    selectedLM,
+                                    messages
+                            );
+
+                    response = thinkingResponse.getContent();
+                    logger.info("Generated query: {}", response);
+
+                } catch (IOException | InterruptedException e) {
+                    logger.error("Caught exception while creating queries: {} ", (Object) e.getStackTrace());
+                    logger.debug("Response before exception: {}", response);
+                    throw new RuntimeException(e);
+                }
 
             default:
                 logger.warn("Unsupported provider detected.");
@@ -234,7 +264,29 @@ public class WebSearchTool {
             response = client.sendPrompt(queryConvo.toString(), prompt);
         }
         else {
-            logger.warn("{} is not reachable; cannot generate a web search query.", client.getProvider());
+            logger.warn("{} is not reachable at the moment, falling back to ollama client.", client.getProvider());
+
+            try {
+                List<OllamaChatMessage> messages = new java.util.ArrayList<>();
+                messages.add(new OllamaChatMessage(OllamaChatMessageRole.SYSTEM, queryConvo.toString()));
+                messages.add(new OllamaChatMessage(OllamaChatMessageRole.USER, prompt));
+
+                net.shasankp000.OllamaClient.OllamaThinkingResponse thinkingResponse =
+                        net.shasankp000.OllamaClient.OllamaAPIHelper.smartChat(
+                                ollamaAPI,
+                                "http://localhost:11434",
+                                selectedLM,
+                                messages
+                        );
+
+                response = thinkingResponse.getContent();
+                logger.info("Generated query: {}", response);
+
+            } catch (IOException | InterruptedException e) {
+                logger.error("Caught exception while creating queries: {} ", (Object) e.getStackTrace());
+                logger.debug("Response before exception: {}", response);
+                throw new RuntimeException(e);
+            }
         }
 
 

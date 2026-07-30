@@ -1,14 +1,14 @@
 package net.shasankp000.PlayerUtils;
 
 
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
 
 public class getOffHandStack {
 
-    public static ItemStack getOffhandItem(ServerPlayer bot) {
+    public static ItemStack getOffhandItem(ServerPlayerEntity bot) {
         // The offhand slot is a specific slot in the bot's inventory
-        return bot.getOffhandItem();
+        return bot.getOffHandStack();
     }
 
 }

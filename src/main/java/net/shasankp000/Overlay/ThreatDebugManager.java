@@ -1,9 +1,12 @@
 package net.shasankp000.Overlay;
 
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
+
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Manages threat analysis debug information for rendering.
@@ -15,7 +18,7 @@ public class ThreatDebugManager {
     private static final Map<UUID, ThreatInfo> entityThreats = new ConcurrentHashMap<>();
     private static volatile UUID currentTargetUUID = null;
     private static volatile String currentAction = "";
-    private static volatile ServerPlayer botPlayer = null;
+    private static volatile ServerPlayerEntity botPlayer = null;
 
     /**
      * Threat information for an entity
@@ -72,14 +75,14 @@ public class ThreatDebugManager {
     /**
      * Set the bot player for reference
      */
-    public static void setBotPlayer(ServerPlayer bot) {
+    public static void setBotPlayer(ServerPlayerEntity bot) {
         botPlayer = bot;
     }
 
     /**
      * Get the bot player
      */
-    public static ServerPlayer getBotPlayer() {
+    public static ServerPlayerEntity getBotPlayer() {
         return botPlayer;
     }
 

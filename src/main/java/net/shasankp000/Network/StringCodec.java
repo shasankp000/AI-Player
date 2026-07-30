@@ -1,11 +1,11 @@
 package net.shasankp000.Network;
 
 
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
 
 
-public class StringCodec implements StreamCodec<FriendlyByteBuf, String> {
+public class StringCodec implements PacketCodec<PacketByteBuf, String> {
     private final int maxLength;
 
     public StringCodec(int maxLength) {
@@ -14,12 +14,12 @@ public class StringCodec implements StreamCodec<FriendlyByteBuf, String> {
 
 
     @Override
-    public String decode(FriendlyByteBuf buf) {
-        return buf.readUtf(maxLength);
+    public String decode(PacketByteBuf buf) {
+        return buf.readString(maxLength);
     }
 
     @Override
-    public void encode(FriendlyByteBuf buf, String value) {
-        buf.writeUtf(value, maxLength);
+    public void encode(PacketByteBuf buf, String value) {
+        buf.writeString(value, maxLength);
     }
 }

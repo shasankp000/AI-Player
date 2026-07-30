@@ -1,14 +1,15 @@
 package net.shasankp000.Entity;
 
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.projectile.ProjectileEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.math.Vec3d;
+
 import java.util.List;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.projectile.Projectile;
-import net.minecraft.world.phys.Vec3;
 
 public class FaceClosestEntity {
 
-    public static void faceClosestEntity(ServerPlayer bot, List<Entity> entities) {
+    public static void faceClosestEntity(ServerPlayerEntity bot, List<Entity> entities) {
         if (entities.isEmpty()) {
             return;
         }
@@ -18,7 +19,7 @@ public class FaceClosestEntity {
 
         // Find the closest entity
         for (Entity entity : entities) {
-            double distance = bot.distanceToSqr(entity);
+            double distance = bot.squaredDistanceTo(entity);
             if (distance < closestDistance) {
                 closestDistance = distance;
                 closestEntity = entity;
@@ -27,17 +28,17 @@ public class FaceClosestEntity {
 
         if (closestEntity != null) {
             // Calculate the direction to the closest entity
-            Vec3 botPos = bot.position();
-            Vec3 entityPos = closestEntity.position();
-            Vec3 direction = entityPos.subtract(botPos).normalize();
+            Vec3d botPos = bot.getPos();
+            Vec3d entityPos = closestEntity.getPos();
+            Vec3d direction = entityPos.subtract(botPos).normalize();
 
             // Calculate yaw and pitch
             double yaw = Math.toDegrees(Math.atan2(direction.z, direction.x)) - 90;
             double pitch = Math.toDegrees(-Math.atan2(direction.y, Math.sqrt(direction.x * direction.x + direction.z * direction.z)));
 
             // Set the bot's rotation
-            bot.setYRot((float) yaw);
-            bot.setXRot((float) pitch);
+            bot.setYaw((float) yaw);
+            bot.setPitch((float) pitch);
 
         }
     }
@@ -45,22 +46,22 @@ public class FaceClosestEntity {
     /**
      * Face a specific projectile entity - used for defense (blocking/tracking)
      */
-    public static void faceProjectile(ServerPlayer bot, Projectile projectile) {
+    public static void faceProjectile(ServerPlayerEntity bot, ProjectileEntity projectile) {
         if (projectile == null || !projectile.isAlive()) {
             return;
         }
 
         // Calculate the direction to the projectile
-        Vec3 botPos = bot.position().add(0, bot.getEyeHeight(), 0); // Account for eye height
-        Vec3 projectilePos = projectile.position();
-        Vec3 direction = projectilePos.subtract(botPos).normalize();
+        Vec3d botPos = bot.getPos().add(0, bot.getStandingEyeHeight(), 0); // Account for eye height
+        Vec3d projectilePos = projectile.getPos();
+        Vec3d direction = projectilePos.subtract(botPos).normalize();
 
         // Calculate yaw and pitch
         double yaw = Math.toDegrees(Math.atan2(direction.z, direction.x)) - 90;
         double pitch = Math.toDegrees(-Math.atan2(direction.y, Math.sqrt(direction.x * direction.x + direction.z * direction.z)));
 
         // Set the bot's rotation to face the projectile
-        bot.setYRot((float) yaw);
-        bot.setXRot((float) pitch);
+        bot.setYaw((float) yaw);
+        bot.setPitch((float) pitch);
     }
 }

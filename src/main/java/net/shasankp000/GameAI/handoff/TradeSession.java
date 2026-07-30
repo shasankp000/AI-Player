@@ -1,7 +1,8 @@
 package net.shasankp000.GameAI.handoff;
 
+import net.minecraft.item.ItemStack;
+
 import java.util.UUID;
-import net.minecraft.world.item.ItemStack;
 
 /**
  * Holds the pending trade state for one player.

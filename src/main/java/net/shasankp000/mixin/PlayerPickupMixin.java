@@ -1,7 +1,7 @@
 package net.shasankp000.mixin;
 
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.shasankp000.GameAI.handoff.ItemHandoffListener;
 import net.shasankp000.GameAI.handoff.TradeListener;
 import org.spongepowered.asm.mixin.Mixin;
@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Intercepts {@link ItemEntity#playerTouch(Player)} to power both
+ * Intercepts {@link ItemEntity#onPlayerCollision(PlayerEntity)} to power both
  * Feature 4 (smart item handoff) and Feature 7 (sneak-throw trade system).
  *
  * <p>{@code PlayerPickupItemCallback} was removed from Fabric API before
@@ -30,8 +30,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ItemEntity.class)
 public class PlayerPickupMixin {
 
-    @Inject(method = "playerTouch(Lnet/minecraft/world/entity/player/Player;)V", at = @At("HEAD"), cancellable = true)
-    private void aiPlayer_onPlayerCollision(Player player, CallbackInfo ci) {
+    @Inject(method = "onPlayerCollision(Lnet/minecraft/entity/player/PlayerEntity;)V", at = @At("HEAD"), cancellable = true)
+    private void aiPlayer_onPlayerCollision(PlayerEntity player, CallbackInfo ci) {
         ItemEntity itemEntity = (ItemEntity)(Object)this;
 
         // TradeListener gets first priority — it returns true only in Phase 2
