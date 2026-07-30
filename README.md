@@ -367,40 +367,11 @@ And type `./graldew build`
 
 **Below instructions are same irrespective of build from intellij or direct mod download.**
 
-Step 6. Setup ollama.
 
-Go to https://ollama.com/
-
-![image](https://github.com/user-attachments/assets/c28798e4-c7bf-4faf-88e5-76315f88f0d1)
-
-Download based on your operating system.
-
-After installation, run ollama from your desktop. This will launch the ollama server. 
-
-This can be accessed in your system tray
-
-![image](https://github.com/user-attachments/assets/3ed6468e-0e8c-4723-ac80-1ab77a7208d4)
+Step 6: Launch the game.
 
 
-Now open a command line client, on windows, search CMD or terminal and then open it.
-
-```
-1. In cmd or terminal type `ollama pull nomic-embed-text (if not already done).
-2. Type `ollama pull llama3.2`
-3. Type `ollama rm gemma2 (if you still have it installed) (for previous users only)
-4. Type `ollama rm llama2 (if you still have it installed) (for previous users only)
-5. If you have run the mod before go to your .minecraft folder, navigate to a folder called config, and delete a file called settings.json5 (for previous users only)
-```
-
-Then **make sure you have turned on ollama server**. 
-
-Step 7: Download the dependencies
-
-Step 8: Launch the game.
-
-Step 9: Type `/configMan` in chat and select llama3.2 as the language model, then hit save and exit.
-
-Step 10: Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
+Step 8: Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
 
 ---
 # Mod usage
