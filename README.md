@@ -371,7 +371,7 @@ And type `./graldew build`
 Step 6: Launch the game.
 
 
-Step 8: Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
+Step 7: Then type `/bot spawn <yourBotName> <training (for training mode, this mode won't connect to language model) and play (for normal usage)`
 
 ---
 # Mod usage
