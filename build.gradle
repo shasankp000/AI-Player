@@ -54,11 +54,11 @@ dependencies {
 	implementation 'org.jsoup:jsoup:1.21.1'
 
 	// DJL dependencies
-	implementation "ai.djl:api:0.33.0"
-	implementation "ai.djl.huggingface:tokenizers:0.33.0"
-	implementation "ai.djl.pytorch:pytorch-engine:0.33.0"
+	implementation "ai.djl:api:0.32.0"
+	implementation "ai.djl.huggingface:tokenizers:0.32.0"
+	implementation "ai.djl.pytorch:pytorch-engine:0.32.0"
 	implementation "ai.djl.pytorch:pytorch-native-cpu:2.5.1"
-	implementation "ai.djl.pytorch:pytorch-model-zoo:0.33.0"
+	implementation "ai.djl.pytorch:pytorch-model-zoo:0.32.0"
 
 	// OpenNLP ONLY - No Stanford CoreNLP!
 	implementation 'org.apache.opennlp:opennlp-tools:2.5.5'
@@ -74,11 +74,11 @@ dependencies {
 	include 'org.apache.commons:commons-math3:3.6.1'
 	include "org.apache.commons:commons-compress:1.28.0"
 	include 'org.jsoup:jsoup:1.21.1'
-	include "ai.djl:api:0.33.0"
-	include "ai.djl.huggingface:tokenizers:0.33.0"
-	include "ai.djl.pytorch:pytorch-engine:0.33.0"
+	include "ai.djl:api:0.32.0"
+	include "ai.djl.huggingface:tokenizers:0.32.0"
+	include "ai.djl.pytorch:pytorch-engine:0.32.0"
 	include "ai.djl.pytorch:pytorch-native-cpu:2.5.1"
-	include "ai.djl.pytorch:pytorch-model-zoo:0.33.0"
+	include "ai.djl.pytorch:pytorch-model-zoo:0.32.0"
 	include 'org.apache.opennlp:opennlp-tools:2.5.5'
 
 	dependencies {
