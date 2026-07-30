@@ -1,14 +1,14 @@
 package net.shasankp000.WorldUitls;
 
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.Level;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.World;
 
 public class GetTime {
-    public static int getTimeOfWorld(ServerPlayer bot) {
+    public static int getTimeOfWorld(ServerPlayerEntity bot) {
 
-        Level GameWorld = bot.level();
+        World GameWorld = bot.getServerWorld();
 
-        long timeOfDay = GameWorld.getDefaultClockTime() % 24000; // Normalize to one day cycle
+        long timeOfDay = GameWorld.getTimeOfDay() % 24000; // Normalize to one day cycle
 
         return (int) timeOfDay;
     }

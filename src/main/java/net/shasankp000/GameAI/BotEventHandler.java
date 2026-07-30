@@ -1,5 +1,14 @@
 package net.shasankp000.GameAI;
 
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.mob.HostileEntity;
+import net.minecraft.entity.mob.SlimeEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.DangerZoneDetector.DangerZoneDetector;
 import net.shasankp000.Database.QTable;
@@ -7,17 +16,9 @@ import net.shasankp000.Database.QTableStorage;
 import net.shasankp000.Database.StateActionPair;
 import net.shasankp000.Entity.AutoFaceEntity;
 import net.shasankp000.GameAI.StateTransition; // Ensure this import exists
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.resources.ResourceKey;
+
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.monster.Monster;
-import net.minecraft.world.entity.monster.cubemob.Slime;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.Entity.FaceClosestEntity;
 import net.shasankp000.LauncherDetection.LauncherEnvironment;
 import net.shasankp000.PlayerUtils.*;
@@ -42,7 +43,7 @@ import static net.shasankp000.GameAI.State.isStateConsistent;
 public class BotEventHandler {
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
     private static MinecraftServer server = null;
-    public static ServerPlayer bot = null;
+    public static ServerPlayerEntity bot = null;
     public static final String qTableDir = LauncherEnvironment.getStorageDirectory("qtable_storage");
     private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(2);
     private static final Object monitorLock = new Object();
@@ -84,7 +85,7 @@ public class BotEventHandler {
 
 
 
-    public BotEventHandler(MinecraftServer server, ServerPlayer bot) {
+    public BotEventHandler(MinecraftServer server, ServerPlayerEntity bot) {
         BotEventHandler.server = server;
         BotEventHandler.bot = bot;
 
@@ -212,7 +213,7 @@ public class BotEventHandler {
         }
 
         try {
-            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
 
             System.out.println("Distance from danger zone: " + DangerZoneDetector.detectDangerZone(bot, 10, 10 , 10) + " blocks");
 
@@ -220,12 +221,12 @@ public class BotEventHandler {
             List<Entity> hostileEntities = nearbyEntities.stream()
                     .filter(entity -> {
                         // Include HostileEntity mobs
-                        if (entity instanceof Monster) {
+                        if (entity instanceof HostileEntity) {
                             return true;
                         }
                         // Include hostile players tracked by retaliation system
-                        if (entity instanceof net.minecraft.world.entity.player.Player player &&
-                            !player.getUUID().equals(bot.getUUID())) {
+                        if (entity instanceof net.minecraft.entity.player.PlayerEntity player &&
+                            !player.getUuid().equals(bot.getUuid())) {
                             return net.shasankp000.PlayerUtils.PlayerRetaliationTracker.isPlayerHostile(bot, player);
                         }
                         return false;
@@ -244,9 +245,9 @@ public class BotEventHandler {
             int timeofDay = GetTime.getTimeOfWorld(bot);
             String time = (timeofDay >= 12000 && timeofDay < 24000) ? "night" : "day";
 
-            Level world = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS).getLevel();
-            ResourceKey<Level> dimType = world.dimension();
-            String dimension = dimType.identifier().toString();
+            World world = bot.getCommandSource().withSilent().withMaxLevel(4).getWorld();
+            RegistryKey<World> dimType = world.getRegistryKey();
+            String dimension = dimType.getValue().toString();
 
             if (!hostileEntities.isEmpty()) {
                 List<EntityDetails> nearbyEntitiesList = new ArrayList<>();
@@ -257,7 +258,7 @@ public class BotEventHandler {
                             entity.getX(),
                             entity.getY(),
                             entity.getZ(),
-                            entity instanceof Monster,
+                            entity instanceof HostileEntity,
                             directionToBot
                     ));
                 }
@@ -302,8 +303,8 @@ public class BotEventHandler {
 
                 List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
                 SelectedItemDetails selectedItem = new SelectedItemDetails(
-                        hotBarUtils.getSelectedHotbarItemStack(bot).getHoverName().getString(),
-                        hotBarUtils.getSelectedHotbarItemStack(bot).getComponents().has(DataComponents.FOOD), // as per 1.20.6 changes.
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getComponents().contains(DataComponentTypes.FOOD), // as per 1.20.6 changes.
                         isBlockItem.checkBlockItem(hotBarUtils.getSelectedHotbarItemStack(bot))
                 );
 
@@ -416,7 +417,7 @@ public class BotEventHandler {
                             entity.getX(),
                             entity.getY(),
                             entity.getZ(),
-                            entity instanceof Monster,
+                            entity instanceof HostileEntity,
                             directionToBot
                     ));
                 }
@@ -459,8 +460,8 @@ public class BotEventHandler {
 
                 List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
                 SelectedItemDetails selectedItem = new SelectedItemDetails(
-                        hotBarUtils.getSelectedHotbarItemStack(bot).getHoverName().getString(),
-                        hotBarUtils.getSelectedHotbarItemStack(bot).getComponents().has(DataComponents.FOOD), // as per 1.20.6 changes.,
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString(),
+                        hotBarUtils.getSelectedHotbarItemStack(bot).getComponents().contains(DataComponentTypes.FOOD), // as per 1.20.6 changes.,
                         isBlockItem.checkBlockItem(hotBarUtils.getSelectedHotbarItemStack(bot))
                 );
 
@@ -615,7 +616,7 @@ public class BotEventHandler {
         }
 
         try {
-            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
 
 
             if (qTable == null) {
@@ -628,12 +629,12 @@ public class BotEventHandler {
                 List<Entity> hostileEntities = nearbyEntities.stream()
                         .filter(entity -> {
                             // Include HostileEntity mobs
-                            if (entity instanceof Monster) {
+                            if (entity instanceof HostileEntity) {
                                 return true;
                             }
                             // Include hostile players tracked by retaliation system
-                            if (entity instanceof net.minecraft.world.entity.player.Player player &&
-                                !player.getUUID().equals(bot.getUUID())) {
+                            if (entity instanceof net.minecraft.entity.player.PlayerEntity player &&
+                                !player.getUuid().equals(bot.getUuid())) {
                                 return net.shasankp000.PlayerUtils.PlayerRetaliationTracker.isPlayerHostile(bot, player);
                             }
                             return false;
@@ -696,7 +697,7 @@ public class BotEventHandler {
         }
     }
 
-    private static void executeAction(StateActions.Action chosenAction, CommandSourceStack botSource) {
+    private static void executeAction(StateActions.Action chosenAction, ServerCommandSource botSource) {
         switch (chosenAction) {
             case MOVE_FORWARD -> performAction("moveForward", botSource);
             case MOVE_BACKWARD -> performAction("moveBackward", botSource);
@@ -727,7 +728,7 @@ public class BotEventHandler {
     }
 
 
-    public static State createInitialState(ServerPlayer bot) {
+    public static State createInitialState(ServerPlayerEntity bot) {
         List<ItemStack> hotBarItems = hotBarUtils.getHotbarItems(bot);
         ItemStack selectedItemStack = hotBarUtils.getSelectedHotbarItemStack(bot);
 
@@ -736,8 +737,8 @@ public class BotEventHandler {
         List<String> nearbyBlocks = blockDistanceLimitedSearch.detectNearbyBlocks();
 
         SelectedItemDetails selectedItem = new SelectedItemDetails(
-                selectedItemStack.getHoverName().getString(),
-                selectedItemStack.getComponents().has(DataComponents.FOOD),
+                selectedItemStack.getItem().getName().getString(),
+                selectedItemStack.getComponents().contains(DataComponentTypes.FOOD),
                 isBlockItem.checkBlockItem(selectedItemStack)
         );
 
@@ -752,9 +753,9 @@ public class BotEventHandler {
             directionToBot = AutoFaceEntity.determineDirectionToBot(bot, entity);
 
             // Determine if entity is hostile (either HostileEntity mob or hostile player)
-            boolean isHostile = entity instanceof Monster;
-            if (entity instanceof net.minecraft.world.entity.player.Player player &&
-                !player.getUUID().equals(bot.getUUID())) {
+            boolean isHostile = entity instanceof HostileEntity;
+            if (entity instanceof net.minecraft.entity.player.PlayerEntity player &&
+                !player.getUuid().equals(bot.getUuid())) {
                 isHostile = net.shasankp000.PlayerUtils.PlayerRetaliationTracker.isPlayerHostile(bot, player);
             }
 
@@ -776,7 +777,7 @@ public class BotEventHandler {
         Map<String, ItemStack> armorItems = getArmorStack.getArmorItems(bot);
         ItemStack offhandItem = getOffHandStack.getOffhandItem(bot);
         String time = GetTime.getTimeOfWorld(bot) >= 12000 ? "night" : "day";
-        String dimension = bot.createCommandSourceStack().getLevel().dimension().identifier().toString();
+        String dimension = bot.getCommandSource().getWorld().getRegistryKey().getValue().toString();
         Map<StateActions.Action, Double> riskMap = new HashMap<>();
 
         Map<StateActions.Action, Double> podMap = new HashMap<>(); // blank pod map for now.
@@ -814,58 +815,58 @@ public class BotEventHandler {
     }
 
 
-    private static void performAction(String action, CommandSourceStack botSource) {
+    private static void performAction(String action, ServerCommandSource botSource) {
 
-        String botName = botSource.getTextName();
+        String botName = botSource.getName();
 
 
         switch (action) {
             case "moveForward":
                 System.out.println("Performing action: move forward");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " move forward");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " move forward");
                 AutoFaceEntity.isBotMoving = true;
                 break;
             case "moveBackward":
                 System.out.println("Performing action: move backward");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " move backward");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " move backward");
                 AutoFaceEntity.isBotMoving = true;
                 break;
             case "turnLeft":
                 System.out.println("Performing action: turn left");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " turn left");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " turn left");
                 break;
             case "turnRight":
                 System.out.println("Performing action: turn right");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " turn right");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " turn right");
                 break;
             case "jump":
                 System.out.println("Performing action: jump");
-                bot.jumpFromGround();
+                bot.jump();
                 break;
             case "sneak":
                 System.out.println("Performing action: sneak");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " sneak");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " sneak");
                 break;
             case "sprint":
                 System.out.println("Performing action: sprint");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " sprint");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " sprint");
                 break;
             case "unsneak":
                 System.out.println("Performing action: unsneak");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " unsneak");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " unsneak");
                 break;
             case "unsprint":
                 System.out.println("Performing action: unsprint");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " unsprint");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " unsprint");
                 break;
             case "stopMoving":
                 System.out.println("Performing action: stop moving");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " stop");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " stop");
                 AutoFaceEntity.isBotMoving = false;
                 break;
             case "useItem":
                 System.out.println("Performing action: use currently selected item");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " use");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " use");
                 break;
             case "attack":
                 System.out.println("Performing action: ATTACK (intelligent combat)");
@@ -894,7 +895,7 @@ public class BotEventHandler {
                     break;
                 }
 
-                double distanceToTarget = Math.sqrt(attackTarget.distanceToSqr(bot));
+                double distanceToTarget = Math.sqrt(attackTarget.squaredDistanceTo(bot));
                 boolean hasRangedWeapon = RangedWeaponUtils.hasBowOrCrossbow(bot);
                 boolean hasAmmo = RangedWeaponUtils.hasArrows(bot);
 
@@ -908,7 +909,7 @@ public class BotEventHandler {
                     System.out.println("Using RANGED attack (distance > 4m)");
 
                     // Execute shooting command synchronously
-                    server.getCommands().performPrefixedCommand(botSource, "/bot shoot_arrow " + botName + " false");
+                    server.getCommandManager().executeWithPrefix(botSource, "/bot shoot_arrow " + botName + " false");
 
                     // Wait for shoot to complete (with timeout)
                     waitForActionCompletion(botName, 3000); // 3 second max wait
@@ -925,7 +926,7 @@ public class BotEventHandler {
                     }
 
                     FaceClosestEntity.faceClosestEntity(bot, AutoFaceEntity.hostileEntities);
-                    server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " attack");
+                    server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " attack");
 
                     // Melee completes instantly
                     completeAction(botName);
@@ -941,7 +942,7 @@ public class BotEventHandler {
                 }
 
                 startAction(botName, "SHOOT_ARROW");
-                server.getCommands().performPrefixedCommand(botSource, "/bot shoot_arrow " + botName + " false");
+                server.getCommandManager().executeWithPrefix(botSource, "/bot shoot_arrow " + botName + " false");
 
                 // Wait for action completion
                 waitForActionCompletion(botName, 3000);
@@ -949,39 +950,39 @@ public class BotEventHandler {
 
             case "hotbar1":
                 System.out.println("Performing action: Select hotbar slot 1");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 1");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 1");
                 break;
             case "hotbar2":
                 System.out.println("Performing action: Select hotbar slot 2");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 2");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 2");
                 break;
             case "hotbar3":
                 System.out.println("Performing action: Select hotbar slot 3");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 3");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 3");
                 break;
             case "hotbar4":
                 System.out.println("Performing action: Select hotbar slot 4");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 4");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 4");
                 break;
             case "hotbar5":
                 System.out.println("Performing action: Select hotbar slot 5");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 5");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 5");
                 break;
             case "hotbar6":
                 System.out.println("Performing action: Select hotbar slot 6");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 6");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 6");
                 break;
             case "hotbar7":
                 System.out.println("Performing action: Select hotbar slot 7");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 7");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 7");
                 break;
             case "hotbar8":
                 System.out.println("Performing action: Select hotbar slot 8");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 8");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 8");
                 break;
             case "hotbar9":
                 System.out.println("Performing action: Select hotbar slot 9");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " hotbar 9");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " hotbar 9");
                 break;
 
             case "evade":
@@ -997,30 +998,30 @@ public class BotEventHandler {
 
                 // Find nearest hostile entity to evade from
                 List<Entity> nearbyHostiles = AutoFaceEntity.detectNearbyEntities(bot, 20.0).stream()
-                    .filter(e -> e instanceof Monster || e instanceof Slime)
+                    .filter(e -> e instanceof HostileEntity || e instanceof SlimeEntity)
                     .toList();
 
                 if (!nearbyHostiles.isEmpty()) {
                     // PRIORITY 1: Check for dangerous creepers first (critical/ignited phase)
-                    net.minecraft.world.entity.monster.Creeper dangerousCreeper =
+                    net.minecraft.entity.mob.CreeperEntity dangerousCreeper =
                         net.shasankp000.PlayerUtils.MobThreatEvaluator.getMostDangerousCreeper(nearbyHostiles, bot);
 
                     Entity closestThreat;
                     if (dangerousCreeper != null) {
                         // Prioritize creeper threat (ignited or critical phase)
                         closestThreat = dangerousCreeper;
-                        double distance = Math.sqrt(dangerousCreeper.distanceToSqr(bot));
+                        double distance = Math.sqrt(dangerousCreeper.squaredDistanceTo(bot));
                         LOGGER.warn("🧨 Prioritizing dangerous CREEPER for evasion at {}m",
                             String.format("%.1f", distance));
                     } else {
                         // No critical creeper - find closest threat normally
                         closestThreat = nearbyHostiles.stream()
-                            .min(Comparator.comparingDouble(e -> e.distanceToSqr(bot)))
+                            .min(Comparator.comparingDouble(e -> e.squaredDistanceTo(bot)))
                             .orElse(null);
                     }
 
                     if (closestThreat != null) {
-                        double distance = Math.sqrt(closestThreat.distanceToSqr(bot));
+                        double distance = Math.sqrt(closestThreat.squaredDistanceTo(bot));
                         LOGGER.info("⚠ Evading from {} at {}m",
                             closestThreat.getName().getString(),
                             String.format("%.1f", distance));
@@ -1029,21 +1030,21 @@ public class BotEventHandler {
                         boolean isRangedThreat = false;
 
                         // Check for ranged mobs
-                        if (closestThreat instanceof net.minecraft.world.entity.monster.skeleton.Skeleton ||
-                            closestThreat instanceof net.minecraft.world.entity.monster.skeleton.WitherSkeleton ||
-                            closestThreat instanceof net.minecraft.world.entity.monster.skeleton.Stray ||
-                            closestThreat instanceof net.minecraft.world.entity.monster.illager.Pillager) {
+                        if (closestThreat instanceof net.minecraft.entity.mob.SkeletonEntity ||
+                            closestThreat instanceof net.minecraft.entity.mob.WitherSkeletonEntity ||
+                            closestThreat instanceof net.minecraft.entity.mob.StrayEntity ||
+                            closestThreat instanceof net.minecraft.entity.mob.PillagerEntity) {
                             isRangedThreat = true;
                         }
 
                         // Check for hostile players with ranged weapons
-                        if (closestThreat instanceof net.minecraft.world.entity.player.Player player) {
-                            net.minecraft.world.item.ItemStack mainHand = player.getMainHandItem();
-                            net.minecraft.world.item.ItemStack activeItem = player.getUseItem();
+                        if (closestThreat instanceof net.minecraft.entity.player.PlayerEntity player) {
+                            net.minecraft.item.ItemStack mainHand = player.getMainHandStack();
+                            net.minecraft.item.ItemStack activeItem = player.getActiveItem();
                             String mainHandId = mainHand.isEmpty() ? "" :
-                                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mainHand.getItem()).toString();
+                                net.minecraft.registry.Registries.ITEM.getId(mainHand.getItem()).toString();
                             String activeItemId = activeItem.isEmpty() ? "" :
-                                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(activeItem.getItem()).toString();
+                                net.minecraft.registry.Registries.ITEM.getId(activeItem.getItem()).toString();
 
                             if (mainHandId.contains("bow") || mainHandId.contains("crossbow") ||
                                 activeItemId.contains("bow") || activeItemId.contains("crossbow")) {
@@ -1069,16 +1070,16 @@ public class BotEventHandler {
                             } else {
                               LOGGER.info("✓ Shield equipped successfully");
                               // Start persistent blocking - will continue until threat changes weapon/dies/goes far
-                              if (closestThreat instanceof net.minecraft.world.entity.LivingEntity) {
-                                AutoFaceEntity.startPersistentBlocking(bot, (net.minecraft.world.entity.LivingEntity) closestThreat, server);
+                              if (closestThreat instanceof net.minecraft.entity.LivingEntity) {
+                                AutoFaceEntity.startPersistentBlocking(bot, (net.minecraft.entity.LivingEntity) closestThreat, server);
                                 break; // Exit case - persistent blocking handles everything
                               }
                             }
                           } else {
                             // Shield already equipped - start persistent blocking
-                            if (closestThreat instanceof net.minecraft.world.entity.LivingEntity) {
+                            if (closestThreat instanceof net.minecraft.entity.LivingEntity) {
                               LOGGER.info("✓ Shield already equipped - starting persistent block");
-                              AutoFaceEntity.startPersistentBlocking(bot, (net.minecraft.world.entity.LivingEntity) closestThreat, server);
+                              AutoFaceEntity.startPersistentBlocking(bot, (net.minecraft.entity.LivingEntity) closestThreat, server);
                               break; // Exit case - persistent blocking handles everything
                             }
                           }
@@ -1086,15 +1087,15 @@ public class BotEventHandler {
 
                         // Dodge/evasion strategy
                         // Calculate escape direction away from threat
-                        Vec3 botPos = bot.position();
-                        Vec3 threatPos = closestThreat.position();
-                        Vec3 awayFromThreat = botPos.subtract(threatPos).normalize();
+                        Vec3d botPos = bot.getPos();
+                        Vec3d threatPos = closestThreat.getPos();
+                        Vec3d awayFromThreat = botPos.subtract(threatPos).normalize();
 
                         // Add randomness for unpredictability
                         double randomAngle = (Math.random() - 0.5) * Math.PI / 2.0; // ±90°
                         double cos = Math.cos(randomAngle);
                         double sin = Math.sin(randomAngle);
-                        Vec3 scrambledDir = new Vec3(
+                        Vec3d scrambledDir = new Vec3d(
                             awayFromThreat.x * cos - awayFromThreat.z * sin,
                             0,
                             awayFromThreat.x * sin + awayFromThreat.z * cos
@@ -1108,10 +1109,10 @@ public class BotEventHandler {
                           LOGGER.info("✓ Path clear ({}m) - Direct sprint evasion", String.format("%.1f", clearance));
 
                           // Create threat object for evasion
-                          if (closestThreat instanceof net.minecraft.world.entity.LivingEntity) {
+                          if (closestThreat instanceof net.minecraft.entity.LivingEntity) {
                             PredictiveThreatDetector.DrawingBowThreat threat =
                               new PredictiveThreatDetector.DrawingBowThreat(
-                                (net.minecraft.world.entity.LivingEntity) closestThreat, bot);
+                                (net.minecraft.entity.LivingEntity) closestThreat, bot);
                             AutoFaceEntity.executeAdaptivePanicEvasion(bot, threat, server);
                           }
                         } else {
@@ -1119,17 +1120,17 @@ public class BotEventHandler {
                           LOGGER.warn("⚠ Obstacles at {}m - Using PathFinder navigation", String.format("%.1f", clearance));
 
                           // Calculate target position (10 blocks in escape direction)
-                          Vec3 targetVec = botPos.add(scrambledDir.scale(10.0));
-                          net.minecraft.core.BlockPos targetPos = new net.minecraft.core.BlockPos(
+                          Vec3d targetVec = botPos.add(scrambledDir.multiply(10.0));
+                          net.minecraft.util.math.BlockPos targetPos = new net.minecraft.util.math.BlockPos(
                             (int) Math.floor(targetVec.x),
                             (int) Math.floor(targetVec.y),
                             (int) Math.floor(targetVec.z)
                           );
 
                           // Find path around obstacles
-                          net.minecraft.server.level.ServerLevel world = (net.minecraft.server.level.ServerLevel) bot.level();
+                          net.minecraft.server.world.ServerWorld world = (net.minecraft.server.world.ServerWorld) bot.getWorld();
                           List<net.shasankp000.PathFinding.PathFinder.PathNode> path =
-                            net.shasankp000.PathFinding.PathFinder.calculatePath(bot.blockPosition(), targetPos, world);
+                            net.shasankp000.PathFinding.PathFinder.calculatePath(bot.getBlockPos(), targetPos, world);
 
                           if (!path.isEmpty()) {
                             LOGGER.info("✓ PathFinder found route with {} nodes - executing", path.size());
@@ -1150,10 +1151,10 @@ public class BotEventHandler {
                           } else {
                             // No path found - use direct evasion as fallback
                             LOGGER.warn("⚠ PathFinder failed - using direct evasion fallback");
-                            if (closestThreat instanceof net.minecraft.world.entity.LivingEntity) {
+                            if (closestThreat instanceof net.minecraft.entity.LivingEntity) {
                               PredictiveThreatDetector.DrawingBowThreat threat =
                                 new PredictiveThreatDetector.DrawingBowThreat(
-                                  (net.minecraft.world.entity.LivingEntity) closestThreat, bot);
+                                  (net.minecraft.entity.LivingEntity) closestThreat, bot);
                               AutoFaceEntity.executeAdaptivePanicEvasion(bot, threat, server);
                             }
                           }
@@ -1181,16 +1182,16 @@ public class BotEventHandler {
     /**
      * Execute ranged combat strategy - shoot arrows/crossbow at enemies
      */
-    private static void executeRangedCombat(ServerPlayer bot, List<Entity> hostiles,
+    private static void executeRangedCombat(ServerPlayerEntity bot, List<Entity> hostiles,
                                            CombatStrategyUtils.CombatStrategy strategy,
-                                           MinecraftServer server, CommandSourceStack botSource, String botName) {
+                                           MinecraftServer server, ServerCommandSource botSource, String botName) {
         LOGGER.info("⚔ Executing RANGED_COMBAT strategy");
 
         // Find closest hostile
         Entity target = findClosestEntity(bot, hostiles);
         if (target == null) return;
 
-        double distance = Math.sqrt(target.distanceToSqr(bot));
+        double distance = Math.sqrt(target.squaredDistanceTo(bot));
         LOGGER.info("🎯 Targeting {} at {}m", target.getName().getString(), String.format("%.1f", distance));
 
         // Equip ranged weapon
@@ -1199,20 +1200,20 @@ public class BotEventHandler {
 
         if (!weaponReady) {
             LOGGER.warn("⚠ Could not equip {} - falling back to melee", weaponType);
-            server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " attack");
+            server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " attack");
             return;
         }
 
         // Face the target and use item (shoot)
         FaceClosestEntity.faceClosestEntity(bot, List.of(target));
-        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " use continuous");
+        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " use continuous");
 
         LOGGER.info("✓ Ranged attack executed - shooting at target");
 
         // Release after 1 second
         executor.schedule(() -> {
             server.execute(() -> {
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " use");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " use");
             });
         }, 1000, TimeUnit.MILLISECONDS);
     }
@@ -1220,15 +1221,15 @@ public class BotEventHandler {
     /**
      * Execute shield advance strategy - block while moving forward, then melee attack
      */
-    private static void executeShieldAdvance(ServerPlayer bot, List<Entity> hostiles,
+    private static void executeShieldAdvance(ServerPlayerEntity bot, List<Entity> hostiles,
                                             CombatStrategyUtils.CombatStrategy strategy,
-                                            MinecraftServer server, CommandSourceStack botSource, String botName) {
+                                            MinecraftServer server, ServerCommandSource botSource, String botName) {
         LOGGER.info("⚔ Executing SHIELD_ADVANCE strategy");
 
         Entity target = findClosestEntity(bot, hostiles);
         if (target == null) return;
 
-        double distance = Math.sqrt(target.distanceToSqr(bot));
+        double distance = Math.sqrt(target.squaredDistanceTo(bot));
         LOGGER.info("🛡 Advancing on {} at {}m with shield", target.getName().getString(), String.format("%.1f", distance));
 
         // Equip shield to offhand if not equipped
@@ -1245,31 +1246,31 @@ public class BotEventHandler {
         equipWeapon(bot, strategy.primaryWeapon, server, botSource, botName);
 
         // Start persistent blocking against the target
-        if (target instanceof net.minecraft.world.entity.LivingEntity) {
-            AutoFaceEntity.startPersistentBlocking(bot, (net.minecraft.world.entity.LivingEntity) target, server);
+        if (target instanceof net.minecraft.entity.LivingEntity) {
+            AutoFaceEntity.startPersistentBlocking(bot, (net.minecraft.entity.LivingEntity) target, server);
         }
 
         // Move forward while blocking (for 2-3 seconds or until in melee range)
         int advanceDuration = (int) Math.min(3000, distance * 200); // ~200ms per block
         LOGGER.info("🛡 Advancing for {}ms", advanceDuration);
 
-        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " sprint");
-        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " move forward");
+        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " sprint");
+        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " move forward");
 
         // Schedule attack when close
         executor.schedule(() -> {
             server.execute(() -> {
                 // Stop blocking and attack
                 AutoFaceEntity.stopPersistentBlocking(bot, server);
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " stopMoving");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " attack continuous");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " stopMoving");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " attack continuous");
 
                 LOGGER.info("⚔ Reached melee range - attacking!");
 
                 // Continue attacking for a few seconds
                 executor.schedule(() -> {
                     server.execute(() -> {
-                        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " attack");
+                        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " attack");
                         LOGGER.info("✓ Shield advance complete");
                     });
                 }, 2000, TimeUnit.MILLISECONDS);
@@ -1280,23 +1281,23 @@ public class BotEventHandler {
     /**
      * Execute melee rush strategy - sprint at enemy and attack
      */
-    private static void executeMeleeRush(ServerPlayer bot, List<Entity> hostiles,
+    private static void executeMeleeRush(ServerPlayerEntity bot, List<Entity> hostiles,
                                         CombatStrategyUtils.CombatStrategy strategy,
-                                        MinecraftServer server, CommandSourceStack botSource, String botName) {
+                                        MinecraftServer server, ServerCommandSource botSource, String botName) {
         LOGGER.info("⚔ Executing MELEE_RUSH strategy");
 
         Entity target = findClosestEntity(bot, hostiles);
         if (target == null) return;
 
-        double distance = Math.sqrt(target.distanceToSqr(bot));
+        double distance = Math.sqrt(target.squaredDistanceTo(bot));
         LOGGER.info("⚔ Rushing {} at {}m", target.getName().getString(), String.format("%.1f", distance));
 
         // Equip melee weapon
         equipWeapon(bot, strategy.primaryWeapon, server, botSource, botName);
 
         // Sprint and attack
-        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " sprint");
-        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " attack continuous");
+        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " sprint");
+        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " attack continuous");
 
         LOGGER.info("✓ Melee rush initiated");
     }
@@ -1304,32 +1305,32 @@ public class BotEventHandler {
     /**
      * Execute evasive melee strategy - zigzag approach to avoid ranged attacks
      */
-    private static void executeEvasiveMelee(ServerPlayer bot, List<Entity> hostiles,
+    private static void executeEvasiveMelee(ServerPlayerEntity bot, List<Entity> hostiles,
                                            CombatStrategyUtils.CombatStrategy strategy,
-                                           MinecraftServer server, CommandSourceStack botSource, String botName) {
+                                           MinecraftServer server, ServerCommandSource botSource, String botName) {
         LOGGER.info("⚔ Executing EVASIVE_MELEE strategy");
 
         Entity target = findClosestEntity(bot, hostiles);
         if (target == null) return;
 
-        double distance = Math.sqrt(target.distanceToSqr(bot));
+        double distance = Math.sqrt(target.squaredDistanceTo(bot));
         LOGGER.info("🏃 Evasive approach to {} at {}m", target.getName().getString(), String.format("%.1f", distance));
 
         // Equip melee weapon
         equipWeapon(bot, strategy.primaryWeapon, server, botSource, botName);
 
         // Use adaptive panic evasion but in reverse - move TOWARD enemy with zigzag
-        if (target instanceof net.minecraft.world.entity.LivingEntity) {
+        if (target instanceof net.minecraft.entity.LivingEntity) {
             // Calculate zigzag approach direction
-            Vec3 botPos = bot.position();
-            Vec3 targetPos = target.position();
-            Vec3 toTarget = targetPos.subtract(botPos).normalize();
+            Vec3d botPos = bot.getPos();
+            Vec3d targetPos = target.getPos();
+            Vec3d toTarget = targetPos.subtract(botPos).normalize();
 
             // Add random lateral movement
             double randomAngle = (Math.random() - 0.5) * Math.PI / 3.0; // ±60°
             double cos = Math.cos(randomAngle);
             double sin = Math.sin(randomAngle);
-            Vec3 zigzagDir = new Vec3(
+            Vec3d zigzagDir = new Vec3d(
                 toTarget.x * cos - toTarget.z * sin,
                 0,
                 toTarget.x * sin + toTarget.z * cos
@@ -1337,11 +1338,11 @@ public class BotEventHandler {
 
             // Set direction and sprint
             double yaw = Math.toDegrees(Math.atan2(zigzagDir.z, zigzagDir.x)) - 90;
-            bot.setYRot((float) yaw);
+            bot.setYaw((float) yaw);
 
-            server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " sprint");
-            server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " move forward");
-            server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " jump continuous");
+            server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " sprint");
+            server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " move forward");
+            server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " jump continuous");
 
             LOGGER.info("🏃 Zigzag approach started");
 
@@ -1349,9 +1350,9 @@ public class BotEventHandler {
             int approachTime = (int) Math.min(3000, distance * 150);
             executor.schedule(() -> {
                 server.execute(() -> {
-                    server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " stopMoving");
-                    server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " jump");
-                    server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " attack continuous");
+                    server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " stopMoving");
+                    server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " jump");
+                    server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " attack continuous");
                     LOGGER.info("⚔ Evasive melee attack commenced");
                 });
             }, approachTime, TimeUnit.MILLISECONDS);
@@ -1361,36 +1362,36 @@ public class BotEventHandler {
     /**
      * Execute tactical retreat - run away from enemies
      */
-    private static void executeTacticalRetreat(ServerPlayer bot, List<Entity> hostiles,
-                                              MinecraftServer server, CommandSourceStack botSource, String botName) {
+    private static void executeTacticalRetreat(ServerPlayerEntity bot, List<Entity> hostiles,
+                                              MinecraftServer server, ServerCommandSource botSource, String botName) {
         LOGGER.info("🏃 Executing TACTICAL_RETREAT");
 
         Entity closestThreat = findClosestEntity(bot, hostiles);
         if (closestThreat == null) return;
 
-        double distance = Math.sqrt(closestThreat.distanceToSqr(bot));
+        double distance = Math.sqrt(closestThreat.squaredDistanceTo(bot));
         LOGGER.info("🏃 Retreating from {} at {}m", closestThreat.getName().getString(), String.format("%.1f", distance));
 
         // Calculate retreat direction (away from threat)
-        Vec3 botPos = bot.position();
-        Vec3 threatPos = closestThreat.position();
-        Vec3 awayFromThreat = botPos.subtract(threatPos).normalize();
+        Vec3d botPos = bot.getPos();
+        Vec3d threatPos = closestThreat.getPos();
+        Vec3d awayFromThreat = botPos.subtract(threatPos).normalize();
 
         // Set direction
         double yaw = Math.toDegrees(Math.atan2(awayFromThreat.z, awayFromThreat.x)) - 90;
-        bot.setYRot((float) yaw);
+        bot.setYaw((float) yaw);
 
         // Sprint away
-        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " sprint");
-        server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " move forward");
+        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " sprint");
+        server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " move forward");
 
         LOGGER.info("✓ Tactical retreat initiated");
 
         // Continue retreating for 3 seconds
         executor.schedule(() -> {
             server.execute(() -> {
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " stopMoving");
-                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " unsprint");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " stopMoving");
+                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " unsprint");
                 LOGGER.info("✓ Tactical retreat complete");
             });
         }, 3000, TimeUnit.MILLISECONDS);
@@ -1399,12 +1400,12 @@ public class BotEventHandler {
     /**
      * Find the closest entity to the bot
      */
-    private static Entity findClosestEntity(ServerPlayer bot, List<Entity> entities) {
+    private static Entity findClosestEntity(ServerPlayerEntity bot, List<Entity> entities) {
         Entity closest = null;
         double minDistance = Double.MAX_VALUE;
 
         for (Entity entity : entities) {
-            double dist = entity.distanceToSqr(bot);
+            double dist = entity.squaredDistanceTo(bot);
             if (dist < minDistance) {
                 minDistance = dist;
                 closest = entity;
@@ -1417,8 +1418,8 @@ public class BotEventHandler {
     /**
      * Equip a specific weapon type by searching inventory and switching hotbar
      */
-    private static boolean equipWeapon(ServerPlayer bot, String weaponType,
-                                      MinecraftServer server, CommandSourceStack botSource, String botName) {
+    private static boolean equipWeapon(ServerPlayerEntity bot, String weaponType,
+                                      MinecraftServer server, ServerCommandSource botSource, String botName) {
         if (weaponType.equals("none")) {
             return false;
         }
@@ -1426,8 +1427,8 @@ public class BotEventHandler {
         LOGGER.info("🗡 Attempting to equip {}", weaponType);
 
         // Check if already holding the correct weapon type
-        ItemStack currentItem = bot.getMainHandItem();
-        String currentItemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(currentItem.getItem()).toString();
+        ItemStack currentItem = bot.getMainHandStack();
+        String currentItemId = net.minecraft.registry.Registries.ITEM.getId(currentItem.getItem()).toString();
 
         if (currentItemId.contains(weaponType.replace("_", "")) ||
             currentItemId.contains(weaponType)) {
@@ -1437,13 +1438,13 @@ public class BotEventHandler {
 
         // Search hotbar for weapon
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getItem(i);
+            ItemStack stack = bot.getInventory().getStack(i);
             if (stack.isEmpty()) continue;
 
-            String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            String itemId = net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString();
             if (itemId.contains(weaponType.replace("_", "")) || itemId.contains(weaponType)) {
                 // Found weapon in hotbar - switch to it
-                server.getCommands().performPrefixedCommand(botSource,
+                server.getCommandManager().executeWithPrefix(botSource,
                     "/player " + botName + " hotbar " + (i + 1));
                 LOGGER.info("✓ Equipped {} from hotbar slot {}", weaponType, i + 1);
                 return true;
@@ -1451,11 +1452,11 @@ public class BotEventHandler {
         }
 
         // Search main inventory
-        for (int i = 9; i < bot.getInventory().getContainerSize(); i++) {
-            ItemStack stack = bot.getInventory().getItem(i);
+        for (int i = 9; i < bot.getInventory().size(); i++) {
+            ItemStack stack = bot.getInventory().getStack(i);
             if (stack.isEmpty()) continue;
 
-            String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            String itemId = net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString();
             if (itemId.contains(weaponType.replace("_", "")) || itemId.contains(weaponType)) {
                 // Found weapon in inventory - need to move to hotbar first
                 LOGGER.info("Found {} in inventory slot {} - moving to hotbar", weaponType, i);
@@ -1463,18 +1464,18 @@ public class BotEventHandler {
                 // Find empty hotbar slot or replace slot 1
                 int targetHotbarSlot = 0; // Default to first slot
                 for (int j = 0; j < 9; j++) {
-                    if (bot.getInventory().getItem(j).isEmpty()) {
+                    if (bot.getInventory().getStack(j).isEmpty()) {
                         targetHotbarSlot = j;
                         break;
                     }
                 }
 
                 // Swap items (simplified - in real impl would need inventory manipulation)
-                bot.getInventory().setItem(targetHotbarSlot, stack.copy());
-                bot.getInventory().setItem(i, ItemStack.EMPTY);
+                bot.getInventory().setStack(targetHotbarSlot, stack.copy());
+                bot.getInventory().setStack(i, ItemStack.EMPTY);
 
                 // Switch to that slot
-                server.getCommands().performPrefixedCommand(botSource,
+                server.getCommandManager().executeWithPrefix(botSource,
                     "/player " + botName + " hotbar " + (targetHotbarSlot + 1));
 
                 LOGGER.info("✓ Equipped {} from inventory", weaponType);
@@ -1529,7 +1530,7 @@ public class BotEventHandler {
      * @param hostileEntities List of nearby hostile entities
      * @return The highest threat entity, or null if none suitable
      */
-    private static Entity selectHighestThreatTarget(ServerPlayer bot, List<Entity> hostileEntities) {
+    private static Entity selectHighestThreatTarget(ServerPlayerEntity bot, List<Entity> hostileEntities) {
         if (hostileEntities.isEmpty()) {
             return null;
         }
@@ -1538,7 +1539,7 @@ public class BotEventHandler {
         double highestThreat = -1.0;
 
         for (Entity entity : hostileEntities) {
-            double distance = Math.sqrt(entity.distanceToSqr(bot));
+            double distance = Math.sqrt(entity.squaredDistanceTo(bot));
 
             // Calculate base threat based on entity type
             double baseThreat = calculateBaseThreatForEntity(entity, distance);
@@ -1570,7 +1571,7 @@ public class BotEventHandler {
 
         if (highestThreatEntity != null) {
             String targetName = highestThreatEntity.getName().getString();
-            double distance = Math.sqrt(highestThreatEntity.distanceToSqr(bot));
+            double distance = Math.sqrt(highestThreatEntity.squaredDistanceTo(bot));
 
             System.out.println("⚔ Selected Priority Target: " + targetName +
                 " (Threat: " + String.format("%.1f", highestThreat) +
@@ -1591,34 +1592,33 @@ public class BotEventHandler {
      */
     private static double calculateBaseThreatForEntity(Entity entity, double distance) {
         // HOSTILE PLAYERS - HIGH PRIORITY THREATS
-        if (entity instanceof net.minecraft.world.entity.player.Player player) {
+        if (entity instanceof net.minecraft.entity.player.PlayerEntity player) {
             double baseThreat = 30.0; // Base threat for hostile player
 
             // Analyze player equipment to assess threat level
-            net.minecraft.world.item.ItemStack mainHand = player.getMainHandItem();
-            net.minecraft.world.item.ItemStack offHand = player.getOffhandItem();
+            net.minecraft.item.ItemStack mainHand = player.getMainHandStack();
+            net.minecraft.item.ItemStack offHand = player.getOffHandStack();
 
             // Check for weapons
-            if (mainHand.getItem() instanceof net.minecraft.world.item.Item) {
+            if (mainHand.getItem() instanceof net.minecraft.item.SwordItem) {
                 baseThreat += 15.0; // Sword wielding player
-            } else if (mainHand.getItem() instanceof net.minecraft.world.item.AxeItem) {
+            } else if (mainHand.getItem() instanceof net.minecraft.item.AxeItem) {
                 baseThreat += 12.0; // Axe wielding player
-            } else if (mainHand.getItem() instanceof net.minecraft.world.item.BowItem ||
-                      mainHand.getItem() instanceof net.minecraft.world.item.CrossbowItem) {
+            } else if (mainHand.getItem() instanceof net.minecraft.item.BowItem ||
+                      mainHand.getItem() instanceof net.minecraft.item.CrossbowItem) {
                 baseThreat += 20.0; // Ranged weapon - very dangerous
-            } else if (mainHand.getItem() instanceof net.minecraft.world.item.TridentItem) {
+            } else if (mainHand.getItem() instanceof net.minecraft.item.TridentItem) {
                 baseThreat += 18.0; // Trident
             }
 
             // Check for shield (defensive capability)
-            if (offHand.getItem() instanceof net.minecraft.world.item.ShieldItem) {
+            if (offHand.getItem() instanceof net.minecraft.item.ShieldItem) {
                 baseThreat += 8.0; // Player with shield is more dangerous
             }
 
             // Check armor (increases survivability = higher threat)
             int armorPieces = 0;
-            for (net.minecraft.world.entity.EquipmentSlot slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST, net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
-                net.minecraft.world.item.ItemStack armorSlot = player.getItemBySlot(slot);
+            for (net.minecraft.item.ItemStack armorSlot : player.getArmorItems()) {
                 if (!armorSlot.isEmpty()) {
                     armorPieces++;
                     // Diamond/Netherite armor is particularly dangerous
@@ -1684,7 +1684,7 @@ public class BotEventHandler {
         if (name.contains("warden")) return "Maximum danger mob";
         if (name.contains("skeleton") || name.contains("stray")) return "Ranged attacker";
         if (name.contains("witch")) return "Potion thrower - high threat";
-        if (entity instanceof net.minecraft.world.entity.player.Player) return "Hostile player detected";
+        if (entity instanceof net.minecraft.entity.player.PlayerEntity) return "Hostile player detected";
         if (distance < 3.0) return "Critical range - immediate threat";
         return "Closest/highest threat in range";
     }

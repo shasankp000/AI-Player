@@ -1,13 +1,16 @@
 package net.shasankp000.ServiceLLMClients;
 
-import net.minecraft.commands.CommandSourceStack;
+import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
+import io.github.amithkoujalgi.ollama4j.core.types.OllamaModelType;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.ChatUtils.Helper.RAG2;
 import net.shasankp000.ChatUtils.NLPProcessor;
 import net.shasankp000.Database.SQLiteDB;
+import net.shasankp000.Exception.intentMisclassification;
 import net.shasankp000.FunctionCaller.FunctionCallerV2;
 import net.shasankp000.Overlay.ThinkingStateManager;
 import org.slf4j.Logger;
@@ -26,6 +29,8 @@ public class LLMServiceHandler {
     private static final ExecutorService BOT_TASK_POOL = Executors.newCachedThreadPool();
     private static final Pattern THINK_BLOCK = Pattern.compile("<think>([\\s\\S]*?)</think>");
     public static String initialResponse = "";
+    private static final String host = "http://localhost:11434";
+    public static final OllamaAPI ollamaAPI = new OllamaAPI(host);
     public static boolean isInitialized = false;
 
     private static String generateSystemPrompt(String botName) {
@@ -65,7 +70,7 @@ public class LLMServiceHandler {
 
     }
 
-    public static void processLLMOutput(String fullResponse, String botName, CommandSourceStack botSource) {
+    public static void processLLMOutput(String fullResponse, String botName, ServerCommandSource botSource) {
         LOGGER.info("processLLMOutput called with response: '{}', botName: '{}'", fullResponse, botName);
 
         if (fullResponse == null || fullResponse.trim().isEmpty()) {
@@ -103,7 +108,7 @@ public class LLMServiceHandler {
     }
 
 
-    public static void sendInitialResponse(CommandSourceStack botSource, LLMClient client) {
+    public static void sendInitialResponse(ServerCommandSource botSource, LLMClient client) {
         MinecraftServer server = botSource.getServer();
         String botName = botSource.getPlayer().getName().getString();
 
@@ -174,12 +179,12 @@ public class LLMServiceHandler {
      */
     public static void runFromChat(String message, String botName, UUID playerUUID, LLMClient client) {
         MinecraftServer server = AIPlayer.serverInstance;
-        ServerPlayer bot = server.getPlayerList().getPlayerByName(botName);
+        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
         if (bot == null) {
             LOGGER.error("Bot {} not online.", botName);
             return;
         }
-        CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+        ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
 
         server.execute(() -> {
             Thread.currentThread().setName("LLM-Chat-Worker");
@@ -200,7 +205,7 @@ public class LLMServiceHandler {
      * @param playerUUID The player's UUID.
      * @throws Exception if an error occurs during intent routing.
      */
-    private static void routeIntent(String message, CommandSourceStack botSource, UUID playerUUID, LLMClient client) throws Exception {
+    private static void routeIntent(String message, ServerCommandSource botSource, UUID playerUUID, LLMClient client) throws Exception {
         NLPProcessor.Intent intent = NLPProcessor.getIntention(message);
 
         LOGGER.info("📨 Received intent: {}", intent);
@@ -230,7 +235,7 @@ public class LLMServiceHandler {
                 LOGGER.warn("⚠️ Intent unclear, retrying with LLM classification...");
                 ChatUtils.sendChatMessages(botSource, "🔍 Reanalyzing...");
 
-                NLPProcessor.Intent retry = retryIntentLLM(message, client);
+                NLPProcessor.Intent retry = retryIntentLLM(message);
 
                 LOGGER.info("📨 Retry intent: {}", retry);
 
@@ -246,19 +251,18 @@ public class LLMServiceHandler {
                         Thread.currentThread().setName("LLM-Function-Caller-Retry-Worker");
                         LOGGER.info("🧵 Started FunctionCallerV2 retry worker thread");
                         new FunctionCallerV2(botSource, playerUUID);
-                        FunctionCallerV2.run(message, client);
+                        FunctionCallerV2.run(message);
                         LOGGER.info("✅ Finished FunctionCallerV2 retry worker thread");
                     });
                 } else {
-                    LOGGER.warn("⚠️ Intent remained unclear after retry.");
-                    ChatUtils.sendChatMessages(botSource, "I couldn't understand that clearly. Please try rephrasing.");
+                    throw new intentMisclassification("LLM failed to classify intent.");
                 }
             }
         }
     }
 
 
-    private static NLPProcessor.Intent retryIntentLLM(String message, LLMClient client) {
-        return NLPProcessor.getIntentionFromLLM(message, client);
+    private static NLPProcessor.Intent retryIntentLLM(String message) {
+        return NLPProcessor.getIntentionFromLLM(message);
     }
 }

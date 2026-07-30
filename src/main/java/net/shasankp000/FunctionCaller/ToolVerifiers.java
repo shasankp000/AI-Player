@@ -1,9 +1,10 @@
 package net.shasankp000.FunctionCaller;
 
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.math.BlockPos;
+
 import java.util.HashMap;
 import java.util.Map;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerPlayer;
 
 /**
  * State-based verifier class. Verifies tool outputs by checking sharedState directly,
@@ -25,7 +26,7 @@ public class ToolVerifiers {
     // Functional interface for verifiers
     @FunctionalInterface
     public interface StateVerifier {
-        VerificationResult verify(Map<String, String> params, Map<String, Object> sharedState, ServerPlayer bot);
+        VerificationResult verify(Map<String, String> params, Map<String, Object> sharedState, ServerPlayerEntity bot);
     }
 
     // Registry of verifiers per function (extend as needed)
@@ -51,7 +52,7 @@ public class ToolVerifiers {
 
                 // Optional cross-check with bot's actual position
                 if (bot != null) {
-                    BlockPos botPos = bot.blockPosition();
+                    BlockPos botPos = bot.getBlockPos();
                     double botDistSq = Math.pow(botPos.getX() - targetX, 2) + Math.pow(botPos.getY() - targetY, 2) + Math.pow(botPos.getZ() - targetZ, 2);
                     success = success && botDistSq <= 16.0;
                 }
@@ -86,7 +87,7 @@ public class ToolVerifiers {
                 double level = ((Number) levelObj).doubleValue();
                 boolean success = level >= 0;
                 // Optional cross-check with bot
-                if (bot != null) success = success && bot.getAirSupply() >= 0;
+                if (bot != null) success = success && bot.getAir() >= 0;
                 return new VerificationResult(success, Map.of("level", level));
             },
             "getHungerLevel", (params, state, bot) -> {
@@ -94,7 +95,7 @@ public class ToolVerifiers {
                 if (!(levelObj instanceof Number)) return new VerificationResult(false, Map.of("error", "Missing or invalid hunger level"));
                 double level = ((Number) levelObj).doubleValue();
                 boolean success = level >= 0;
-                if (bot != null) success = success && bot.getFoodData().getFoodLevel() >= 0;
+                if (bot != null) success = success && bot.getHungerManager().getFoodLevel() >= 0;
                 return new VerificationResult(success, Map.of("level", level));
             },
             "getHealthLevel", (params, state, bot) -> {
@@ -123,7 +124,7 @@ public class ToolVerifiers {
                 boolean success = true;
                 if (bot != null) {
                     BlockPos targetPos = new BlockPos(targetX, targetY, targetZ);
-                    var blockState = bot.level().getBlockState(targetPos);
+                    var blockState = bot.getWorld().getBlockState(targetPos);
                     // Verify block is not air (successfully placed)
                     success = !blockState.isAir();
                 }

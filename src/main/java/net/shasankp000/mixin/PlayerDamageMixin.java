@@ -1,10 +1,9 @@
 package net.shasankp000.mixin;
 
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.PlayerUtils.PlayerRetaliationTracker;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,18 +14,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Mixin to detect when bot player entities are damaged by other players
  * This enables the player retaliation system
  */
-@Mixin(ServerPlayer.class)
+@Mixin(ServerPlayerEntity.class)
 public class PlayerDamageMixin {
 
-    @Inject(method = "hurtServer", at = @At("HEAD"))
-    private void onPlayerDamaged(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        ServerPlayer bot = (ServerPlayer) (Object) this;
+    @Inject(method = "damage", at = @At("HEAD"))
+    private void onPlayerDamaged(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        ServerPlayerEntity bot = (ServerPlayerEntity) (Object) this;
 
         // Check if damage source is another player
-        Entity attacker = source.getEntity();
-        if (attacker instanceof Player playerAttacker) {
+        Entity attacker = source.getAttacker();
+        if (attacker instanceof PlayerEntity playerAttacker) {
             // Don't track damage from the bot to itself
-            if (playerAttacker.getUUID().equals(bot.getUUID())) {
+            if (playerAttacker.getUuid().equals(bot.getUuid())) {
                 return;
             }
 
@@ -35,3 +34,4 @@ public class PlayerDamageMixin {
         }
     }
 }
+

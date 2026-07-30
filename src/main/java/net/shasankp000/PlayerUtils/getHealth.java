@@ -1,10 +1,10 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerPlayerEntity;
 
 public class getHealth {
 
-    public static float getBotHealthLevel(ServerPlayer bot) {
+    public static float getBotHealthLevel(ServerPlayerEntity bot) {
         if (bot != null) {
             return bot.getHealth();
         }

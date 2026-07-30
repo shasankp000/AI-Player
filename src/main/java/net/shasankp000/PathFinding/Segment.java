@@ -1,6 +1,6 @@
 package net.shasankp000.PathFinding;
 
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.math.BlockPos;
 
 public class Segment {
     private final BlockPos start;
