@@ -1,6 +1,6 @@
 package net.shasankp000.Personality;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.GameAI.State;
 import net.shasankp000.OllamaClient.ollamaClient;
 import org.slf4j.Logger;
@@ -39,7 +39,7 @@ public class LLMContextBridge {
      *         (empty string on failure)
      */
     public static CompletableFuture<String> reactAsync(
-            ServerPlayerEntity bot,
+            ServerPlayer bot,
             State state,
             String extraCtx) {
 
@@ -84,7 +84,7 @@ public class LLMContextBridge {
      * {@code isAvailable()} guard that returns false quickly when Ollama
      * is not running, avoiding long timeouts on the server thread.
      */
-    private static String dispatchToBackend(ServerPlayerEntity bot, String prompt) {
+    private static String dispatchToBackend(ServerPlayer bot, String prompt) {
         // Primary: local Ollama
         if (ollamaClient.isAvailable()) {
             try {
@@ -110,12 +110,12 @@ public class LLMContextBridge {
      * This is required because {@code bot.sendMessage} touches MC internals
      * and must not be called from a background thread.
      */
-    private static void postChatSafe(ServerPlayerEntity bot, String message) {
-        if (bot.getServer() == null) return;
-        bot.getServer().execute(() -> {
+    private static void postChatSafe(ServerPlayer bot, String message) {
+        if (bot.createCommandSourceStack().getServer() == null) return;
+        bot.createCommandSourceStack().getServer().execute(() -> {
             try {
                 net.shasankp000.ChatUtils.ChatUtils.sendChatMessages(
-                        bot.getCommandSource().withSilent().withMaxLevel(4),
+                        bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS),
                         message
                 );
             } catch (Exception e) {

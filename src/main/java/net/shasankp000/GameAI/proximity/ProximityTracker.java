@@ -1,7 +1,7 @@
 package net.shasankp000.GameAI.proximity;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.shasankp000.GameAI.mood.AffectiveState;
 import net.shasankp000.GameAI.mood.MoodEngine;
 import net.shasankp000.GameAI.mood.MoodLabel;
@@ -145,20 +145,20 @@ public final class ProximityTracker {
     // Public entry point
     // -------------------------------------------------------------------------
 
-    public static void tick(ServerPlayerEntity bot, List<Entity> nearbyEntities) {
+    public static void tick(ServerPlayer bot, List<Entity> nearbyEntities) {
         if (bot == null || !bot.isAlive()) return;
 
         String botName = bot.getName().getString();
         long now = System.currentTimeMillis();
 
         for (Entity entity : nearbyEntities) {
-            if (!(entity instanceof ServerPlayerEntity player)) continue;
-            if (player.getUuid().equals(bot.getUuid())) continue;
-            if (!player.networkHandler.isConnectionOpen()) continue;
+            if (!(entity instanceof ServerPlayer player)) continue;
+            if (player.getUUID().equals(bot.getUUID())) continue;
+            if (!player.connection.isAcceptingMessages()) continue;
 
             String playerName = player.getName().getString();
-            UUID pid = player.getUuid();
-            double dist = Math.sqrt(player.squaredDistanceTo(bot));
+            UUID pid = player.getUUID();
+            double dist = Math.sqrt(player.distanceToSqr(bot));
 
             // 1. Approach greeting
             if (dist <= GREET_RADIUS) {
@@ -208,7 +208,7 @@ public final class ProximityTracker {
     // -------------------------------------------------------------------------
 
     private static void fireReaction(
-            ServerPlayerEntity bot,
+            ServerPlayer bot,
             String botName,
             String playerName,
             Map<MoodLabel, List<String>> pool,
@@ -228,11 +228,11 @@ public final class ProximityTracker {
         }
 
         final String finalMessage = message;
-        if (bot.getServer() != null) {
-            bot.getServer().execute(() -> {
+        if (bot.createCommandSourceStack().getServer() != null) {
+            bot.createCommandSourceStack().getServer().execute(() -> {
                 try {
-                    bot.getServer().getCommandManager().executeWithPrefix(
-                        bot.getCommandSource().withSilent().withMaxLevel(4),
+                    bot.createCommandSourceStack().getServer().getCommands().performPrefixedCommand(
+                        bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS),
                         "/say " + finalMessage
                     );
                 } catch (Exception e) {

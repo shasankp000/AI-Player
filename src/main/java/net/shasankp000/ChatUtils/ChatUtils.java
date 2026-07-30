@@ -1,8 +1,8 @@
 package net.shasankp000.ChatUtils;
 
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,7 @@ public class ChatUtils {
      * @param message The message to send.
      * @param withDelay Whether to add typing delays between message parts.
      */
-    public static void sendChatMessages(ServerCommandSource source, String message, boolean withDelay) {
+    public static void sendChatMessages(CommandSourceStack source, String message, boolean withDelay) {
         if (message == null || message.trim().isEmpty()) {
             LOGGER.warn("Attempted to send null or empty message");
             return;
@@ -63,7 +63,7 @@ public class ChatUtils {
      * @param partIndex The current index of the message part to send.
      * @param withDelay If delays should be used.
      */
-    private static void scheduleAndSendMessages(MinecraftServer server, ServerCommandSource source, List<String> messageParts, int partIndex, boolean withDelay) {
+    private static void scheduleAndSendMessages(MinecraftServer server, CommandSourceStack source, List<String> messageParts, int partIndex, boolean withDelay) {
         if (partIndex >= messageParts.size()) {
             // All parts have been sent, stop the recursion.
             return;
@@ -90,11 +90,11 @@ public class ChatUtils {
     /**
      * Send a single message part to the chat.
      */
-    private static void sendSingleMessage(MinecraftServer server, ServerCommandSource source, String message, int partIndex) {
+    private static void sendSingleMessage(MinecraftServer server, CommandSourceStack source, String message, int partIndex) {
         try {
 
             // Inside sendSingleMessage
-            String sourceName = (source.getPlayer() != null) ? source.getPlayer().getName().getString() : source.getName();
+            String sourceName = (source.getPlayer() != null) ? source.getPlayer().getName().getString() : source.getTextName();
             String formattedMessage = message;
 
             // Check if the message already starts with the source name.
@@ -109,7 +109,7 @@ public class ChatUtils {
             LOGGER.info("Broadcasting message part {}: '{}' from source: {}", partIndex, coloredMessage, sourceName);
 
             // Using the command manager to send the message
-            server.getCommandManager().executeWithPrefix(source, "/say " + coloredMessage);
+            server.getCommands().performPrefixedCommand(source, "/say " + coloredMessage);
 
             LOGGER.debug("Successfully broadcasted message part {}", partIndex);
 
@@ -123,7 +123,7 @@ public class ChatUtils {
      * @param source The command source.
      * @param message The message to send.
      */
-    public static void sendSystemMessage(ServerCommandSource source, String message) {
+    public static void sendSystemMessage(CommandSourceStack source, String message) {
         if (message == null || message.trim().isEmpty()) {
             LOGGER.warn("Attempted to send null or empty system message");
             return;
@@ -140,8 +140,8 @@ public class ChatUtils {
         // Execute immediately on the server thread to prevent threading issues.
         server.execute(() -> {
             try {
-                Text textComponent = Text.literal("§7" + message); // Gray color for system messages
-                server.getCommandManager().executeWithPrefix(source.withSilent(), "/say " + textComponent.getString());
+                Component textComponent = Component.literal("§7" + message); // Gray color for system messages
+                server.getCommands().performPrefixedCommand(source.withSuppressedOutput(), "/say " + textComponent.getString());
                 LOGGER.debug("Successfully sent system message");
             } catch (Exception e) {
                 LOGGER.error("Failed to send system message: {}", e.getMessage(), e);
@@ -232,7 +232,7 @@ public class ChatUtils {
      * Send a message with default delay behavior (delayed).
      * This is a convenience method.
      */
-    public static void sendChatMessages(ServerCommandSource source, String message) {
+    public static void sendChatMessages(CommandSourceStack source, String message) {
         sendChatMessages(source, message, true);
     }
 }

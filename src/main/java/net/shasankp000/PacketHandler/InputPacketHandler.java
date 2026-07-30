@@ -4,16 +4,19 @@ package net.shasankp000.PacketHandler;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.command.argument.EntityArgumentType;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInputC2SPacket;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-
-import net.minecraft.util.math.*;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.util.Mth;
+import net.minecraft.core.*;
+import net.minecraft.world.phys.*;
+import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +26,7 @@ public class InputPacketHandler {
 
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
     private static int ticksRemaining = 0;
-    private static Vec3d lastPosition = null;
+    private static Vec3 lastPosition = null;
 
 
     public static class BotLookController {
@@ -33,14 +36,14 @@ public class InputPacketHandler {
          * @param bot The bot whose direction is being set.
          * @param direction The direction (NORTH, SOUTH, EAST, WEST, UP, DOWN).
          */
-        public static void lookInDirection(ServerPlayerEntity bot, Direction direction) {
+        public static void lookInDirection(ServerPlayer bot, Direction direction) {
             switch (direction) {
                 case NORTH -> setLook(bot, 180, 0);
                 case SOUTH -> setLook(bot, 0, 0);
                 case EAST -> setLook(bot, -90, 0);
                 case WEST -> setLook(bot, 90, 0);
-                case UP -> setLook(bot, bot.getYaw(), -90);
-                case DOWN -> setLook(bot, bot.getYaw(), 90);
+                case UP -> setLook(bot, bot.getYRot(), -90);
+                case DOWN -> setLook(bot, bot.getYRot(), 90);
             }
         }
 
@@ -50,9 +53,9 @@ public class InputPacketHandler {
          * @param yaw The yaw (horizontal rotation).
          * @param pitch The pitch (vertical rotation).
          */
-        public static void setLook(ServerPlayerEntity bot, float yaw, float pitch) {
-            bot.setYaw(normalizeYaw(yaw)); // Normalize yaw to [0, 360)
-            bot.setPitch(MathHelper.clamp(pitch, -90, 90)); // Clamp pitch to valid range
+        public static void setLook(ServerPlayer bot, float yaw, float pitch) {
+            bot.setYRot(normalizeYaw(yaw)); // Normalize yaw to [0, 360)
+            bot.setXRot(Mth.clamp(pitch, -90, 90)); // Clamp pitch to valid range
         }
 
         /**
@@ -71,18 +74,18 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketStopSprint(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketStopSprint(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
@@ -90,15 +93,15 @@ public class InputPacketHandler {
         try {
 
             // Get the bot's network handler (which implements ServerPlayPacketListener)
-            ServerPlayNetworkHandler networkHandler = bot.networkHandler;
+            ServerGamePacketListenerImpl networkHandler = bot.connection;
 
             // Create a packet to simulate releasing the sprint key.
-            ClientCommandC2SPacket packet = new ClientCommandC2SPacket(bot, ClientCommandC2SPacket.Mode.STOP_SPRINTING);
+            ServerboundPlayerCommandPacket packet = new ServerboundPlayerCommandPacket(bot, ServerboundPlayerCommandPacket.Action.STOP_SPRINTING);
 
             // Send the packet to the server
-            networkHandler.onClientCommand(packet);
+            networkHandler.handlePlayerCommand(packet);
 
-            context.getSource().sendMessage(Text.of("Sneak action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("Sneak action performed for bot: " + bot.getName().getString()));
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending stop sprint packet: {}", e.getMessage());
         }
@@ -112,18 +115,18 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketSprint(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketSprint(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
@@ -131,15 +134,15 @@ public class InputPacketHandler {
         try {
 
             // Get the bot's network handler (which implements ServerPlayPacketListener)
-            ServerPlayNetworkHandler networkHandler = bot.networkHandler;
+            ServerGamePacketListenerImpl networkHandler = bot.connection;
 
             // Create a packet to simulate holding down the sprint key.
-            ClientCommandC2SPacket packet = new ClientCommandC2SPacket(bot, ClientCommandC2SPacket.Mode.START_SPRINTING);
+            ServerboundPlayerCommandPacket packet = new ServerboundPlayerCommandPacket(bot, ServerboundPlayerCommandPacket.Action.START_SPRINTING);
 
             // Send the packet to the server
-            networkHandler.onClientCommand(packet);
+            networkHandler.handlePlayerCommand(packet);
 
-            context.getSource().sendMessage(Text.of("Sprint action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("Sprint action performed for bot: " + bot.getName().getString()));
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending sprint packet: {}", e.getMessage());
         }
@@ -150,34 +153,27 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketSneak(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketSneak(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
 
         try {
 
-            // Get the bot's network handler (which implements ServerPlayPacketListener)
-            ServerPlayNetworkHandler networkHandler = bot.networkHandler;
+            bot.setShiftKeyDown(true);
 
-            // Create a packet to simulate pressing the sneak key
-            ClientCommandC2SPacket packet = new ClientCommandC2SPacket(bot, ClientCommandC2SPacket.Mode.PRESS_SHIFT_KEY);
-
-            // Send the packet to the server
-            networkHandler.onClientCommand(packet);
-
-            context.getSource().sendMessage(Text.of("Sneak action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("Sneak action performed for bot: " + bot.getName().getString()));
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending sneak packet: {}", e.getMessage());
         }
@@ -188,33 +184,26 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketUnSneak(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketUnSneak(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
 
         try {
-            // Get the bot's network handler (which implements ServerPlayPacketListener)
-            ServerPlayNetworkHandler networkHandler = bot.networkHandler;
+            bot.setShiftKeyDown(false);
 
-            // Create a packet to simulate releasing the sneak key
-            ClientCommandC2SPacket packet = new ClientCommandC2SPacket(bot, ClientCommandC2SPacket.Mode.RELEASE_SHIFT_KEY);
-
-            // Send the packet to the server
-            networkHandler.onClientCommand(packet);
-
-            context.getSource().sendMessage(Text.of("Sneak action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("Sneak action performed for bot: " + bot.getName().getString()));
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending unSneak packet: {}", e.getMessage());
         }
@@ -226,28 +215,28 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketPressWKey(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketPressWKey(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
 
 
-        lastPosition = bot.getPos();
+        lastPosition = bot.position();
 
-        ServerPlayNetworkHandler networkHandler = bot.networkHandler;
-        PlayerInputC2SPacket packet = new PlayerInputC2SPacket(0.0f, 1.0f, false, false); // W key packet.
-        networkHandler.onPlayerInput(packet);
+        ServerGamePacketListenerImpl networkHandler = bot.connection;
+        ServerboundPlayerInputPacket packet = new ServerboundPlayerInputPacket(new net.minecraft.world.entity.player.Input(true, false, false, false, false, false, false)); // W key packet.
+        networkHandler.handlePlayerInput(packet);
 
 
         System.out.println("Recorded current bot position as last pos: " + lastPosition);
@@ -256,19 +245,19 @@ public class InputPacketHandler {
         try {
             ticksRemaining = 20; // Number of ticks to hold the key
 
-            Direction direction = bot.getHorizontalFacing();
+            Direction direction = bot.getDirection();
             System.out.println(direction.getAxis().getName());
 
             if(direction.getAxis().equals(Direction.Axis.X)) {
 
 
-                final ServerPlayerEntity[] finalBot = {bot};
+                final ServerPlayer[] finalBot = {bot};
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
 
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(1.0F).multiply(0.1);
-                        finalBot[0].setPos(finalBot[0].getX() + forwardMovement.x, finalBot[0].getY(), finalBot[0].getZ());
+                        Vec3 forwardMovement = finalBot[0].getViewVector(1.0F).scale(0.1);
+                        finalBot[0].setPosRaw(finalBot[0].getX() + forwardMovement.x, finalBot[0].getY(), finalBot[0].getZ());
                         System.out.println("Updating movement value for S key by 1");
 
 
@@ -278,7 +267,7 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
 
@@ -286,13 +275,13 @@ public class InputPacketHandler {
 
             else if(direction.getAxis().equals(Direction.Axis.Z)) {
 
-                final ServerPlayerEntity[] finalBot = {bot};
+                final ServerPlayer[] finalBot = {bot};
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
 
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(1.0F).multiply(0.1);
-                        finalBot[0].setPos(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.z);
+                        Vec3 forwardMovement = finalBot[0].getViewVector(1.0F).scale(0.1);
+                        finalBot[0].setPosRaw(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.z);
                         System.out.println("Updating movement value for S key by 1");
 
 
@@ -302,13 +291,13 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
 
             }
 
-            context.getSource().sendMessage(Text.of("W key press action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("W key press action performed for bot: " + bot.getName().getString()));
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending W key packet: {}", e.getMessage());
         }
@@ -320,47 +309,47 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketPressSKey(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketPressSKey(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
 
 
-        lastPosition = bot.getPos();
+        lastPosition = bot.position();
 
-        ServerPlayNetworkHandler networkHandler = bot.networkHandler;
-        PlayerInputC2SPacket packet = new PlayerInputC2SPacket(0.0f, -1.0f, false, false); // S key packet.
-        networkHandler.onPlayerInput(packet);
+        ServerGamePacketListenerImpl networkHandler = bot.connection;
+        ServerboundPlayerInputPacket packet = new ServerboundPlayerInputPacket(new net.minecraft.world.entity.player.Input(false, true, false, false, false, false, false)); // S key packet.
+        networkHandler.handlePlayerInput(packet);
 
         System.out.println("Recorded current bot position as last pos: " + lastPosition);
 
         try {
             ticksRemaining = 20; // Number of ticks to hold the key
 
-            Direction direction = bot.getHorizontalFacing();
+            Direction direction = bot.getDirection();
             System.out.println(direction.getAxis().getName());
 
             if(direction.getAxis().equals(Direction.Axis.X)) {
 
 
-                final ServerPlayerEntity[] finalBot = {bot};
+                final ServerPlayer[] finalBot = {bot};
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
 
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(1.0F).multiply(-0.1);
-                        finalBot[0].setPos(finalBot[0].getX() + forwardMovement.x, finalBot[0].getY(), finalBot[0].getZ());
+                        Vec3 forwardMovement = finalBot[0].getViewVector(1.0F).scale(-0.1);
+                        finalBot[0].setPosRaw(finalBot[0].getX() + forwardMovement.x, finalBot[0].getY(), finalBot[0].getZ());
                         System.out.println("Updating movement value for S key by 1");
 
 
@@ -370,7 +359,7 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
 
@@ -378,13 +367,13 @@ public class InputPacketHandler {
 
             else if(direction.getAxis().equals(Direction.Axis.Z)) {
 
-                final ServerPlayerEntity[] finalBot = {bot};
+                final ServerPlayer[] finalBot = {bot};
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
 
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(1.0F).multiply(-0.1);
-                        finalBot[0].setPos(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.z);
+                        Vec3 forwardMovement = finalBot[0].getViewVector(1.0F).scale(-0.1);
+                        finalBot[0].setPosRaw(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.z);
                         System.out.println("Updating movement value for S key by 1");
 
 
@@ -394,14 +383,14 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
 
             }
 
 
-            context.getSource().sendMessage(Text.of("S key press action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("S key press action performed for bot: " + bot.getName().getString()));
 
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending S key packet: {}", e.getMessage());
@@ -414,28 +403,28 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketPressAKey(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketPressAKey(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
 
 
-        lastPosition = bot.getPos();
+        lastPosition = bot.position();
 
-        ServerPlayNetworkHandler networkHandler = bot.networkHandler;
-        PlayerInputC2SPacket packet = new PlayerInputC2SPacket(-1.0f, 0.0f, false, false); // A key packet.
-        networkHandler.onPlayerInput(packet);
+        ServerGamePacketListenerImpl networkHandler = bot.connection;
+        ServerboundPlayerInputPacket packet = new ServerboundPlayerInputPacket(new net.minecraft.world.entity.player.Input(false, false, true, false, false, false, false)); // A key packet.
+        networkHandler.handlePlayerInput(packet);
 
         System.out.println("Recorded current bot position as last pos: " + lastPosition);
 
@@ -443,18 +432,18 @@ public class InputPacketHandler {
         try {
             ticksRemaining = 20; // Number of ticks to hold the key
 
-            Direction direction = bot.getHorizontalFacing();
+            Direction direction = bot.getDirection();
             System.out.println(direction.getAxis().getName());
 
-            final ServerPlayerEntity[] finalBot = {bot};
+            final ServerPlayer[] finalBot = {bot};
 
             if (direction.getAxis().equals(Direction.Axis.X)) {
 
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(2.5F).multiply(0.3);
-                        finalBot[0].setPos(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.getZ());
+                        Vec3 forwardMovement = finalBot[0].getViewVector(2.5F).scale(0.3);
+                        finalBot[0].setPosRaw(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.z());
                         System.out.println("Updating movement value for A key");
 
                         ticksRemaining--;
@@ -462,7 +451,7 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
 
@@ -472,8 +461,8 @@ public class InputPacketHandler {
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(2.5F).multiply(0.3);
-                        finalBot[0].setPos(finalBot[0].getX() + forwardMovement.getX(), finalBot[0].getY(), finalBot[0].getZ());
+                        Vec3 forwardMovement = finalBot[0].getViewVector(2.5F).scale(0.3);
+                        finalBot[0].setPosRaw(finalBot[0].getX() + forwardMovement.x(), finalBot[0].getY(), finalBot[0].getZ());
                         System.out.println("Updating movement value for A key");
 
                         ticksRemaining--;
@@ -481,12 +470,12 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
             }
 
-            context.getSource().sendMessage(Text.of("A key press action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("A key press action performed for bot: " + bot.getName().getString()));
 
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending A key packet: {}", e.getMessage());
@@ -500,28 +489,28 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketPressDKey(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketPressDKey(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
 
 
-        lastPosition = bot.getPos();
+        lastPosition = bot.position();
 
-        ServerPlayNetworkHandler networkHandler = bot.networkHandler;
-        PlayerInputC2SPacket packet = new PlayerInputC2SPacket(1.0f, 0.0f, false, false); // D key packet.
-        networkHandler.onPlayerInput(packet);
+        ServerGamePacketListenerImpl networkHandler = bot.connection;
+        ServerboundPlayerInputPacket packet = new ServerboundPlayerInputPacket(new net.minecraft.world.entity.player.Input(false, false, false, true, false, false, false)); // D key packet.
+        networkHandler.handlePlayerInput(packet);
 
         System.out.println("Recorded current bot position as last pos: " + lastPosition);
 
@@ -529,18 +518,18 @@ public class InputPacketHandler {
             ticksRemaining = 20; // Number of ticks to hold the key
 
 
-            Direction direction = bot.getHorizontalFacing();
+            Direction direction = bot.getDirection();
             System.out.println(direction.getAxis().getName());
 
-            final ServerPlayerEntity[] finalBot = {bot};
+            final ServerPlayer[] finalBot = {bot};
 
             if (direction.getAxis().equals(Direction.Axis.X)) {
 
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(2.5F).multiply(-0.3);
-                        finalBot[0].setPos(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.getZ());
+                        Vec3 forwardMovement = finalBot[0].getViewVector(2.5F).scale(-0.3);
+                        finalBot[0].setPosRaw(finalBot[0].getX(), finalBot[0].getY(), finalBot[0].getZ() + forwardMovement.z());
                         System.out.println("Updating movement value for A key");
 
                         ticksRemaining--;
@@ -548,7 +537,7 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
 
@@ -558,8 +547,8 @@ public class InputPacketHandler {
                 ServerTickEvents.END_SERVER_TICK.register(server1 -> {
                     if (ticksRemaining > 0) {
                         // Manually update the bot's position
-                        Vec3d forwardMovement = finalBot[0].getRotationVec(2.5F).multiply(-0.3);
-                        finalBot[0].setPos(finalBot[0].getX() + forwardMovement.getX(), finalBot[0].getY(), finalBot[0].getZ());
+                        Vec3 forwardMovement = finalBot[0].getViewVector(2.5F).scale(-0.3);
+                        finalBot[0].setPosRaw(finalBot[0].getX() + forwardMovement.x(), finalBot[0].getY(), finalBot[0].getZ());
                         System.out.println("Updating movement value for A key");
 
                         ticksRemaining--;
@@ -567,12 +556,12 @@ public class InputPacketHandler {
                 });
 
                 if (ticksRemaining <= 0) {
-                    System.out.println("Current bot position: " + finalBot[0].getPos());
+                    System.out.println("Current bot position: " + finalBot[0].position());
                 }
 
             }
 
-            context.getSource().sendMessage(Text.of("D key press action performed for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("D key press action performed for bot: " + bot.getName().getString()));
 
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending D key packet: {}", e.getMessage());
@@ -584,18 +573,18 @@ public class InputPacketHandler {
      *
      * @param context The command context containing the server and bot information.
      */
-    public static void manualPacketReleaseMovementKey(CommandContext<ServerCommandSource> context) {
+    public static void manualPacketReleaseMovementKey(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
 
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
@@ -605,7 +594,7 @@ public class InputPacketHandler {
             manualPacketUnSneak(context);
             manualPacketStopSprint(context);
 
-            context.getSource().sendMessage(Text.of("Released movement keys for bot: " + bot.getName().getString()));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("Released movement keys for bot: " + bot.getName().getString()));
         } catch (Exception e) {
             LOGGER.error("Caught exception while sending release movement key packet: {}", e.getMessage());
         }

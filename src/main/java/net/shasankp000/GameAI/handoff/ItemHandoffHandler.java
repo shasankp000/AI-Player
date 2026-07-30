@@ -1,9 +1,9 @@
 package net.shasankp000.GameAI.handoff;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.shasankp000.GameAI.mood.MoodEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,14 +119,26 @@ public final class ItemHandoffHandler {
      * @param stack   the item stack that was picked up
      */
     public static void onBotPickedUpItem(
-            ServerPlayerEntity bot,
-            ServerPlayerEntity thrower,
+            ServerPlayer bot,
+            ServerPlayer thrower,
             ItemStack stack) {
+        onBotPickedUpItem(bot, thrower, stack, true);
+    }
+
+    /**
+     * Handles a pickup while optionally suppressing its chat reaction. This is
+     * used when several item entities are part of the same gift burst.
+     */
+    static void onBotPickedUpItem(
+            ServerPlayer bot,
+            ServerPlayer thrower,
+            ItemStack stack,
+            boolean sendReaction) {
 
         if (bot == null || stack == null || stack.isEmpty()) return;
 
         String botName     = bot.getName().getString();
-        String itemName    = stack.getName().getString();
+        String itemName    = stack.getHoverName().getString();
         String throwerName = (thrower != null) ? thrower.getName().getString() : "someone";
 
         ItemTier rawTier = ItemTier.of(stack);
@@ -155,13 +167,13 @@ public final class ItemHandoffHandler {
                 botName, itemName, rawTier, effectiveTier, throwerName, delta[0], delta[1]);
 
         // 2. Send chat reaction (only when thrown by a real player)
-        if (thrower != null) {
+        if (thrower != null && sendReaction) {
             String reaction = pickReaction(effectiveTier, neededJunk, throwerName, itemName);
-            if (bot.getServer() != null) {
-                bot.getServer().execute(() -> {
+            if (bot.createCommandSourceStack().getServer() != null) {
+                bot.createCommandSourceStack().getServer().execute(() -> {
                     try {
-                        bot.getServer().getCommandManager().executeWithPrefix(
-                            bot.getCommandSource().withSilent().withMaxLevel(4),
+                        bot.createCommandSourceStack().getServer().getCommands().performPrefixedCommand(
+                            bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS),
                             "/say " + reaction
                         );
                     } catch (Exception e) {
@@ -182,12 +194,12 @@ public final class ItemHandoffHandler {
      * This check runs <em>before</em> the picked-up stack is merged in, so it
      * reflects what the bot already had.
      */
-    private static int countItemInInventory(ServerPlayerEntity bot, ItemStack reference) {
-        Identifier refId = Registries.ITEM.getId(reference.getItem());
+    private static int countItemInInventory(ServerPlayer bot, ItemStack reference) {
+        Identifier refId = BuiltInRegistries.ITEM.getKey(reference.getItem());
         int total = 0;
-        for (int i = 0; i < bot.getInventory().size(); i++) {
-            ItemStack slot = bot.getInventory().getStack(i);
-            if (!slot.isEmpty() && Registries.ITEM.getId(slot.getItem()).equals(refId)) {
+        for (int i = 0; i < bot.getInventory().getContainerSize(); i++) {
+            ItemStack slot = bot.getInventory().getItem(i);
+            if (!slot.isEmpty() && BuiltInRegistries.ITEM.getKey(slot.getItem()).equals(refId)) {
                 total += slot.getCount();
             }
         }

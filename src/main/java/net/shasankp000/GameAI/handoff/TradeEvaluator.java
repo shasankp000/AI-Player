@@ -1,13 +1,12 @@
 package net.shasankp000.GameAI.handoff;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 /**
  * Pure-logic class: given what the player offered and what the bot currently
@@ -85,7 +84,7 @@ public final class TradeEvaluator {
      * @param offered what the player threw
      * @param bot     the bot whose inventory will be searched
      */
-    public static ItemStack evaluate(ItemStack offered, ServerPlayerEntity bot) {
+    public static ItemStack evaluate(ItemStack offered, ServerPlayer bot) {
         if (offered.isEmpty()) return ItemStack.EMPTY;
 
         int offeredTier = tierOf(offered.getItem());
@@ -96,8 +95,8 @@ public final class TradeEvaluator {
         ItemStack best = ItemStack.EMPTY;
         int bestTierDelta = Integer.MAX_VALUE;
 
-        for (int slot = 0; slot < bot.getInventory().size(); slot++) {
-            ItemStack stack = bot.getInventory().getStack(slot);
+        for (int slot = 0; slot < bot.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = bot.getInventory().getItem(slot);
             if (stack.isEmpty()) continue;
             if (stack.getItem() == offered.getItem()) continue; // same item — skip
 
@@ -123,10 +122,10 @@ public final class TradeEvaluator {
      * Returns how many of {@code item} the bot currently carries across
      * all inventory slots (mirrors the private helper in {@code ItemHandoffHandler}).
      */
-    public static int countItemInBotInventory(ServerPlayerEntity bot, Item item) {
+    public static int countItemInBotInventory(ServerPlayer bot, Item item) {
         int total = 0;
-        for (int slot = 0; slot < bot.getInventory().size(); slot++) {
-            ItemStack stack = bot.getInventory().getStack(slot);
+        for (int slot = 0; slot < bot.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = bot.getInventory().getItem(slot);
             if (!stack.isEmpty() && stack.getItem() == item) {
                 total += stack.getCount();
             }
@@ -146,7 +145,7 @@ public final class TradeEvaluator {
      */
     public static String displayName(ItemStack stack) {
         if (stack.isEmpty()) return "nothing";
-        String id = Registries.ITEM.getId(stack.getItem()).getPath(); // e.g. "diamond"
+        String id = BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath(); // e.g. "diamond"
         String[] words = id.split("_");
         StringBuilder sb = new StringBuilder();
         for (String w : words) {

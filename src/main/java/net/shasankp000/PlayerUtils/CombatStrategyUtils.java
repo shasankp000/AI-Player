@@ -1,14 +1,9 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.mob.*;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.RangedWeaponItem;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.entity.monster.*;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.shasankp000.Entity.EntityDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +48,7 @@ public class CombatStrategyUtils {
     /**
      * Determine the best combat strategy based on bot's inventory and enemy types
      */
-    public static CombatStrategy determineCombatStrategy(ServerPlayerEntity bot, List<EntityDetails> nearbyEntities) {
+    public static CombatStrategy determineCombatStrategy(ServerPlayer bot, List<EntityDetails> nearbyEntities) {
         LOGGER.debug("🎯 Analyzing combat strategy for {} nearby hostile entities", nearbyEntities.size());
 
         // Parallel execution: analyze inventory AND enemies simultaneously
@@ -102,20 +97,20 @@ public class CombatStrategyUtils {
         int totalCombatItems = 0;
     }
 
-    private static InventoryAnalysis analyzeInventory(ServerPlayerEntity bot) {
+    private static InventoryAnalysis analyzeInventory(ServerPlayer bot) {
         InventoryAnalysis analysis = new InventoryAnalysis();
 
         LOGGER.debug("Starting inventory analysis for bot: {}", bot.getName().getString());
 
         // Check all inventory slots
-        for (int i = 0; i < bot.getInventory().size(); i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
+        for (int i = 0; i < bot.getInventory().getContainerSize(); i++) {
+            ItemStack stack = bot.getInventory().getItem(i);
             if (stack.isEmpty()) continue;
 
             Item item = stack.getItem();
             // Use item name string (same method as RangedWeaponUtils - more reliable!)
-            String itemName = item.getName().getString().toLowerCase();
-            String itemId = net.minecraft.registry.Registries.ITEM.getId(item).toString().toLowerCase();
+            String itemName = stack.getHoverName().getString().toLowerCase();
+            String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item).toString().toLowerCase();
 
             LOGGER.debug("Slot {}: itemName='{}', itemId='{}', count={}",
                 i, itemName, itemId, stack.getCount());

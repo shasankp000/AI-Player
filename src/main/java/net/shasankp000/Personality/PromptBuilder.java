@@ -1,6 +1,6 @@
 package net.shasankp000.Personality;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.GameAI.State;
 
 /**
@@ -29,7 +29,7 @@ public class PromptBuilder {
      * @return the complete prompt string
      */
     public static String build(
-            ServerPlayerEntity bot,
+            ServerPlayer bot,
             State state,
             AffectiveState mood,
             String extraCtx) {
@@ -49,10 +49,10 @@ public class PromptBuilder {
         sb.append("[WORLD]\n");
         sb.append("Bot name: ").append(bot.getName().getString()).append("\n");
         sb.append("Health: ").append((int) bot.getHealth()).append("/20\n");
-        sb.append("Hunger: ").append(bot.getHungerManager().getFoodLevel()).append("/20\n");
+        sb.append("Hunger: ").append(bot.getFoodData().getFoodLevel()).append("/20\n");
 
-        String dimension = bot.getCommandSource().getWorld()
-                .getRegistryKey().getValue().toString();
+        String dimension = bot.createCommandSourceStack().getLevel()
+                .dimension().identifier().toString();
         sb.append("Dimension: ").append(dimension).append("\n");
 
         if (state != null) {

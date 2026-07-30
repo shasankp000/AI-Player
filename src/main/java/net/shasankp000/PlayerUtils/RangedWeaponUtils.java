@@ -1,15 +1,15 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 
 public class RangedWeaponUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger("ranged-weapon-utils");
@@ -17,12 +17,12 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has a bow or crossbow equipped (mainhand or offhand only)
      */
-    public static boolean hasBowOrCrossbowEquipped(ServerPlayerEntity bot) {
-        ItemStack mainHand = bot.getMainHandStack();
-        ItemStack offHand = bot.getOffHandStack();
+    public static boolean hasBowOrCrossbowEquipped(ServerPlayer bot) {
+        ItemStack mainHand = bot.getMainHandItem();
+        ItemStack offHand = bot.getOffhandItem();
 
-        String mainHandName = mainHand.getItem().getName().getString().toLowerCase();
-        String offHandName = offHand.getItem().getName().getString().toLowerCase();
+        String mainHandName = mainHand.getHoverName().getString().toLowerCase();
+        String offHandName = offHand.getHoverName().getString().toLowerCase();
 
         return mainHandName.contains("bow") || mainHandName.contains("crossbow") ||
                offHandName.contains("bow") || offHandName.contains("crossbow");
@@ -31,7 +31,7 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has a bow or crossbow anywhere in inventory (equipped or not)
      */
-    public static boolean hasBowOrCrossbow(ServerPlayerEntity bot) {
+    public static boolean hasBowOrCrossbow(ServerPlayer bot) {
         // First check if equipped
         if (hasBowOrCrossbowEquipped(bot)) {
             return true;
@@ -50,19 +50,19 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has arrows in inventory
      */
-    public static boolean hasArrows(ServerPlayerEntity bot) {
+    public static boolean hasArrows(ServerPlayer bot) {
         // Check hotbar
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem().getName().getString().toLowerCase().contains("arrow")) {
+            ItemStack stack = bot.getInventory().getItem(i);
+            if (stack.getHoverName().getString().toLowerCase().contains("arrow")) {
                 return true;
             }
         }
 
         // Check rest of inventory
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem().getName().getString().toLowerCase().contains("arrow")) {
+            ItemStack stack = bot.getInventory().getItem(i);
+            if (stack.getHoverName().getString().toLowerCase().contains("arrow")) {
                 return true;
             }
         }
@@ -73,19 +73,19 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has firework rockets in inventory (for crossbows)
      */
-    public static boolean hasFireworkRockets(ServerPlayerEntity bot) {
+    public static boolean hasFireworkRockets(ServerPlayer bot) {
         // Check hotbar
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem().getName().getString().toLowerCase().contains("firework rocket")) {
+            ItemStack stack = bot.getInventory().getItem(i);
+            if (stack.getHoverName().getString().toLowerCase().contains("firework rocket")) {
                 return true;
             }
         }
 
         // Check rest of inventory
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem().getName().getString().toLowerCase().contains("firework rocket")) {
+            ItemStack stack = bot.getInventory().getItem(i);
+            if (stack.getHoverName().getString().toLowerCase().contains("firework rocket")) {
                 return true;
             }
         }
@@ -96,18 +96,18 @@ public class RangedWeaponUtils {
     /**
      * Check if firework rocket is in offhand (required for crossbow)
      */
-    public static boolean isFireworkInOffhand(ServerPlayerEntity bot) {
-        ItemStack offHand = bot.getOffHandStack();
-        return offHand.getItem().getName().getString().toLowerCase().contains("firework rocket");
+    public static boolean isFireworkInOffhand(ServerPlayer bot) {
+        ItemStack offHand = bot.getOffhandItem();
+        return offHand.getHoverName().getString().toLowerCase().contains("firework rocket");
     }
 
     /**
      * Get the hotbar slot containing firework rockets, or -1 if not found
      */
-    public static int getFireworkSlot(ServerPlayerEntity bot) {
+    public static int getFireworkSlot(ServerPlayer bot) {
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem().getName().getString().toLowerCase().contains("firework rocket")) {
+            ItemStack stack = bot.getInventory().getItem(i);
+            if (stack.getHoverName().getString().toLowerCase().contains("firework rocket")) {
                 return i;
             }
         }
@@ -117,12 +117,12 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has a crossbow equipped (mainhand or offhand only)
      */
-    public static boolean hasCrossbowEquipped(ServerPlayerEntity bot) {
-        ItemStack mainHand = bot.getMainHandStack();
-        ItemStack offHand = bot.getOffHandStack();
+    public static boolean hasCrossbowEquipped(ServerPlayer bot) {
+        ItemStack mainHand = bot.getMainHandItem();
+        ItemStack offHand = bot.getOffhandItem();
 
-        String mainHandName = mainHand.getItem().getName().getString().toLowerCase();
-        String offHandName = offHand.getItem().getName().getString().toLowerCase();
+        String mainHandName = mainHand.getHoverName().getString().toLowerCase();
+        String offHandName = offHand.getHoverName().getString().toLowerCase();
 
         return mainHandName.contains("crossbow") || offHandName.contains("crossbow");
     }
@@ -130,7 +130,7 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has a crossbow anywhere in inventory (equipped or not)
      */
-    public static boolean hasCrossbow(ServerPlayerEntity bot) {
+    public static boolean hasCrossbow(ServerPlayer bot) {
         // First check if equipped
         if (hasCrossbowEquipped(bot)) {
             return true;
@@ -144,12 +144,12 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has a bow equipped (not crossbow) - mainhand or offhand only
      */
-    public static boolean hasBowEquipped(ServerPlayerEntity bot) {
-        ItemStack mainHand = bot.getMainHandStack();
-        ItemStack offHand = bot.getOffHandStack();
+    public static boolean hasBowEquipped(ServerPlayer bot) {
+        ItemStack mainHand = bot.getMainHandItem();
+        ItemStack offHand = bot.getOffhandItem();
 
-        String mainHandName = mainHand.getItem().getName().getString().toLowerCase();
-        String offHandName = offHand.getItem().getName().getString().toLowerCase();
+        String mainHandName = mainHand.getHoverName().getString().toLowerCase();
+        String offHandName = offHand.getHoverName().getString().toLowerCase();
 
         return (mainHandName.contains("bow") && !mainHandName.contains("crossbow")) ||
                (offHandName.contains("bow") && !offHandName.contains("crossbow"));
@@ -158,7 +158,7 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot has a bow anywhere in inventory (equipped or not)
      */
-    public static boolean hasBow(ServerPlayerEntity bot) {
+    public static boolean hasBow(ServerPlayer bot) {
         // First check if equipped
         if (hasBowEquipped(bot)) {
             return true;
@@ -174,7 +174,7 @@ public class RangedWeaponUtils {
      * Returns: "arrow", "firework", or null if no valid ammo
      * Note: Firework rockets must be in offhand to work with crossbows
      */
-    public static String getAmmoType(ServerPlayerEntity bot) {
+    public static String getAmmoType(ServerPlayer bot) {
         if (hasCrossbow(bot)) {
             // Crossbows can use firework rockets (preferred for explosive damage) or arrows
             // BUT firework rockets MUST be in offhand to work!
@@ -195,7 +195,7 @@ public class RangedWeaponUtils {
     /**
      * Check if the bot can shoot (has ranged weapon and appropriate ammo)
      */
-    public static boolean canShoot(ServerPlayerEntity bot) {
+    public static boolean canShoot(ServerPlayer bot) {
         boolean hasWeapon = hasBowOrCrossbow(bot);
         String ammoType = getAmmoType(bot);
         boolean hasAmmo = ammoType != null;
@@ -209,7 +209,7 @@ public class RangedWeaponUtils {
      * Calculate the optimal target entity for shooting based on distance and threat level
      * Now supports BOTH hostile mobs and hostile players
      */
-    public static Entity findBestShootingTarget(ServerPlayerEntity bot, List<Entity> hostileEntities) {
+    public static Entity findBestShootingTarget(ServerPlayer bot, List<Entity> hostileEntities) {
         if (hostileEntities.isEmpty()) {
             return null;
         }
@@ -217,14 +217,14 @@ public class RangedWeaponUtils {
         Entity bestTarget = null;
         double bestScore = Double.NEGATIVE_INFINITY;
 
-        Vec3d botPos = bot.getPos();
+        Vec3 botPos = bot.position();
 
         for (Entity entity : hostileEntities) {
             if (!(entity instanceof LivingEntity livingEntity) || !livingEntity.isAlive()) {
                 continue;
             }
 
-            double distance = botPos.distanceTo(entity.getPos());
+            double distance = botPos.distanceTo(entity.position());
 
             // Skip targets that are too close (melee range) or too far
             if (distance < 3.0 || distance > 32.0) {
@@ -234,7 +234,7 @@ public class RangedWeaponUtils {
             double threatScore;
 
             // Use player-specific threat calculation for hostile players
-            if (entity instanceof PlayerEntity player) {
+            if (entity instanceof Player player) {
                 // Get player threat from retaliation system
                 double playerThreat = net.shasankp000.PlayerUtils.PlayerRetaliationTracker.getPlayerThreatLevel(bot, player);
 
@@ -448,7 +448,7 @@ public class RangedWeaponUtils {
     /**
      * Simple line of sight check (can be improved with raycasting)
      */
-    private static boolean hasLineOfSight(ServerPlayerEntity bot, Entity target) {
+    private static boolean hasLineOfSight(ServerPlayer bot, Entity target) {
         // Basic check: target is roughly at the same Y level or visible
         double yDiff = Math.abs(bot.getY() - target.getY());
         return yDiff < 5.0; // Simplified check
@@ -457,13 +457,13 @@ public class RangedWeaponUtils {
     /**
      * Calculate lead compensation for moving targets
      */
-    public static Vec3d calculateLeadPosition(Entity target, double projectileSpeed) {
+    public static Vec3 calculateLeadPosition(Entity target, double projectileSpeed) {
         if (!(target instanceof LivingEntity)) {
-            return target.getPos();
+            return target.position();
         }
 
-        Vec3d targetPos = target.getPos();
-        Vec3d targetVelocity = target.getVelocity();
+        Vec3 targetPos = target.position();
+        Vec3 targetVelocity = target.getDeltaMovement();
 
         // If target is not moving much, no need to lead
         if (targetVelocity.length() < 0.1) {
@@ -476,7 +476,7 @@ public class RangedWeaponUtils {
         double timeToImpact = distance / projectileSpeed;
 
         // Lead the target based on its velocity
-        Vec3d leadOffset = targetVelocity.multiply(timeToImpact * 0.8); // 0.8 factor for tuning
+        Vec3 leadOffset = targetVelocity.scale(timeToImpact * 0.8); // 0.8 factor for tuning
 
         return targetPos.add(leadOffset);
     }
@@ -494,9 +494,9 @@ public class RangedWeaponUtils {
      * Pitch angle = atan((v² ± sqrt(v⁴ - g(gx² + 2yv²))) / (gx))
      * Where: v = velocity, g = gravity, x = horizontal distance, y = vertical distance
      */
-    public static float[] calculateAimAngles(ServerPlayerEntity bot, Vec3d targetPos) {
-        Vec3d botPos = bot.getEyePos();
-        Vec3d toTarget = targetPos.subtract(botPos);
+    public static float[] calculateAimAngles(ServerPlayer bot, Vec3 targetPos) {
+        Vec3 botPos = bot.getEyePosition();
+        Vec3 toTarget = targetPos.subtract(botPos);
 
         // Calculate yaw (horizontal angle) - same as before
         float yaw = (float) Math.toDegrees(Math.atan2(toTarget.z, toTarget.x)) - 90.0f;
@@ -623,7 +623,7 @@ public class RangedWeaponUtils {
             return false;
         }
 
-        Vec3d velocity = target.getVelocity();
+        Vec3 velocity = target.getDeltaMovement();
         double speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
 
         // Consider targets moving faster than 0.2 blocks/tick as fast-moving
@@ -633,10 +633,10 @@ public class RangedWeaponUtils {
     /**
      * Get the hotbar slot with a bow or crossbow
      */
-    public static int getBowOrCrossbowSlot(ServerPlayerEntity bot) {
+    public static int getBowOrCrossbowSlot(ServerPlayer bot) {
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            String itemName = stack.getItem().getName().getString().toLowerCase();
+            ItemStack stack = bot.getInventory().getItem(i);
+            String itemName = stack.getHoverName().getString().toLowerCase();
             if (itemName.contains("bow") || itemName.contains("crossbow")) {
                 return i + 1; // Hotbar slots are 1-indexed in commands
             }
@@ -648,31 +648,31 @@ public class RangedWeaponUtils {
      * Find firework rocket in entire inventory (hotbar + main inventory + hands)
      * Returns slot index (0-35) or -1 if not found, -100 if in mainhand, -101 if in offhand
      */
-    private static int findFireworkInInventory(ServerPlayerEntity bot) {
+    private static int findFireworkInInventory(ServerPlayer bot) {
         // Check mainhand first (currently equipped)
-        ItemStack mainHand = bot.getMainHandStack();
-        if (mainHand.getItem().getName().getString().toLowerCase().contains("firework rocket")) {
+        ItemStack mainHand = bot.getMainHandItem();
+        if (mainHand.getHoverName().getString().toLowerCase().contains("firework rocket")) {
             return -100; // Special code for mainhand
         }
 
         // Check offhand
-        ItemStack offHand = bot.getOffHandStack();
-        if (offHand.getItem().getName().getString().toLowerCase().contains("firework rocket")) {
+        ItemStack offHand = bot.getOffhandItem();
+        if (offHand.getHoverName().getString().toLowerCase().contains("firework rocket")) {
             return -101; // Special code for offhand
         }
 
         // Check hotbar (slots 0-8)
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem().getName().getString().toLowerCase().contains("firework rocket")) {
+            ItemStack stack = bot.getInventory().getItem(i);
+            if (stack.getHoverName().getString().toLowerCase().contains("firework rocket")) {
                 return i;
             }
         }
 
         // Check main inventory (slots 9-35)
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem().getName().getString().toLowerCase().contains("firework rocket")) {
+            ItemStack stack = bot.getInventory().getItem(i);
+            if (stack.getHoverName().getString().toLowerCase().contains("firework rocket")) {
                 return i;
             }
         }
@@ -684,23 +684,23 @@ public class RangedWeaponUtils {
      * Find crossbow in entire inventory (hotbar + main inventory + hands)
      * Returns slot index (0-35) or -1 if not found, -100 if in mainhand, -101 if in offhand
      */
-    private static int findCrossbowInInventory(ServerPlayerEntity bot) {
+    private static int findCrossbowInInventory(ServerPlayer bot) {
         // Check mainhand first (currently equipped)
-        ItemStack mainHand = bot.getMainHandStack();
-        if (mainHand.getItem().getName().getString().toLowerCase().contains("crossbow")) {
+        ItemStack mainHand = bot.getMainHandItem();
+        if (mainHand.getHoverName().getString().toLowerCase().contains("crossbow")) {
             return -100; // Special code for mainhand
         }
 
         // Check offhand
-        ItemStack offHand = bot.getOffHandStack();
-        if (offHand.getItem().getName().getString().toLowerCase().contains("crossbow")) {
+        ItemStack offHand = bot.getOffhandItem();
+        if (offHand.getHoverName().getString().toLowerCase().contains("crossbow")) {
             return -101; // Special code for offhand
         }
 
         // Check hotbar (slots 0-8)
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            String itemName = stack.getItem().getName().getString().toLowerCase();
+            ItemStack stack = bot.getInventory().getItem(i);
+            String itemName = stack.getHoverName().getString().toLowerCase();
             if (itemName.contains("crossbow")) {
                 return i;
             }
@@ -708,8 +708,8 @@ public class RangedWeaponUtils {
 
         // Check main inventory (slots 9-35)
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            String itemName = stack.getItem().getName().getString().toLowerCase();
+            ItemStack stack = bot.getInventory().getItem(i);
+            String itemName = stack.getHoverName().getString().toLowerCase();
             if (itemName.contains("crossbow")) {
                 return i;
             }
@@ -721,9 +721,9 @@ public class RangedWeaponUtils {
     /**
      * Find an empty hotbar slot, or -1 if hotbar is full
      */
-    private static int findEmptyHotbarSlot(ServerPlayerEntity bot) {
+    private static int findEmptyHotbarSlot(ServerPlayer bot) {
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
+            ItemStack stack = bot.getInventory().getItem(i);
             if (stack.isEmpty()) {
                 return i;
             }
@@ -736,7 +736,7 @@ public class RangedWeaponUtils {
      * Moves firework rocket to offhand and crossbow to mainhand
      * Returns the ammo type that will be used: "firework", "arrow", or null
      */
-    public static String prepareCrossbowAmmo(ServerPlayerEntity bot, net.minecraft.server.MinecraftServer server, net.minecraft.server.command.ServerCommandSource botSource) {
+    public static String prepareCrossbowAmmo(ServerPlayer bot, net.minecraft.server.MinecraftServer server, net.minecraft.commands.CommandSourceStack botSource) {
         String botName = bot.getName().getString();
 
         // Check if setup is already complete
@@ -760,7 +760,7 @@ public class RangedWeaponUtils {
             else if (fireworkSlot == -100) {
                 LOGGER.info("Firework in mainhand, swapping to offhand");
                 // Just swap to offhand (this will swap whatever is in offhand to mainhand)
-                server.getCommandManager().executeWithPrefix(botSource,
+                server.getCommands().performPrefixedCommand(botSource,
                     "/player " + botName + " swapHands");
 
                 try {
@@ -770,8 +770,8 @@ public class RangedWeaponUtils {
                 }
 
                 // After swap, check if crossbow is now in mainhand (it could have been in offhand)
-                ItemStack mainHand = bot.getMainHandStack();
-                if (mainHand.getItem().getName().getString().toLowerCase().contains("crossbow")) {
+                ItemStack mainHand = bot.getMainHandItem();
+                if (mainHand.getHoverName().getString().toLowerCase().contains("crossbow")) {
                     LOGGER.info("Crossbow was in offhand, now in mainhand after swap - setup complete!");
                     return "firework";
                 }
@@ -788,7 +788,7 @@ public class RangedWeaponUtils {
 
                     LOGGER.info("Moving firework from inventory slot {} to hotbar slot {}", fireworkSlot, emptyHotbarSlot);
 
-                    server.getCommandManager().executeWithPrefix(botSource,
+                    server.getCommands().performPrefixedCommand(botSource,
                         "/item replace entity " + botName + " hotbar." + emptyHotbarSlot + " from entity " + botName + " inventory." + (fireworkSlot - 9));
 
                     try {
@@ -802,7 +802,7 @@ public class RangedWeaponUtils {
 
                 // Step 3: Equip firework rocket in mainhand
                 LOGGER.info("Equipping firework rocket from hotbar slot {}", fireworkSlot);
-                server.getCommandManager().executeWithPrefix(botSource,
+                server.getCommands().performPrefixedCommand(botSource,
                     "/player " + botName + " hotbar " + (fireworkSlot + 1));
 
                 try {
@@ -813,7 +813,7 @@ public class RangedWeaponUtils {
 
                 // Step 4: Swap firework to offhand
                 LOGGER.info("Swapping firework to offhand");
-                server.getCommandManager().executeWithPrefix(botSource,
+                server.getCommands().performPrefixedCommand(botSource,
                     "/player " + botName + " swapHands");
 
                 try {
@@ -840,7 +840,7 @@ public class RangedWeaponUtils {
             // Handle crossbow in offhand
             else if (crossbowSlot == -101) {
                 LOGGER.info("Crossbow in offhand, swapping to mainhand");
-                server.getCommandManager().executeWithPrefix(botSource,
+                server.getCommands().performPrefixedCommand(botSource,
                     "/player " + botName + " swapHands");
 
                 try {
@@ -861,7 +861,7 @@ public class RangedWeaponUtils {
 
                     LOGGER.info("Moving crossbow from inventory slot {} to hotbar slot {}", crossbowSlot, emptyHotbarSlot);
 
-                    server.getCommandManager().executeWithPrefix(botSource,
+                    server.getCommands().performPrefixedCommand(botSource,
                         "/item replace entity " + botName + " hotbar." + emptyHotbarSlot + " from entity " + botName + " inventory." + (crossbowSlot - 9));
 
                     try {
@@ -875,7 +875,7 @@ public class RangedWeaponUtils {
 
                 // Step 7: Equip crossbow in mainhand
                 LOGGER.info("Equipping crossbow from hotbar slot {}", crossbowSlot);
-                server.getCommandManager().executeWithPrefix(botSource,
+                server.getCommands().performPrefixedCommand(botSource,
                     "/player " + botName + " hotbar " + (crossbowSlot + 1));
 
                 try {
@@ -901,7 +901,7 @@ public class RangedWeaponUtils {
                     // Already equipped
                 } else if (crossbowSlot == -101) {
                     LOGGER.info("Crossbow in offhand, swapping to mainhand");
-                    server.getCommandManager().executeWithPrefix(botSource,
+                    server.getCommands().performPrefixedCommand(botSource,
                         "/player " + botName + " swapHands");
 
                     try {
@@ -914,7 +914,7 @@ public class RangedWeaponUtils {
                     int emptyHotbarSlot = findEmptyHotbarSlot(bot);
                     if (emptyHotbarSlot == -1) emptyHotbarSlot = 7;
 
-                    server.getCommandManager().executeWithPrefix(botSource,
+                    server.getCommands().performPrefixedCommand(botSource,
                         "/item replace entity " + botName + " hotbar." + emptyHotbarSlot + " from entity " + botName + " inventory." + (crossbowSlot - 9));
 
                     try {
@@ -925,7 +925,7 @@ public class RangedWeaponUtils {
 
                     crossbowSlot = emptyHotbarSlot;
 
-                    server.getCommandManager().executeWithPrefix(botSource,
+                    server.getCommands().performPrefixedCommand(botSource,
                         "/player " + botName + " hotbar " + (crossbowSlot + 1));
 
                     try {
@@ -935,7 +935,7 @@ public class RangedWeaponUtils {
                     }
                 } else {
                     // In hotbar, just equip
-                    server.getCommandManager().executeWithPrefix(botSource,
+                    server.getCommands().performPrefixedCommand(botSource,
                         "/player " + botName + " hotbar " + (crossbowSlot + 1));
 
                     try {
@@ -957,25 +957,25 @@ public class RangedWeaponUtils {
      * Find bow in entire inventory (hotbar + main inventory + hands)
      * Returns slot index (0-35) or -1 if not found, -100 if in mainhand, -101 if in offhand
      */
-    private static int findBowInInventory(ServerPlayerEntity bot) {
+    private static int findBowInInventory(ServerPlayer bot) {
         // Check mainhand first (currently equipped)
-        ItemStack mainHand = bot.getMainHandStack();
-        String mainHandName = mainHand.getItem().getName().getString().toLowerCase();
+        ItemStack mainHand = bot.getMainHandItem();
+        String mainHandName = mainHand.getHoverName().getString().toLowerCase();
         if (mainHandName.contains("bow") && !mainHandName.contains("crossbow")) {
             return -100; // Special code for mainhand
         }
 
         // Check offhand
-        ItemStack offHand = bot.getOffHandStack();
-        String offHandName = offHand.getItem().getName().getString().toLowerCase();
+        ItemStack offHand = bot.getOffhandItem();
+        String offHandName = offHand.getHoverName().getString().toLowerCase();
         if (offHandName.contains("bow") && !offHandName.contains("crossbow")) {
             return -101; // Special code for offhand
         }
 
         // Check hotbar (slots 0-8)
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            String itemName = stack.getItem().getName().getString().toLowerCase();
+            ItemStack stack = bot.getInventory().getItem(i);
+            String itemName = stack.getHoverName().getString().toLowerCase();
             if (itemName.contains("bow") && !itemName.contains("crossbow")) {
                 return i;
             }
@@ -983,8 +983,8 @@ public class RangedWeaponUtils {
 
         // Check main inventory (slots 9-35)
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            String itemName = stack.getItem().getName().getString().toLowerCase();
+            ItemStack stack = bot.getInventory().getItem(i);
+            String itemName = stack.getHoverName().getString().toLowerCase();
             if (itemName.contains("bow") && !itemName.contains("crossbow")) {
                 return i;
             }
@@ -998,7 +998,7 @@ public class RangedWeaponUtils {
      * Ensures bow is in mainhand and arrows are available
      * Returns the ammo type that will be used: "arrow" or null
      */
-    public static String prepareBowAmmo(ServerPlayerEntity bot, net.minecraft.server.MinecraftServer server, net.minecraft.server.command.ServerCommandSource botSource) {
+    public static String prepareBowAmmo(ServerPlayer bot, net.minecraft.server.MinecraftServer server, net.minecraft.commands.CommandSourceStack botSource) {
         String botName = bot.getName().getString();
 
         // Check if we have arrows
@@ -1009,8 +1009,8 @@ public class RangedWeaponUtils {
 
         // Check if bow is already in mainhand
         if (hasBow(bot)) {
-            ItemStack mainHand = bot.getMainHandStack();
-            String mainHandName = mainHand.getItem().getName().getString().toLowerCase();
+            ItemStack mainHand = bot.getMainHandItem();
+            String mainHandName = mainHand.getHoverName().getString().toLowerCase();
             if (mainHandName.contains("bow") && !mainHandName.contains("crossbow")) {
                 LOGGER.info("Bow already equipped in mainhand - ready to fire");
                 return "arrow";
@@ -1034,7 +1034,7 @@ public class RangedWeaponUtils {
         // Handle bow in offhand
         else if (bowSlot == -101) {
             LOGGER.info("Bow in offhand, swapping to mainhand");
-            server.getCommandManager().executeWithPrefix(botSource,
+            server.getCommands().performPrefixedCommand(botSource,
                 "/player " + botName + " swapHands");
 
             try {
@@ -1055,7 +1055,7 @@ public class RangedWeaponUtils {
 
                 LOGGER.info("Moving bow from inventory slot {} to hotbar slot {}", bowSlot, emptyHotbarSlot);
 
-                server.getCommandManager().executeWithPrefix(botSource,
+                server.getCommands().performPrefixedCommand(botSource,
                     "/item replace entity " + botName + " hotbar." + emptyHotbarSlot + " from entity " + botName + " inventory." + (bowSlot - 9));
 
                 try {
@@ -1069,7 +1069,7 @@ public class RangedWeaponUtils {
 
             // Equip bow in mainhand
             LOGGER.info("Equipping bow from hotbar slot {}", bowSlot);
-            server.getCommandManager().executeWithPrefix(botSource,
+            server.getCommands().performPrefixedCommand(botSource,
                 "/player " + botName + " hotbar " + (bowSlot + 1));
 
             try {
@@ -1086,10 +1086,10 @@ public class RangedWeaponUtils {
     /**
      * Equip bow or crossbow in main hand directly (without carpet commands)
      */
-    public static void equipBowOrCrossbowInMainHand(ServerPlayerEntity bot) {
+    public static void equipBowOrCrossbowInMainHand(ServerPlayer bot) {
         // Check if already equipped
-        ItemStack mainHand = bot.getMainHandStack();
-        String mainHandName = mainHand.getItem().getName().getString().toLowerCase();
+        ItemStack mainHand = bot.getMainHandItem();
+        String mainHandName = mainHand.getHoverName().getString().toLowerCase();
         if (mainHandName.contains("bow") || mainHandName.contains("crossbow")) {
             LOGGER.info("Bow/Crossbow already equipped in mainhand");
             return;
@@ -1098,8 +1098,8 @@ public class RangedWeaponUtils {
         // Find weapon in hotbar
         int weaponSlot = -1;
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            String itemName = stack.getItem().getName().getString().toLowerCase();
+            ItemStack stack = bot.getInventory().getItem(i);
+            String itemName = stack.getHoverName().getString().toLowerCase();
             if (itemName.contains("bow") || itemName.contains("crossbow")) {
                 weaponSlot = i;
                 break;
@@ -1109,13 +1109,13 @@ public class RangedWeaponUtils {
         if (weaponSlot == -1) {
             // Check rest of inventory and move to hotbar
             for (int i = 9; i < 36; i++) {
-                ItemStack stack = bot.getInventory().getStack(i);
-                String itemName = stack.getItem().getName().getString().toLowerCase();
+                ItemStack stack = bot.getInventory().getItem(i);
+                String itemName = stack.getHoverName().getString().toLowerCase();
                 if (itemName.contains("bow") || itemName.contains("crossbow")) {
                     // Find empty hotbar slot
                     int emptySlot = -1;
                     for (int h = 0; h < 9; h++) {
-                        if (bot.getInventory().getStack(h).isEmpty()) {
+                        if (bot.getInventory().getItem(h).isEmpty()) {
                             emptySlot = h;
                             break;
                         }
@@ -1124,8 +1124,8 @@ public class RangedWeaponUtils {
                     if (emptySlot != -1) {
                         // Swap from inventory to hotbar
                         ItemStack weapon = stack.copy();
-                        bot.getInventory().setStack(emptySlot, weapon);
-                        bot.getInventory().setStack(i, ItemStack.EMPTY);
+                        bot.getInventory().setItem(emptySlot, weapon);
+                        bot.getInventory().setItem(i, ItemStack.EMPTY);
                         weaponSlot = emptySlot;
                         LOGGER.info("Moved weapon from inventory slot {} to hotbar slot {}", i, emptySlot);
                         break;
@@ -1136,7 +1136,7 @@ public class RangedWeaponUtils {
 
         if (weaponSlot != -1) {
             // Select the hotbar slot
-            bot.getInventory().selectedSlot = weaponSlot;
+            bot.getInventory().setSelectedSlot(weaponSlot);
             LOGGER.info("Equipped weapon in mainhand from hotbar slot {}", weaponSlot);
         } else {
             LOGGER.warn("No bow or crossbow found in inventory!");

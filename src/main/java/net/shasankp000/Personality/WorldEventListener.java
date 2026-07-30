@@ -1,6 +1,6 @@
 package net.shasankp000.Personality;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.GameAI.BotEventHandler;
 import net.shasankp000.GameAI.State;
 import org.slf4j.Logger;
@@ -61,7 +61,7 @@ public class WorldEventListener {
      * @param detail    optional free-text detail appended to LLM context
      *                  (may be null or blank)
      */
-    public static void process(ServerPlayerEntity bot, EventType type, String detail) {
+    public static void process(ServerPlayer bot, EventType type, String detail) {
         if (bot == null) return;
 
         LOGGER.debug("[WorldEventListener] event={} detail='{}'", type, detail);

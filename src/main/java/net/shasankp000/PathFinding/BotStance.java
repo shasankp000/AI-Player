@@ -1,10 +1,10 @@
 package net.shasankp000.PathFinding;
 
-import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.core.BlockPos;
 
 /**
  * Holds the active stance (NONE / STAY / FOLLOW) for each bot by name.

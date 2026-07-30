@@ -1,6 +1,7 @@
 package net.shasankp000.ServiceLLMClients;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.slf4j.Logger;
@@ -31,9 +32,16 @@ public class GenericOpenAIClient implements LLMClient {
         if (baseUrl == null || baseUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("Base URL cannot be null or empty");
         }
-        String trimmedUrl = baseUrl.trim();
-        this.baseUrl = trimmedUrl.endsWith("/") ? trimmedUrl : trimmedUrl + "/";
+        this.baseUrl = normalizeBaseUrl(baseUrl);
         this.client = HttpClient.newHttpClient();
+    }
+
+    private static String normalizeBaseUrl(String baseUrl) {
+        String normalized = baseUrl.trim().replaceAll("/+$", "");
+        normalized = normalized.replaceAll("/chat/completions$", "");
+        normalized = normalized.replaceAll("/completions$", "");
+        normalized = normalized.replaceAll("/embeddings$", "");
+        return normalized + "/";
     }
 
     @Override
@@ -58,14 +66,18 @@ public class GenericOpenAIClient implements LLMClient {
             messages.add(userMessage);
 
             requestBody.add("messages", messages);
-            requestBody.addProperty("max_tokens", 150);
+            requestBody.addProperty("max_tokens", 1024);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "chat/completions"))
-                    .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
-                    .POST(BodyPublishers.ofString(requestBody.toString()))
-                    .build();
+                    .POST(BodyPublishers.ofString(requestBody.toString()));
+
+            if (apiKey != null && !apiKey.isBlank()) {
+                requestBuilder.header("Authorization", "Bearer " + apiKey);
+            }
+
+            HttpRequest request = requestBuilder.build();
 
             HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
 
@@ -77,16 +89,57 @@ public class GenericOpenAIClient implements LLMClient {
             // Parse the JSON response
             JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
 
-            // Extract the content from the chat message
-            return jsonResponse.getAsJsonArray("choices")
-                    .get(0).getAsJsonObject()
-                    .getAsJsonObject("message")
-                    .get("content").getAsString();
+            return extractResponseText(jsonResponse, response.body());
 
         } catch (Exception e) {
             LOGGER.error("Error occurred while sending prompt", e);
             return "Error: " + e.getMessage();
         }
+    }
+
+    private static String extractResponseText(JsonObject jsonResponse, String rawResponseBody) {
+        JsonArray choices = jsonResponse.getAsJsonArray("choices");
+        if (choices == null || choices.isEmpty()) {
+            LOGGER.warn("OpenAI-compatible response did not include choices: {}", rawResponseBody);
+            return "Error: Provider returned no choices.";
+        }
+
+        JsonObject choice = choices.get(0).getAsJsonObject();
+        JsonObject message = choice.getAsJsonObject("message");
+        if (message != null) {
+            String content = readStringField(message, "content");
+            if (!content.isBlank()) {
+                return content;
+            }
+
+            String reasoning = readStringField(message, "reasoning");
+            if (!reasoning.isBlank()) {
+                return reasoning;
+            }
+        }
+
+        String text = readStringField(choice, "text");
+        if (!text.isBlank()) {
+            return text;
+        }
+
+        String finishReason = readStringField(choice, "finish_reason");
+        LOGGER.warn("OpenAI-compatible response had no text content. finish_reason={}, body={}", finishReason, rawResponseBody);
+        return "Error: Provider returned an empty message content.";
+    }
+
+    private static String readStringField(JsonObject object, String fieldName) {
+        if (object == null || !object.has(fieldName)) {
+            return "";
+        }
+        JsonElement element = object.get(fieldName);
+        if (element == null || element.isJsonNull()) {
+            return "";
+        }
+        if (element.isJsonPrimitive()) {
+            return element.getAsString();
+        }
+        return element.toString();
     }
 
     /**
@@ -98,11 +151,15 @@ public class GenericOpenAIClient implements LLMClient {
     @Override
     public boolean isReachable() {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "models"))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .GET()
-                    .build();
+                    .GET();
+
+            if (apiKey != null && !apiKey.isBlank()) {
+                requestBuilder.header("Authorization", "Bearer " + apiKey);
+            }
+
+            HttpRequest request = requestBuilder.build();
             HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
             return response.statusCode() == 200;
         } catch (Exception e) {

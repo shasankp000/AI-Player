@@ -3,9 +3,6 @@ package net.shasankp000.ChatUtils;
 import ai.djl.modality.Classifications;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
-
 import net.fabricmc.loader.api.FabricLoader;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.ChatUtils.CART.CartClassifier;
@@ -13,6 +10,8 @@ import net.shasankp000.ChatUtils.DecisionResolver.DecisionResolver;
 import net.shasankp000.ChatUtils.LIDSNetModel.LIDSNetModelManager;
 import net.shasankp000.ChatUtils.PreProcessing.NLPModelSetup;
 import net.shasankp000.ChatUtils.PreProcessing.OpenNLPProcessor;
+import net.shasankp000.FilingSystem.LLMClientFactory;
+import net.shasankp000.ServiceLLMClients.LLMClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +30,12 @@ import java.util.zip.ZipInputStream;
 public class NLPProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("NLPProcessor");
-    private static final OllamaAPI ollamaAPI = new OllamaAPI("http://localhost:11434/");
     private static final String bertModelURL = "https://github.com/shasankp000/AI-Player/releases/download/v1.0.5-release-1.20.6-NLP-asset/distilbert-finetuned-intent-torchscript.zip";
     private static final String bertModelExpectedHash = "2356cecf61ee2bbea5cea406253b67aeee6ad21ce74dada64e8be730cc016bdf";
     private static final String cartZipURL = "https://github.com/shasankp000/AI-Player/releases/download/v1.0.5-release-1.20.6-NLP-asset/cart.zip";
     private static final String cartExpectedHash = "1b8e0cc8c5fdb1bdb579b9f916c735929e82ab492a3c3cd13d0a254e765f7d22";
     private static final String LIDSNetModelURL = "https://github.com/shasankp000/AI-Player/releases/download/v1.0.5-release-1.20.6-NLP-asset/LIDSNet_torchscript.zip";
     private static final String LIDSNetExpectedHash = "ad93089b9bfa735d472ab828942541d0d80203dbfd42a3a5bc303a8bc12158e8";
-    private static String selectedLM = AIPlayer.CONFIG.getSelectedLanguageModel();
     private static Map<String, String> checkSumFileNameMap = getcheckSumFileNameMap();
 
     public enum Intent {
@@ -568,8 +565,83 @@ public class NLPProcessor {
             LOGGER.error("Error while resolving the final decision: {}", e.getMessage());
         }
 
-        return Intent.valueOf(decision);
+        Intent resolvedIntent = parseIntentOrUnspecified(decision);
+        if (resolvedIntent != Intent.UNSPECIFIED) {
+            return resolvedIntent;
+        }
 
+        Intent localFallback = chooseLocalClassifierFallback(
+                bertLabel, bertClassificationConfidence,
+                cartLabel, cartClassificationConfidence,
+                LIDSNetLabel, LIDSNetClassificationConfidence
+        );
+        if (localFallback != Intent.UNSPECIFIED) {
+            LOGGER.warn("Intent resolver did not return a usable decision. Using local classifier fallback: {}", localFallback);
+            return localFallback;
+        }
+
+        return Intent.UNSPECIFIED;
+
+    }
+
+    private static Intent parseIntentOrUnspecified(String decision) {
+        if (decision == null || decision.isBlank()) {
+            LOGGER.warn("Intent resolver returned an empty decision. Falling back to UNSPECIFIED.");
+            return Intent.UNSPECIFIED;
+        }
+
+        String normalizedDecision = decision.trim();
+        try {
+            return Intent.valueOf(normalizedDecision);
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("Intent resolver returned unsupported decision '{}'. Falling back to UNSPECIFIED.", normalizedDecision);
+            return Intent.UNSPECIFIED;
+        }
+    }
+
+    private static Intent chooseLocalClassifierFallback(
+            String bertLabel, double bertConfidence,
+            String cartLabel, double cartConfidence,
+            String lidsNetLabel, double lidsNetConfidence
+    ) {
+        Intent bestIntent = Intent.UNSPECIFIED;
+        double bestConfidence = 0.0;
+
+        double normalizedBertConfidence = normalizeConfidence(bertConfidence);
+        if (normalizedBertConfidence > bestConfidence && isSupportedIntentLabel(bertLabel)) {
+            bestIntent = Intent.valueOf(bertLabel);
+            bestConfidence = normalizedBertConfidence;
+        }
+
+        double normalizedCartConfidence = normalizeConfidence(cartConfidence);
+        if (normalizedCartConfidence > bestConfidence && isSupportedIntentLabel(cartLabel)) {
+            bestIntent = Intent.valueOf(cartLabel);
+            bestConfidence = normalizedCartConfidence;
+        }
+
+        double normalizedLidsNetConfidence = normalizeConfidence(lidsNetConfidence);
+        if (normalizedLidsNetConfidence > bestConfidence && isSupportedIntentLabel(lidsNetLabel)) {
+            bestIntent = Intent.valueOf(lidsNetLabel);
+            bestConfidence = normalizedLidsNetConfidence;
+        }
+
+        return bestConfidence >= 0.60 ? bestIntent : Intent.UNSPECIFIED;
+    }
+
+    private static double normalizeConfidence(double confidence) {
+        return confidence > 1.0 ? confidence / 100.0 : confidence;
+    }
+
+    private static boolean isSupportedIntentLabel(String label) {
+        if (label == null || label.isBlank()) {
+            return false;
+        }
+        try {
+            Intent.valueOf(label.trim());
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
 
@@ -578,25 +650,24 @@ public class NLPProcessor {
     // Fallback LLM method
     // -------------------------------
     public static Intent getIntentionFromLLM(String userPrompt) {
-        ollamaAPI.setRequestTimeoutSeconds(600);
+        String llmProvider = System.getProperty("aiplayer.llmMode", "custom");
+        LLMClient client = LLMClientFactory.createClient(llmProvider);
+        return getIntentionFromLLM(userPrompt, client);
+    }
+
+    public static Intent getIntentionFromLLM(String userPrompt, LLMClient client) {
         String systemPrompt = buildPrompt();
 
         try {
-            List<io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage> messages = new java.util.ArrayList<>();
-            messages.add(new io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage(
-                    OllamaChatMessageRole.SYSTEM, systemPrompt));
-            messages.add(new io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage(
-                    OllamaChatMessageRole.USER, userPrompt));
+            if (client == null) {
+                LOGGER.error("LLM fallback failed: no OpenAI-compatible client is configured.");
+                return Intent.UNSPECIFIED;
+            }
 
-            net.shasankp000.OllamaClient.OllamaThinkingResponse thinkingResponse =
-                    net.shasankp000.OllamaClient.OllamaAPIHelper.smartChat(
-                            ollamaAPI,
-                            "http://localhost:11434",
-                            selectedLM,
-                            messages
-                    );
-
-            String response = thinkingResponse.getContent().trim();
+            String response = client.sendPrompt(
+                    "Analyze the Minecraft player prompt and answer only with the requested intent label.",
+                    systemPrompt + "\n\nPlayer prompt:\n" + userPrompt
+            ).trim();
             // No need to strip think tags anymore - they're handled separately
             // response = stripThinkTags(response);
 

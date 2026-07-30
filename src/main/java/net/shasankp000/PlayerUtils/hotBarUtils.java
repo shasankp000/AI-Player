@@ -1,31 +1,30 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 
 public class hotBarUtils {
-    public static List<ItemStack> getHotbarItems(ServerPlayerEntity bot) {
+    public static List<ItemStack> getHotbarItems(ServerPlayer bot) {
         List<ItemStack> hotbarItems = new ArrayList<>();
 
         if (bot != null) {
             for (int i = 0; i < 9; i++) {
-                hotbarItems.add(bot.getInventory().getStack(i));
+                hotbarItems.add(bot.getInventory().getItem(i));
             }
         }
 
         return hotbarItems;
     }
 
-    public static ItemStack getSelectedHotbarItemStack(ServerPlayerEntity bot) {
+    public static ItemStack getSelectedHotbarItemStack(ServerPlayer bot) {
 
         // Ensure the client and player are not null
 
         // Get the selected slot's stack
-        int selectedSlot = bot.getInventory().selectedSlot;
-        ItemStack selectedStack = bot.getInventory().getStack(selectedSlot);
+        int selectedSlot = bot.getInventory().getSelectedSlot();
+        ItemStack selectedStack = bot.getInventory().getItem(selectedSlot);
 
         // Check if the slot is not empty
         if (!selectedStack.isEmpty()) {

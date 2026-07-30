@@ -2,8 +2,6 @@ package net.shasankp000.GameAI.autonomous;
 
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

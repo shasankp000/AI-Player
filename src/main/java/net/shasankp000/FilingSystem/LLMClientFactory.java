@@ -61,10 +61,6 @@ public class LLMClientFactory {
                 yield new GrokClient(AIPlayer.CONFIG.getGrokKey(), AIPlayer.CONFIG.getSelectedLanguageModel());
             }
             case "custom" -> {
-                if (AIPlayer.CONFIG.getCustomApiKey().isEmpty()) {
-                    LOGGER.error("Custom API key not set in config!");
-                    yield null;
-                }
                 if (AIPlayer.CONFIG.getCustomApiUrl().isEmpty()) {
                     LOGGER.error("Custom API URL not set in config!");
                     yield null;
@@ -79,7 +75,7 @@ public class LLMClientFactory {
                 yield new Player2Client(playerUUID, AIPlayer.CONFIG.getSelectedLanguageModel(), chatCallback);
             }
             default -> {
-                LOGGER.info("Defaulting to Ollama client");
+                LOGGER.error("Unsupported LLM provider: {}. Set aiplayer.llmMode=custom for an OpenAI-compatible endpoint.", mode);
                 yield null;
             }
         };

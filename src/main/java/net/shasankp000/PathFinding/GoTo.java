@@ -1,11 +1,11 @@
 package net.shasankp000.PathFinding;
 
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.shasankp000.PathFinding.PathFinder.PathNode;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
@@ -15,22 +15,22 @@ import static net.shasankp000.PathFinding.PathFinder.*;
 
 public class GoTo {
 
-    public static String goTo(ServerCommandSource botSource, int x, int y, int z, boolean sprint) {
+    public static String goTo(CommandSourceStack botSource, int x, int y, int z, boolean sprint) {
         MinecraftServer server = botSource.getServer();
-        ServerPlayerEntity bot = botSource.getPlayer();
-        ServerWorld world = server.getOverworld();
-        String botName = botSource.getName();
+        ServerPlayer bot = botSource.getPlayer();
+        ServerLevel world = server.overworld();
+        String botName = botSource.getTextName();
 
         if (bot == null) {
             System.out.println("Bot not found!");
             return "Bot not found!";
         }
 
-        System.out.println("Found bot: " + botSource.getName());
+        System.out.println("Found bot: " + botSource.getTextName());
 
         try {
             // Calculate the path
-            List<PathNode> rawPath = calculatePath(bot.getBlockPos(), new BlockPos(x, y, z), world);
+            List<PathNode> rawPath = calculatePath(bot.blockPosition(), new BlockPos(x, y, z), world);
 
             // Simplify + filter
             List<PathNode> finalPath = simplifyPath(rawPath, world);

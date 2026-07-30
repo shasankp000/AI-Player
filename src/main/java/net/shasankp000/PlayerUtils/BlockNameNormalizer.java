@@ -1,7 +1,7 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 
 public class BlockNameNormalizer {
 
@@ -15,7 +15,7 @@ public class BlockNameNormalizer {
         Identifier bestMatch = null;
         int bestScore = Integer.MIN_VALUE;
 
-        for (Identifier id : Registries.BLOCK.getIds()) {
+        for (Identifier id : BuiltInRegistries.BLOCK.keySet()) {
             String path = id.getPath();
 
             int score = getMatchScore(cleaned, path);

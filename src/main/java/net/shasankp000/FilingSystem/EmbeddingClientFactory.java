@@ -24,7 +24,7 @@ public class EmbeddingClientFactory {
      * @return An EmbeddingClient instance for the configured provider
      */
     public static EmbeddingClient createClient() {
-        String mode = System.getProperty("aiplayer.llmMode", "ollama");
+        String mode = System.getProperty("aiplayer.llmMode", "custom");
 
         // Return cached client if mode hasn't changed
         if (cachedClient != null && mode.equals(cachedMode)) {
@@ -34,40 +34,40 @@ public class EmbeddingClientFactory {
         EmbeddingClient client = switch (mode) {
             case "openai", "gpt" -> {
                 if (AIPlayer.CONFIG.getOpenAIKey().isEmpty()) {
-                    LOGGER.warn("OpenAI API key not set - falling back to Ollama for embeddings");
-                    yield createOllamaClient();
+                    LOGGER.error("OpenAI API key not set!");
+                    yield null;
                 }
                 LOGGER.info("Using OpenAI embeddings (text-embedding-3-small)");
                 yield new OpenAIEmbeddingClient(AIPlayer.CONFIG.getOpenAIKey());
             }
             case "anthropic", "claude" -> {
                 if (AIPlayer.CONFIG.getClaudeKey().isEmpty()) {
-                    LOGGER.warn("Claude API key not set - falling back to Ollama for embeddings");
-                    yield createOllamaClient();
+                    LOGGER.error("Claude API key not set!");
+                    yield null;
                 }
                 LOGGER.info("Using Anthropic embeddings (Voyage AI)");
                 yield new AnthropicEmbeddingClient(AIPlayer.CONFIG.getClaudeKey());
             }
             case "google", "gemini" -> {
                 if (AIPlayer.CONFIG.getGeminiKey().isEmpty()) {
-                    LOGGER.warn("Gemini API key not set - falling back to Ollama for embeddings");
-                    yield createOllamaClient();
+                    LOGGER.error("Gemini API key not set!");
+                    yield null;
                 }
                 LOGGER.info("Using Gemini embeddings (text-embedding-004)");
                 yield new GeminiEmbeddingClient(AIPlayer.CONFIG.getGeminiKey());
             }
             case "xAI", "xai", "grok" -> {
                 if (AIPlayer.CONFIG.getGrokKey().isEmpty()) {
-                    LOGGER.warn("Grok API key not set - falling back to Ollama for embeddings");
-                    yield createOllamaClient();
+                    LOGGER.error("Grok API key not set!");
+                    yield null;
                 }
                 LOGGER.info("Using xAI embeddings (embedding-large-1)");
                 yield new GrokEmbeddingClient(AIPlayer.CONFIG.getGrokKey());
             }
             case "custom" -> {
                 if (AIPlayer.CONFIG.getCustomApiUrl().isEmpty()) {
-                    LOGGER.warn("Custom API URL not set - falling back to Ollama for embeddings");
-                    yield createOllamaClient();
+                    LOGGER.error("Custom API URL not set!");
+                    yield null;
                 }
                 // For custom providers, intelligently construct embedding endpoint
                 String baseUrl = AIPlayer.CONFIG.getCustomApiUrl();
@@ -81,8 +81,8 @@ public class EmbeddingClientFactory {
                 );
             }
             default -> {
-                LOGGER.info("Using Ollama embeddings (nomic-embed-text)");
-                yield createOllamaClient();
+                LOGGER.error("Unsupported embedding provider: {}", mode);
+                yield null;
             }
         };
 
@@ -145,8 +145,8 @@ public class EmbeddingClientFactory {
                 );
             }
             default -> {
-                LOGGER.info("Defaulting to Ollama embedding client");
-                yield createOllamaClient();
+                LOGGER.error("Unsupported embedding provider: {}", mode);
+                yield null;
             }
         };
     }
@@ -244,7 +244,7 @@ public class EmbeddingClientFactory {
      */
     public static void validateConfiguration() {
         try {
-            String mode = System.getProperty("aiplayer.llmMode", "ollama");
+            String mode = System.getProperty("aiplayer.llmMode", "custom");
             LOGGER.info("═══════════════════════════════════════════════════════");
             LOGGER.info("🔧 Validating Embedding Configuration");
             LOGGER.info("═══════════════════════════════════════════════════════");
@@ -295,4 +295,3 @@ public class EmbeddingClientFactory {
         }
     }
 }
-

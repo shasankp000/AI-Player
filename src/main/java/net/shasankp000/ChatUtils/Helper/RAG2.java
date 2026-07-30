@@ -2,7 +2,7 @@ package net.shasankp000.ChatUtils.Helper;
 
 import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
 import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.shasankp000.AIProviders.EmbeddingProvider;
 import net.shasankp000.AIProviders.EmbeddingProviderFactory;
 import net.shasankp000.ChatUtils.ChatUtils;
@@ -84,7 +84,7 @@ public class RAG2 {
             """;
     }
 
-    public static void processLLMOutput(String fullResponse, String botName, ServerCommandSource botSource) {
+    public static void processLLMOutput(String fullResponse, String botName, CommandSourceStack botSource) {
         Matcher matcher = THINK_BLOCK.matcher(fullResponse);
 
         if (matcher.find()) {
@@ -143,7 +143,7 @@ public class RAG2 {
     }
 
 
-    public static void run(String userPrompt, ServerCommandSource botSource, NLPProcessor.Intent intent, LLMClient client) {
+    public static void run(String userPrompt, CommandSourceStack botSource, NLPProcessor.Intent intent, LLMClient client) {
         ollamaAPI.setRequestTimeoutSeconds(120);
         logger.info("⚡ RAG v2: Running with intent = {} and using provider: {}", intent, client);
 
@@ -193,7 +193,7 @@ public class RAG2 {
 
             String finalResponse = client.sendPrompt(systemPrompt, finalUserPrompt);
 
-            processLLMOutput(finalResponse, botSource.getName(), botSource);
+            processLLMOutput(finalResponse, botSource.getTextName(), botSource);
 
             // 🔒 Always store final response
             SQLiteDB.storeMemory("conversation", userPrompt, finalResponse, queryEmbedding);
@@ -208,7 +208,7 @@ public class RAG2 {
 
     // overloaded method for the existing ollama client to work with.
 
-    public static void run(String userPrompt, ServerCommandSource botSource, NLPProcessor.Intent intent) {
+    public static void run(String userPrompt, CommandSourceStack botSource, NLPProcessor.Intent intent) {
 
         ollamaAPI.setRequestTimeoutSeconds(120);
 
@@ -316,7 +316,7 @@ public class RAG2 {
 
             String finalResponse = response.getFullResponse();
 
-            ollamaClient.processLLMOutput(finalResponse, botSource.getName(), botSource);
+            ollamaClient.processLLMOutput(finalResponse, botSource.getTextName(), botSource);
 
 
             // 🔒 Always store final response

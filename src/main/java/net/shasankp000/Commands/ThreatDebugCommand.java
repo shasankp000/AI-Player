@@ -3,10 +3,10 @@ package net.shasankp000.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 import net.shasankp000.Overlay.ThreatDebugManager;
 
 /**
@@ -14,65 +14,65 @@ import net.shasankp000.Overlay.ThreatDebugManager;
  */
 public class ThreatDebugCommand {
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
-            CommandManager.literal("threatdebug")
-                .requires(source -> source.hasPermissionLevel(2))
+            Commands.literal("threatdebug")
+                .requires(source -> true)
                 .executes(ThreatDebugCommand::toggleDebug)
-                .then(CommandManager.literal("on")
+                .then(Commands.literal("on")
                     .executes(ctx -> setDebug(ctx, true)))
-                .then(CommandManager.literal("off")
+                .then(Commands.literal("off")
                     .executes(ctx -> setDebug(ctx, false)))
-                .then(CommandManager.literal("clear")
+                .then(Commands.literal("clear")
                     .executes(ThreatDebugCommand::clearDebug))
         );
     }
 
-    private static int toggleDebug(CommandContext<ServerCommandSource> ctx) {
+    private static int toggleDebug(CommandContext<CommandSourceStack> ctx) {
         ThreatDebugManager.toggleDebug();
         boolean enabled = ThreatDebugManager.isDebugEnabled();
 
-        Text message = Text.literal("Threat Analysis Debug: ")
-            .formatted(Formatting.YELLOW)
-            .append(Text.literal(enabled ? "ENABLED" : "DISABLED")
-                .formatted(enabled ? Formatting.GREEN : Formatting.RED));
+        Component message = Component.literal("Threat Analysis Debug: ")
+            .withStyle(ChatFormatting.YELLOW)
+            .append(Component.literal(enabled ? "ENABLED" : "DISABLED")
+                .withStyle(enabled ? ChatFormatting.GREEN : ChatFormatting.RED));
 
-        ctx.getSource().sendFeedback(() -> message, true);
+        ctx.getSource().sendSuccess(() -> message, true);
 
         if (enabled) {
-            ctx.getSource().sendFeedback(() ->
-                Text.literal("Threat calculations will now be displayed above entities.")
-                    .formatted(Formatting.GRAY), false);
+            ctx.getSource().sendSuccess(() ->
+                Component.literal("Threat calculations will now be displayed above entities.")
+                    .withStyle(ChatFormatting.GRAY), false);
         }
 
         return Command.SINGLE_SUCCESS;
     }
 
-    private static int setDebug(CommandContext<ServerCommandSource> ctx, boolean enable) {
+    private static int setDebug(CommandContext<CommandSourceStack> ctx, boolean enable) {
         ThreatDebugManager.setDebugEnabled(enable);
 
-        Text message = Text.literal("Threat Analysis Debug: ")
-            .formatted(Formatting.YELLOW)
-            .append(Text.literal(enable ? "ENABLED" : "DISABLED")
-                .formatted(enable ? Formatting.GREEN : Formatting.RED));
+        Component message = Component.literal("Threat Analysis Debug: ")
+            .withStyle(ChatFormatting.YELLOW)
+            .append(Component.literal(enable ? "ENABLED" : "DISABLED")
+                .withStyle(enable ? ChatFormatting.GREEN : ChatFormatting.RED));
 
-        ctx.getSource().sendFeedback(() -> message, true);
+        ctx.getSource().sendSuccess(() -> message, true);
 
         if (enable) {
-            ctx.getSource().sendFeedback(() ->
-                Text.literal("Threat calculations will now be displayed above entities.")
-                    .formatted(Formatting.GRAY), false);
+            ctx.getSource().sendSuccess(() ->
+                Component.literal("Threat calculations will now be displayed above entities.")
+                    .withStyle(ChatFormatting.GRAY), false);
         }
 
         return Command.SINGLE_SUCCESS;
     }
 
-    private static int clearDebug(CommandContext<ServerCommandSource> ctx) {
+    private static int clearDebug(CommandContext<CommandSourceStack> ctx) {
         ThreatDebugManager.clear();
 
-        ctx.getSource().sendFeedback(() ->
-            Text.literal("Cleared all threat debug data.")
-                .formatted(Formatting.GREEN), true);
+        ctx.getSource().sendSuccess(() ->
+            Component.literal("Cleared all threat debug data.")
+                .withStyle(ChatFormatting.GREEN), true);
 
         return Command.SINGLE_SUCCESS;
     }

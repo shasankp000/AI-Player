@@ -1,6 +1,6 @@
 package net.shasankp000.GameAI.planner;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.GameAI.BotEventHandler;
 import net.shasankp000.GameAI.RLAgent;
 import net.shasankp000.GameAI.State;
@@ -78,11 +78,11 @@ public class HybridPlanner {
      * calls {@link #buildPlan(State, String, short)}, and executes each
      * {@link PlannedStep} in sequence via {@link net.shasankp000.FunctionCaller.FunctionCallerV2}.
      *
-     * @param bot         The bot {@link ServerPlayerEntity} executing the goal.
+     * @param bot         The bot {@link ServerPlayer} executing the goal.
      * @param goalId      Numeric goal identifier from {@link GoalMapper}.
      * @param goalText    Human-readable goal description for plan generation.
      */
-    public static void executeGoal(ServerPlayerEntity bot, short goalId, String goalText) {
+    public static void executeGoal(ServerPlayer bot, short goalId, String goalText) {
         LOGGER.info("[HybridPlanner] executeGoal called -- bot='{}', goalId={}, goal='{}'",
                 bot.getName().getString(), goalId, goalText);
 
@@ -128,8 +128,8 @@ public class HybridPlanner {
                     plan.steps.size(), goalText);
 
             new net.shasankp000.FunctionCaller.FunctionCallerV2(
-                    bot.getCommandSource().withSilent().withMaxLevel(4),
-                    bot.getUuid());
+                    bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS),
+                    bot.getUUID());
             boolean executed = net.shasankp000.FunctionCaller.FunctionCallerV2
                     .executePlan(plan, null, currentState)
                     .join();

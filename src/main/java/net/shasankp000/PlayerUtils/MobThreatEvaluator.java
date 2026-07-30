@@ -1,15 +1,15 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.CreeperEntity;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Monster;
 
 /**
  * Evaluates special threat levels for specific mob types
@@ -59,7 +59,7 @@ public class MobThreatEvaluator {
     /**
      * Evaluate threat level for a specific mob with phase awareness
      */
-    public static MobThreatInfo evaluateMobThreat(Entity mob, ServerPlayerEntity bot) {
+    public static MobThreatInfo evaluateMobThreat(Entity mob, ServerPlayer bot) {
         if (!(mob instanceof LivingEntity livingMob)) {
             return null; // Not a living mob
         }
@@ -67,7 +67,7 @@ public class MobThreatEvaluator {
         double baseThreat = calculateBaseThreat(livingMob, bot);
 
         // Special handling for creepers
-        if (mob instanceof CreeperEntity creeper) {
+        if (mob instanceof Creeper creeper) {
             return evaluateCreeperThreat(creeper, bot, baseThreat);
         }
 
@@ -87,8 +87,8 @@ public class MobThreatEvaluator {
      * Calculate base threat for any living mob
      * Based on: health, distance, attack damage, armor
      */
-    private static double calculateBaseThreat(LivingEntity mob, ServerPlayerEntity bot) {
-        double distance = Math.sqrt(mob.squaredDistanceTo(bot));
+    private static double calculateBaseThreat(LivingEntity mob, ServerPlayer bot) {
+        double distance = Math.sqrt(mob.distanceToSqr(bot));
         float health = mob.getHealth();
         float maxHealth = mob.getMaxHealth();
 
@@ -99,7 +99,7 @@ public class MobThreatEvaluator {
         double healthThreat = (health / maxHealth) * 15.0;
 
         // Hostile mobs get bonus threat
-        double hostilityBonus = mob instanceof HostileEntity ? 20.0 : 0.0;
+        double hostilityBonus = mob instanceof Monster ? 20.0 : 0.0;
 
         return distanceThreat + healthThreat + hostilityBonus;
     }
@@ -107,8 +107,8 @@ public class MobThreatEvaluator {
     /**
      * Evaluate creeper-specific threat with explosion phase analysis
      */
-    private static MobThreatInfo evaluateCreeperThreat(CreeperEntity creeper, ServerPlayerEntity bot, double baseThreat) {
-        double distance = Math.sqrt(creeper.squaredDistanceTo(bot));
+    private static MobThreatInfo evaluateCreeperThreat(Creeper creeper, ServerPlayer bot, double baseThreat) {
+        double distance = Math.sqrt(creeper.distanceToSqr(bot));
 
         // Detect creeper explosion phase
         CreeperPhase phase = detectCreeperPhase(creeper);
@@ -179,8 +179,8 @@ public class MobThreatEvaluator {
      * Detect which explosion phase a creeper is in
      * Uses fuse time and client flash state
      */
-    private static CreeperPhase detectCreeperPhase(CreeperEntity creeper) {
-        int fuseTime = creeper.getFuseSpeed();
+    private static CreeperPhase detectCreeperPhase(Creeper creeper) {
+        int fuseTime = creeper.getSwellDir();
 
         // Not ignited - fuse speed is -1 when idle
         if (fuseTime <= 0) {
@@ -193,7 +193,7 @@ public class MobThreatEvaluator {
         if (creeper.getTarget() != null) {
             // Creeper is tracking a target (bot)
             // Check distance to determine criticality
-            double distanceToTarget = Math.sqrt(creeper.squaredDistanceTo(creeper.getTarget()));
+            double distanceToTarget = Math.sqrt(creeper.distanceToSqr(creeper.getTarget()));
 
             if (distanceToTarget < 2.0) {
                 // Very close = critical phase (about to blow)
@@ -213,14 +213,14 @@ public class MobThreatEvaluator {
      * Get enhanced threat map for all nearby mobs
      * Returns map of mob UUID -> MobThreatInfo
      */
-    public static Map<String, MobThreatInfo> evaluateAllMobThreats(Iterable<Entity> mobs, ServerPlayerEntity bot) {
+    public static Map<String, MobThreatInfo> evaluateAllMobThreats(Iterable<Entity> mobs, ServerPlayer bot) {
         Map<String, MobThreatInfo> threatMap = new HashMap<>();
 
         for (Entity mob : mobs) {
             if (mob instanceof LivingEntity) {
                 MobThreatInfo info = evaluateMobThreat(mob, bot);
                 if (info != null) {
-                    threatMap.put(mob.getUuidAsString(), info);
+                    threatMap.put(mob.getStringUUID(), info);
                 }
             }
         }
@@ -231,9 +231,9 @@ public class MobThreatEvaluator {
     /**
      * Check if any creepers are in critical explosion phase nearby
      */
-    public static boolean hasCriticalCreeperThreat(Iterable<Entity> mobs, ServerPlayerEntity bot) {
+    public static boolean hasCriticalCreeperThreat(Iterable<Entity> mobs, ServerPlayer bot) {
         for (Entity mob : mobs) {
-            if (mob instanceof CreeperEntity creeper) {
+            if (mob instanceof Creeper creeper) {
                 MobThreatInfo info = evaluateCreeperThreat(creeper, bot, 0.0);
                 if (info.creeperPhase == CreeperPhase.CRITICAL) {
                     return true;
@@ -246,12 +246,12 @@ public class MobThreatEvaluator {
     /**
      * Get the most dangerous creeper (by phase and distance)
      */
-    public static CreeperEntity getMostDangerousCreeper(Iterable<Entity> mobs, ServerPlayerEntity bot) {
-        CreeperEntity mostDangerous = null;
+    public static Creeper getMostDangerousCreeper(Iterable<Entity> mobs, ServerPlayer bot) {
+        Creeper mostDangerous = null;
         double highestThreat = 0.0;
 
         for (Entity mob : mobs) {
-            if (mob instanceof CreeperEntity creeper) {
+            if (mob instanceof Creeper creeper) {
                 MobThreatInfo info = evaluateCreeperThreat(creeper, bot, 0.0);
                 if (info.totalThreat > highestThreat) {
                     highestThreat = info.totalThreat;

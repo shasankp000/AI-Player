@@ -1,8 +1,8 @@
 package net.shasankp000.GameAI.handoff;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Classifies an {@link ItemStack} into one of five gift-value tiers.
@@ -50,7 +50,7 @@ public enum ItemTier {
     // -----------------------------------------------------------------------
 
     private static String rawId(ItemStack stack) {
-        Identifier id = Registries.ITEM.getId(stack.getItem());
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return id.getPath(); // e.g. "diamond_sword", "netherite_pickaxe"
     }
 

@@ -1,7 +1,7 @@
 package net.shasankp000.WorldUitls;
 
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
 
 public class isBlockItem {
 

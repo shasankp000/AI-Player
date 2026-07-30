@@ -1,17 +1,17 @@
 package net.shasankp000.Tools;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Efficient block searching tool with incremental radius expansion.
@@ -51,7 +51,7 @@ public class SearchBlocks {
      * @return BlockPos of nearest matching block, or null if not found
      */
     public static BlockPos searchBlock(
-            ServerPlayerEntity bot,
+            ServerPlayer bot,
             String blockType,
             int initialRadius,
             int maxRadius,
@@ -65,9 +65,9 @@ public class SearchBlocks {
         // Periodic cleanup of old caches
         cleanupOldCaches();
 
-        ServerWorld world = bot.getServerWorld();
-        BlockPos botPos = bot.getBlockPos();
-        UUID botId = bot.getUuid();
+        ServerLevel world = bot.level();
+        BlockPos botPos = bot.blockPosition();
+        UUID botId = bot.getUUID();
 
         // Initialize search cache for this bot if needed
         searchedPositions.putIfAbsent(botId, ConcurrentHashMap.newKeySet());
@@ -101,7 +101,7 @@ public class SearchBlocks {
 
             if (result != null) {
                 LOGGER.info("✓ Found {} at {} (distance: {} blocks)",
-                    normalizedBlockType, result, botPos.getManhattanDistance(result));
+                    normalizedBlockType, result, botPos.distManhattan(result));
                 return result;
             }
 
@@ -117,7 +117,7 @@ public class SearchBlocks {
      * Uses parallel processing and respects max blocks per iteration.
      */
     private static BlockPos searchShell(
-            ServerWorld world,
+            ServerLevel world,
             BlockPos center,
             Block targetBlock,
             int innerRadius,
@@ -203,14 +203,14 @@ public class SearchBlocks {
                     int distSq = x*x + y*y + z*z;
 
                     if (distSq > innerRadiusSq && distSq <= outerRadiusSq) {
-                        positions.add(center.add(x, y, z));
+                        positions.add(center.offset(x, y, z));
                     }
                 }
             }
         }
 
         // Sort by distance for more efficient searching (closer first)
-        positions.sort(Comparator.comparingInt(pos -> pos.getManhattanDistance(center)));
+        positions.sort(Comparator.comparingInt(pos -> pos.distManhattan(center)));
 
         return positions;
     }
@@ -233,8 +233,8 @@ public class SearchBlocks {
      */
     private static Block getBlockFromIdentifier(String blockId) {
         try {
-            Identifier id = Identifier.of(blockId);
-            return Registries.BLOCK.get(id);
+            Identifier id = Identifier.parse(blockId);
+            return BuiltInRegistries.BLOCK.getValue(id);
         } catch (Exception e) {
             LOGGER.error("Failed to parse block identifier: {}", blockId, e);
             return null;

@@ -1,15 +1,15 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.block.Block;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.BlockPos;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
 
 public class BlockDistanceLimitedSearch {
 
-    private final ServerPlayerEntity player;
+    private final ServerPlayer player;
     private final int maxDepth;       // Vertical search range (both up and down)
     private final int searchRadius;   // Horizontal search radius (x and z)
     private final List<String> reachableBlockNames = new ArrayList<>();
@@ -19,7 +19,7 @@ public class BlockDistanceLimitedSearch {
      * @param maxDepth     The maximum vertical offset (both up and down) to search.
      * @param searchRadius The horizontal radius (x and z) to search.
      */
-    public BlockDistanceLimitedSearch(ServerPlayerEntity player, int maxDepth, int searchRadius) {
+    public BlockDistanceLimitedSearch(ServerPlayer player, int maxDepth, int searchRadius) {
         this.player = player;
         this.maxDepth = maxDepth;
         this.searchRadius = searchRadius;
@@ -33,7 +33,7 @@ public class BlockDistanceLimitedSearch {
         // Clear previous results if any.
         reachableBlockNames.clear();
 
-        BlockPos botPos = player.getBlockPos();
+        BlockPos botPos = player.blockPosition();
         // Iterate horizontally over a circle.
         for (int dx = -searchRadius; dx <= searchRadius; dx++) {
             for (int dz = -searchRadius; dz <= searchRadius; dz++) {
@@ -43,10 +43,10 @@ public class BlockDistanceLimitedSearch {
                 }
                 // Iterate vertically from -maxDepth to maxDepth.
                 for (int dy = -maxDepth; dy <= maxDepth; dy++) {
-                    BlockPos pos = botPos.add(dx, dy, dz);
+                    BlockPos pos = botPos.offset(dx, dy, dz);
                     if (canReachBlock(pos)) {
                         // Get the block's name and add it to the list.
-                        Block block = player.getEntityWorld().getBlockState(pos).getBlock();
+                        Block block = player.level().getBlockState(pos).getBlock();
                         String blockName = block.getName().getString();
                         reachableBlockNames.add(blockName);
                     }
@@ -63,9 +63,9 @@ public class BlockDistanceLimitedSearch {
      * @return true if the block is not air, false otherwise.
      */
     private boolean canReachBlock(BlockPos pos) {
-        Block block = player.getEntityWorld().getBlockState(pos).getBlock();
+        Block block = player.level().getBlockState(pos).getBlock();
         // Consider the block reachable if it's not air.
-        return !block.getDefaultState().isAir();
+        return !block.defaultBlockState().isAir();
     }
 
     /**

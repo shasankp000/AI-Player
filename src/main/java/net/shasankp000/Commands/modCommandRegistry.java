@@ -5,25 +5,25 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.command.argument.BlockPosArgumentType;
-import net.minecraft.command.argument.EntityArgumentType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec2f;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.GameMode;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.DangerZoneDetector.DangerZoneDetector;
 import net.shasankp000.Database.QTableExporter;
@@ -61,7 +61,7 @@ import java.util.concurrent.TimeUnit;
 
 
 import static net.shasankp000.PathFinding.PathFinder.*;
-import static net.minecraft.server.command.CommandManager.literal;
+import static net.minecraft.commands.Commands.literal;
 import net.shasankp000.PacketHandler.InputPacketHandler;
 
 public class modCommandRegistry {
@@ -72,7 +72,7 @@ public class modCommandRegistry {
     public static final Logger LOGGER = LoggerFactory.getLogger("mod-command-registry");
 
 
-    public record BotStopTask(MinecraftServer server, ServerCommandSource botSource,
+    public record BotStopTask(MinecraftServer server, CommandSourceStack botSource,
                                   String botName) implements Runnable {
 
         @Override
@@ -98,8 +98,8 @@ public class modCommandRegistry {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 literal("bot")
                         .then(literal("spawn")
-                                .then(CommandManager.argument("bot_name", StringArgumentType.string())
-                                        .then(CommandManager.argument("mode", StringArgumentType.string())
+                                .then(Commands.argument("bot_name", StringArgumentType.string())
+                                        .then(Commands.argument("mode", StringArgumentType.string())
                                                 .executes(context -> {
 
                                                     String spawnMode = StringArgumentType.getString(context, "mode");
@@ -113,31 +113,31 @@ public class modCommandRegistry {
                                 )
                         )
                         .then(literal("walk")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("till", IntegerArgumentType.integer())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("till", IntegerArgumentType.integer())
                                                 .executes(context -> { botWalk(context); return 1; })
                                         )
                                 )
                         )
                         .then(literal("jump")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> { botJump(context); return 1; })
                                 )
                         )
                         .then(literal("teleport_forward")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> { teleportForward(context); return 1; })
                                 )
                         )
                         .then(literal("test_chat_message")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> { testChatMessage(context); return 1; })
                                 )
                         )
                         .then(literal("go_to")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
-                                                .then(CommandManager.argument("sprint", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                                .then(Commands.argument("sprint", StringArgumentType.string())
                                                         .executes(context -> { botGo(context); return 1; })
                                                 )
                                         )
@@ -151,10 +151,10 @@ public class modCommandRegistry {
                         // cancel — removes any active stance and stops ongoing path
                         // ----------------------------------------------------------------
                         .then(literal("stance")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("mode", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("mode", StringArgumentType.string())
                                                 // variant with optional target player name (for follow)
-                                                .then(CommandManager.argument("target", StringArgumentType.string())
+                                                .then(Commands.argument("target", StringArgumentType.string())
                                                         .executes(context -> {
                                                             botStance(context, true);
                                                             return 1;
@@ -169,8 +169,8 @@ public class modCommandRegistry {
                                 )
                         )
                         .then(literal("send_message_to")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("message", StringArgumentType.greedyString())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("message", StringArgumentType.greedyString())
                                                 .executes(context -> {
 
                                                     ollamaClient.execute(context);
@@ -182,9 +182,9 @@ public class modCommandRegistry {
                                 )
                         )
                         .then(literal("detect_entities")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                             if (bot != null) {
                                                 RayCasting.detect(bot);
                                             }
@@ -193,11 +193,11 @@ public class modCommandRegistry {
                                 )
                         )
                         .then(literal("get_block_map")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("vertical", IntegerArgumentType.integer())
-                                                .then(CommandManager.argument("horizontal", IntegerArgumentType.integer())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("vertical", IntegerArgumentType.integer())
+                                                .then(Commands.argument("horizontal", IntegerArgumentType.integer())
                                                         .executes(context -> {
-                                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                                             int y = IntegerArgumentType.getInteger(context, "vertical");
                                                             int x = IntegerArgumentType.getInteger(context, "horizontal");
 
@@ -213,9 +213,9 @@ public class modCommandRegistry {
 
                         )
                         .then(literal("start_autoface")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                             LOGGER.info("Manually starting autoface for bot: {}", bot.getName().getString());
                                             AutoFaceEntity.startAutoFace(bot);
                                             ChatUtils.sendSystemMessage(context.getSource(), "AutoFace started for " + bot.getName().getString());
@@ -225,11 +225,11 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("detect_blocks")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("block_type", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("block_type", StringArgumentType.string())
                                                 .executes(context -> {
 
-                                                    ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                    ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                                     String blockType = StringArgumentType.getString(context, "block_type");
 
                                                     BlockPos outPutPos = blockDetectionUnit.detectBlocks(bot, blockType);
@@ -244,24 +244,24 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("turn")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("direction", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("direction", StringArgumentType.string())
                                                 .executes(context -> {
 
-                                                    ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
-                                                    MinecraftServer server = bot.getServer();
+                                                    ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+                                                    MinecraftServer server = bot.createCommandSourceStack().getServer();
                                                     assert server != null;
                                                     String direction = StringArgumentType.getString(context, "direction");
 
                                                     switch (direction) {
                                                         case "left", "right", "back" -> {
-                                                            turnTool.turn(bot.getCommandSource().withSilent().withMaxLevel(4), direction);
+                                                            turnTool.turn(bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS), direction);
 
-                                                            LOGGER.info("Now facing {} which is in {} in {} axis", direction, bot.getFacing().getName(), bot.getFacing().getAxis().asString());
+                                                            LOGGER.info("Now facing {} which is in {} in {} axis", direction, bot.getNearestViewDirection().getName(), bot.getNearestViewDirection().getAxis().getSerializedName());
                                                         }
                                                         default -> {
                                                             server.execute(() -> {
-                                                                ChatUtils.sendChatMessages(bot.getCommandSource().withSilent().withMaxLevel(4), "Invalid parameters! Accepted parameters: left, right, back only!");
+                                                                ChatUtils.sendChatMessages(bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS), "Invalid parameters! Accepted parameters: left, right, back only!");
                                                             });
                                                         }
                                                     }
@@ -274,15 +274,15 @@ public class modCommandRegistry {
 
 
                         .then(literal("chart_path_to_block")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("block_type", StringArgumentType.string())
-                                                .then(CommandManager.argument("x", IntegerArgumentType.integer())
-                                                        .then(CommandManager.argument("y", IntegerArgumentType.integer())
-                                                                .then(CommandManager.argument("z", IntegerArgumentType.integer())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("block_type", StringArgumentType.string())
+                                                .then(Commands.argument("x", IntegerArgumentType.integer())
+                                                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                                                .then(Commands.argument("z", IntegerArgumentType.integer())
                                                                         .executes(context -> {
 
-                                                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
-                                                                            MinecraftServer server = bot.getServer();
+                                                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+                                                                            MinecraftServer server = bot.createCommandSourceStack().getServer();
                                                                             assert server != null;
                                                                             String blockType = StringArgumentType.getString(context, "block_type");
                                                                             int x = IntegerArgumentType.getInteger(context, "x");
@@ -303,15 +303,15 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("shoot_arrow")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("debug", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("debug", StringArgumentType.string())
                                                 .executes(context -> {
 
-                                                    ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                    ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                                     String debugMode = StringArgumentType.getString(context, "debug");
-                                                    MinecraftServer server = bot.getServer();
+                                                    MinecraftServer server = bot.createCommandSourceStack().getServer();
                                                     assert server != null;
-                                                    ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                                    CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
                                                     // Check if bot can shoot (checks entire inventory now, not just equipped)
                                                     if (!RangedWeaponUtils.hasBowOrCrossbow(bot)) {
@@ -347,12 +347,12 @@ public class modCommandRegistry {
                                                     List<Entity> hostileEntities = nearbyEntities.stream()
                                                             .filter(entity -> {
                                                                 // Include hostile mobs
-                                                                if (entity instanceof HostileEntity) {
+                                                                if (entity instanceof Monster) {
                                                                     return true;
                                                                 }
                                                                 // Include hostile players (tracked by retaliation system)
-                                                                if (entity instanceof net.minecraft.entity.player.PlayerEntity player &&
-                                                                    !player.getUuid().equals(bot.getUuid())) {
+                                                                if (entity instanceof net.minecraft.world.entity.player.Player player &&
+                                                                    !player.getUUID().equals(bot.getUUID())) {
                                                                     return net.shasankp000.PlayerUtils.PlayerRetaliationTracker.isPlayerHostile(bot, player);
                                                                 }
                                                                 return false;
@@ -375,7 +375,7 @@ public class modCommandRegistry {
                                                         return 0;
                                                     }
 
-                                                    double distance = bot.getPos().distanceTo(target.getPos());
+                                                    double distance = bot.position().distanceTo(target.position());
                                                     String targetName = target.getName().getString();
 
                                                     if (debugMode.equals("true")) {
@@ -388,8 +388,8 @@ public class modCommandRegistry {
 
                                                     // Switch to bow/crossbow if not already equipped
                                                     int weaponSlot = RangedWeaponUtils.getBowOrCrossbowSlot(bot);
-                                                    if (weaponSlot != -1 && bot.getInventory().selectedSlot != (weaponSlot - 1)) {
-                                                        server.getCommandManager().executeWithPrefix(botSource, "/player " + bot.getName().getString() + " hotbar " + weaponSlot);
+                                                    if (weaponSlot != -1 && bot.getInventory().getSelectedSlot() != (weaponSlot - 1)) {
+                                                        server.getCommands().performPrefixedCommand(botSource, "/player " + bot.getName().getString() + " hotbar " + weaponSlot);
                                                         LOGGER.info("Switched to ranged weapon in slot {}", weaponSlot);
                                                         try {
                                                             Thread.sleep(100);
@@ -403,22 +403,22 @@ public class modCommandRegistry {
 
                                                     boolean isMovingFast = RangedWeaponUtils.isTargetMovingFast(target);
 
-                                                    Vec3d aimPosition;
+                                                    Vec3 aimPosition;
                                                     if (isMovingFast) {
                                                         aimPosition = RangedWeaponUtils.calculateLeadPosition(target, projectileSpeed);
                                                         LOGGER.info("Applied lead compensation for fast-moving target");
                                                     } else {
-                                                        aimPosition = target.getPos().add(0, target.getHeight() * 0.6, 0);
+                                                        aimPosition = target.position().add(0, target.getBbHeight() * 0.6, 0);
                                                     }
 
                                                     float[] aimAngles = RangedWeaponUtils.calculateAimAngles(bot, aimPosition);
-                                                    bot.setYaw(aimAngles[0]);
-                                                    bot.setPitch(aimAngles[1]);
+                                                    bot.setYRot(aimAngles[0]);
+                                                    bot.setXRot(aimAngles[1]);
 
                                                     LOGGER.info("Aiming at {} at distance {} using {} (ballistic trajectory)",
                                                         targetName, String.format("%.1f", distance), ammoTypeName);
 
-                                                    String weaponName = bot.getMainHandStack().getItem().getName().getString().toLowerCase();
+                                                    String weaponName = bot.getMainHandItem().getHoverName().getString().toLowerCase();
                                                     boolean isCrossbow = weaponName.contains("crossbow");
 
                                                     int drawTime;
@@ -439,7 +439,7 @@ public class modCommandRegistry {
                                                     }
 
                                                     String playerName = bot.getName().getString();
-                                                    server.getCommandManager().executeWithPrefix(botSource, "/player " + playerName + " use continuous");
+                                                    server.getCommands().performPrefixedCommand(botSource, "/player " + playerName + " use continuous");
                                                     LOGGER.info("Started drawing weapon");
 
                                                     Entity finalTarget = target;
@@ -447,18 +447,18 @@ public class modCommandRegistry {
                                                     double finalProjectileSpeed = projectileSpeed;
                                                     scheduler.schedule(() -> {
                                                         if (finalTarget.isAlive()) {
-                                                            Vec3d finalAimPosition;
+                                                            Vec3 finalAimPosition;
                                                             if (isMovingFast) {
                                                                 finalAimPosition = RangedWeaponUtils.calculateLeadPosition(finalTarget, finalProjectileSpeed);
                                                             } else {
-                                                                finalAimPosition = finalTarget.getPos().add(0, finalTarget.getHeight() * 0.6, 0);
+                                                                finalAimPosition = finalTarget.position().add(0, finalTarget.getBbHeight() * 0.6, 0);
                                                             }
                                                             float[] reAimAngles = RangedWeaponUtils.calculateAimAngles(bot, finalAimPosition);
-                                                            bot.setYaw(reAimAngles[0]);
-                                                            bot.setPitch(reAimAngles[1]);
+                                                            bot.setYRot(reAimAngles[0]);
+                                                            bot.setXRot(reAimAngles[1]);
                                                         }
 
-                                                        server.getCommandManager().executeWithPrefix(botSource, "/player " + playerName + " use");
+                                                        server.getCommands().performPrefixedCommand(botSource, "/player " + playerName + " use");
                                                         if (debugMode.equals("true")) {
                                                             ChatUtils.sendChatMessages(botSource, ammoTypeName.substring(0, 1).toUpperCase() + ammoTypeName.substring(1) + " released at " + targetName + "!");
                                                         }
@@ -482,11 +482,11 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("reset_autoface")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
-                                            MinecraftServer server = bot.getServer();
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+                                            MinecraftServer server = bot.createCommandSourceStack().getServer();
                                             assert server != null;
                                             blockDetectionUnit.setIsBlockDetectionActive(false);
                                             PathTracer.flushAllMovementTasks();
@@ -494,7 +494,7 @@ public class modCommandRegistry {
                                             AutoFaceEntity.isBotMoving = false;
 
                                             server.execute(() -> {
-                                                ChatUtils.sendChatMessages(bot.getCommandSource().withSilent().withMaxLevel(4), "Autoface module reset complete.");
+                                                ChatUtils.sendChatMessages(bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS), "Autoface module reset complete.");
                                             });
 
                                             return 1;
@@ -504,14 +504,14 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("plan")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("goal", StringArgumentType.greedyString())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("goal", StringArgumentType.greedyString())
                                                 .executes(context -> {
-                                                    ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                    ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                                     String goal = StringArgumentType.getString(context, "goal");
-                                                    MinecraftServer server = bot.getServer();
+                                                    MinecraftServer server = bot.createCommandSourceStack().getServer();
                                                     assert server != null;
-                                                    ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                                    CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
                                                     net.shasankp000.GameAI.RLAgent rlAgent = BotEventHandler.getRLAgent();
                                                     if (rlAgent == null) {
@@ -553,14 +553,14 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("mine_block")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("block_type", StringArgumentType.string())
-                                                .then(CommandManager.argument("x", IntegerArgumentType.integer())
-                                                        .then(CommandManager.argument("y", IntegerArgumentType.integer())
-                                                                .then(CommandManager.argument("z", IntegerArgumentType.integer())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("block_type", StringArgumentType.string())
+                                                .then(Commands.argument("x", IntegerArgumentType.integer())
+                                                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                                                .then(Commands.argument("z", IntegerArgumentType.integer())
                                                                         .executes(context -> {
 
-                                                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                                                             int x = IntegerArgumentType.getInteger(context, "x");
                                                                             int y = IntegerArgumentType.getInteger(context, "y");
                                                                             int z = IntegerArgumentType.getInteger(context, "z");
@@ -577,12 +577,12 @@ public class modCommandRegistry {
 
 
                         .then(literal("use-key")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("key", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("key", StringArgumentType.string())
                                                 .executes(context -> {
                                                     MinecraftServer server = context.getSource().getServer();
 
-                                                    ServerCommandSource serverSource = server.getCommandSource();
+                                                    CommandSourceStack serverSource = server.createCommandSourceStack();
                                                     String inputKey = StringArgumentType.getString(context, "key");
 
                                                     switch (inputKey) {
@@ -620,18 +620,18 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("look")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("bot_name", StringArgumentType.string())
-                                                .then(CommandManager.argument("direction", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("bot_name", StringArgumentType.string())
+                                                .then(Commands.argument("direction", StringArgumentType.string())
                                                         .executes(context -> {
 
                                                             MinecraftServer server = context.getSource().getServer();
 
-                                                            ServerCommandSource serverSource = server.getCommandSource();
+                                                            CommandSourceStack serverSource = server.createCommandSourceStack();
 
                                                             String botName = StringArgumentType.getString(context, "bot_name");
 
-                                                            ServerPlayerEntity bot = context.getSource().getServer().getPlayerManager().getPlayer(botName);
+                                                            ServerPlayer bot = context.getSource().getServer().getPlayerList().getPlayerByName(botName);
 
                                                             String direction = StringArgumentType.getString(context, "direction");
 
@@ -669,12 +669,12 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("release-all-keys")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("bot_name", StringArgumentType.string())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("bot_name", StringArgumentType.string())
                                                 .executes(context -> {
                                                     MinecraftServer server = context.getSource().getServer();
 
-                                                    ServerCommandSource serverSource = server.getCommandSource();
+                                                    CommandSourceStack serverSource = server.createCommandSourceStack();
 
                                                     String botName = StringArgumentType.getString(context, "bot_name");
 
@@ -690,14 +690,14 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("detectDangerZone")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
-                                        .then(CommandManager.argument("lavaRange", IntegerArgumentType.integer())
-                                                .then(CommandManager.argument("cliffRange", IntegerArgumentType.integer())
-                                                        .then(CommandManager.argument("cliffDepth", IntegerArgumentType.integer())
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(Commands.argument("lavaRange", IntegerArgumentType.integer())
+                                                .then(Commands.argument("cliffRange", IntegerArgumentType.integer())
+                                                        .then(Commands.argument("cliffDepth", IntegerArgumentType.integer())
                                                                 .executes(context -> {
 
-                                                                    ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
-                                                                    ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                                                    ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+                                                                    CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
                                                                     MinecraftServer server = botSource.getServer();
 
                                                                     int lavaRange = IntegerArgumentType.getInteger(context, "lavaRange");
@@ -725,10 +725,10 @@ public class modCommandRegistry {
 
 
                         .then(literal("getHotbarItems")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
-                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+                                            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
                                             List<ItemStack> hotbarItems = hotBarUtils.getHotbarItems(bot);
 
@@ -743,7 +743,7 @@ public class modCommandRegistry {
                                                     messageBuilder.append("Slot ").append(i+1).append(": EMPTY\n");
                                                 } else {
                                                     messageBuilder.append("Slot ").append(i+1).append(": ")
-                                                            .append(itemStack.getName().getString())
+                                                            .append(itemStack.getHoverName().getString())
                                                             .append(" (Count: ").append(itemStack.getCount()).append(")\n");
                                                 }
                                             }
@@ -760,14 +760,14 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("getSelectedItem")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
 
-                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
-                                            String selectedItem = hotBarUtils.getSelectedHotbarItemStack(bot).getItem().getName().getString();
+                                            String selectedItem = hotBarUtils.getSelectedHotbarItemStack(bot).getHoverName().getString();
 
                                             ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItem);
 
@@ -779,12 +779,12 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("getHungerLevel")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
 
-                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
                                             int botHungerLevel = getPlayerHunger.getBotHungerLevel(bot);
 
@@ -797,12 +797,12 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("getOxygenLevel")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
 
-                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
                                             int botHungerLevel = getPlayerOxygen.getBotOxygenLevel(bot);
 
@@ -813,12 +813,12 @@ public class modCommandRegistry {
                                 )
                         )
                         .then(literal("getHealth")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
 
-                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
                                             int botHealthLevel = (int) bot.getHealth();
 
@@ -830,24 +830,24 @@ public class modCommandRegistry {
                         )
 
                         .then(literal("isFoodItem")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
 
-                                            ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+                                            CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
                                             ItemStack selectedItemStack = hotBarUtils.getSelectedHotbarItemStack(bot);
 
                                             if (isFoodItem.checkFoodItem(selectedItemStack)) {
 
-                                                ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItemStack.getItem().getName().getString() + " is a food item.");
+                                                ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItemStack.getHoverName().getString() + " is a food item.");
 
                                             }
 
                                             else {
 
-                                                ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItemStack.getItem().getName().getString() + " is not a food item.");
+                                                ChatUtils.sendChatMessages(botSource, "Currently selected item: " + selectedItemStack.getHoverName().getString() + " is not a food item.");
 
                                             }
 
@@ -858,10 +858,10 @@ public class modCommandRegistry {
 
 
                         .then(literal("equipArmor")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
 
                                             armorUtils.autoEquipArmor(bot);
 
@@ -871,10 +871,10 @@ public class modCommandRegistry {
                                 )
                         )
                         .then(literal("removeArmor")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
 
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
 
                                             armorUtils.autoDeEquipArmor(bot);
 
@@ -888,7 +888,7 @@ public class modCommandRegistry {
                                 .executes(context -> {
 
                                     MinecraftServer server = context.getSource().getServer();
-                                    ServerCommandSource serverSource = server.getCommandSource();
+                                    CommandSourceStack serverSource = server.createCommandSourceStack();
 
                                     ChatUtils.sendSystemMessage(serverSource, "Exporting Q-table to JSON. Please wait.... ");
 
@@ -902,17 +902,17 @@ public class modCommandRegistry {
 
                         // Feature 2: /bot mood
                         .then(literal("mood")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                             String snapshot = MoodEngine.getStatusSnapshot(bot.getName().getString());
                                             ChatUtils.sendSystemMessage(context.getSource(),
                                                     "[" + bot.getName().getString() + "] mood: " + snapshot);
                                             return 1;
                                         })
-                                        .then(CommandManager.argument("mood_label", StringArgumentType.string())
+                                        .then(Commands.argument("mood_label", StringArgumentType.string())
                                                 .executes(context -> {
-                                                    ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                    ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                                     String botName = bot.getName().getString();
                                                     String labelStr = StringArgumentType.getString(context, "mood_label").toUpperCase();
                                                     MoodLabel label;
@@ -947,9 +947,9 @@ public class modCommandRegistry {
 
                         // Feature 3: /bot persona
                         .then(literal("persona")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                             String botName = bot.getName().getString();
                                             String all = PersonaRegistry.ids().stream()
                                                     .collect(Collectors.joining(", "));
@@ -957,9 +957,9 @@ public class modCommandRegistry {
                                                     "[" + botName + "] available personas: " + all);
                                             return 1;
                                         })
-                                        .then(CommandManager.argument("persona_id", StringArgumentType.string())
+                                        .then(Commands.argument("persona_id", StringArgumentType.string())
                                                 .executes(context -> {
-                                                    ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
+                                                    ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
                                                     String botName = bot.getName().getString();
                                                     String personaId = StringArgumentType.getString(context, "persona_id");
                                                     Optional<PersonaTemplate> opt = PersonaRegistry.get(personaId);
@@ -982,27 +982,27 @@ public class modCommandRegistry {
 
                         // Feature 4: /bot trade
                         .then(literal("trade")
-                                .then(CommandManager.argument("bot", EntityArgumentType.player())
+                                .then(Commands.argument("bot", EntityArgument.player())
                                         .executes(context -> {
-                                            ServerPlayerEntity bot = EntityArgumentType.getPlayer(context, "bot");
-                                            ServerCommandSource src = context.getSource();
-                                            ServerPlayerEntity player;
+                                            ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+                                            CommandSourceStack src = context.getSource();
+                                            ServerPlayer player;
                                             try {
-                                                player = src.getPlayerOrThrow();
+                                                player = src.getPlayerOrException();
                                             } catch (CommandSyntaxException e) {
                                                 ChatUtils.sendSystemMessage(src, "This command must be run by a player.");
                                                 return 0;
                                             }
                                             ItemStack botOffer = TradeEvaluator.evaluate(ItemStack.EMPTY, bot);
                                             if (botOffer.isEmpty()) {
-                                                player.sendMessage(
-                                                        Text.literal("§e[" + bot.getName().getString()
+                                                player.sendSystemMessage(
+                                                        Component.literal("§e[" + bot.getName().getString()
                                                                 + "] §fI have nothing worth trading right now."),
                                                         false);
                                                 return 0;
                                             }
-                                            player.sendMessage(
-                                                    Text.literal("§e[" + bot.getName().getString()
+                                            player.sendSystemMessage(
+                                                    Component.literal("§e[" + bot.getName().getString()
                                                             + "] §fI could offer: §b"
                                                             + TradeEvaluator.displayName(botOffer)
                                                             + "§f. Sneak and throw the item you want to give me!"),
@@ -1011,15 +1011,15 @@ public class modCommandRegistry {
                                         })
                                         .then(literal("cancel")
                                                 .executes(context -> {
-                                                    ServerCommandSource src = context.getSource();
-                                                    ServerPlayerEntity player;
+                                                    CommandSourceStack src = context.getSource();
+                                                    ServerPlayer player;
                                                     try {
-                                                        player = src.getPlayerOrThrow();
+                                                        player = src.getPlayerOrException();
                                                     } catch (CommandSyntaxException e) {
                                                         ChatUtils.sendSystemMessage(src, "Must be run by a player.");
                                                         return 0;
                                                     }
-                                                    TradeListener.cancelSession(player.getUuid());
+                                                    TradeListener.cancelSession(player.getUUID());
                                                     ChatUtils.sendSystemMessage(src, "Trade session cancelled.");
                                                     return 1;
                                                 })
@@ -1031,7 +1031,7 @@ public class modCommandRegistry {
                                 .executes(context -> {
 
                                     MinecraftServer server = context.getSource().getServer();
-                                    ServerCommandSource serverSource = server.getCommandSource();
+                                    CommandSourceStack serverSource = server.createCommandSourceStack();
                                     PathTracer.flushAllMovementTasks();
 
                                     ChatUtils.sendSystemMessage(serverSource, "Flushed all movement tasks");
@@ -1064,22 +1064,22 @@ public class modCommandRegistry {
      * @param context   the command context
      * @param hasTarget true when the optional {@code target} argument was supplied
      */
-    private static void botStance(CommandContext<ServerCommandSource> context, boolean hasTarget) {
-        ServerPlayerEntity bot;
+    private static void botStance(CommandContext<CommandSourceStack> context, boolean hasTarget) {
+        ServerPlayer bot;
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException e) {
-            context.getSource().sendMessage(Text.of("Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("Bot not found!"));
             return;
         }
 
         String mode = StringArgumentType.getString(context, "mode").toLowerCase();
         String botName = bot.getName().getString();
-        ServerCommandSource cmdSource = context.getSource();
+        CommandSourceStack cmdSource = context.getSource();
 
         switch (mode) {
             case "stay" -> {
-                BlockPos anchor = bot.getBlockPos();
+                BlockPos anchor = bot.blockPosition();
                 BotStance.setStay(botName, anchor);
                 ChatUtils.sendSystemMessage(cmdSource,
                         botName + " is now in STAY mode. Anchor: " + anchor);
@@ -1095,7 +1095,7 @@ public class modCommandRegistry {
                 String target = StringArgumentType.getString(context, "target");
                 // Validate target exists on the server
                 MinecraftServer server = cmdSource.getServer();
-                if (server.getPlayerManager().getPlayer(target) == null) {
+                if (server.getPlayerList().getPlayerByName(target) == null) {
                     ChatUtils.sendSystemMessage(cmdSource,
                             "Player '" + target + "' not found on this server.");
                     return;
@@ -1119,23 +1119,23 @@ public class modCommandRegistry {
     }
 
 
-    private static void spawnBot(CommandContext<ServerCommandSource> context, String spawnMode) {
+    private static void spawnBot(CommandContext<CommandSourceStack> context, String spawnMode) {
         LOGGER.info("========== SPAWNING BOT IN MODE: {} ==========", spawnMode);
 
         MinecraftServer server = context.getSource().getServer();
         BlockPos spawnPos = getBlockPos(context);
 
-        RegistryKey<World> dimType = context.getSource().getWorld().getRegistryKey();
+        ResourceKey<Level> dimType = context.getSource().getLevel().dimension();
 
-        Vec2f facing = context.getSource().getRotation();
+        Vec2 facing = context.getSource().getRotation();
 
-        Vec3d pos = new Vec3d(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
+        Vec3 pos = new Vec3(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
 
-        GameMode mode = GameMode.SURVIVAL;
+        GameType mode = GameType.SURVIVAL;
 
         botName = StringArgumentType.getString(context, "bot_name");
 
-        ServerCommandSource serverSource = server.getCommandSource();
+        CommandSourceStack serverSource = server.createCommandSourceStack();
 
 
         if (spawnMode.equals("training")) {
@@ -1155,11 +1155,11 @@ public class modCommandRegistry {
 
             LOGGER.info("Spawned new bot {}!", botName);
 
-            ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+            ServerPlayer bot = server.getPlayerList().getPlayerByName(botName);
 
             if (bot!=null) {
 
-                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+                Objects.requireNonNull(bot.getAttribute(Attributes.KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
 
                 RespawnHandler.registerRespawnListener(bot);
 
@@ -1186,13 +1186,13 @@ public class modCommandRegistry {
 
             LOGGER.info("Spawned new bot {}!", botName);
 
-            ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+            ServerPlayer bot = server.getPlayerList().getPlayerByName(botName);
 
             System.out.println("Preparing for connection to language model....");
 
             if (bot!=null) {
 
-                Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
+                Objects.requireNonNull(bot.getAttribute(Attributes.KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
 
                 System.out.println("Registering respawn listener....");
 
@@ -1202,17 +1202,20 @@ public class modCommandRegistry {
 
                 System.out.println("Set bot's username to " + botName);
 
-                String llmProvider = System.getProperty("aiplayer.llmMode", "ollama");
+                String llmProvider = System.getProperty("aiplayer.llmMode", "custom");
 
                 System.out.println("Using provider");
 
                 switch (llmProvider) {
                     case "openai", "gpt", "google", "gemini", "anthropic", "claude", "xAI", "xai", "grok", "custom":
                         LLMClient llmClient = LLMClientFactory.createClient(llmProvider);
-                        assert llmClient != null;
+                        if (llmClient == null) {
+                            ChatUtils.sendSystemMessage(serverSource, "LLM client could not be created. Check your OpenAI-compatible endpoint, API key, and selected model.");
+                            break;
+                        }
 
                         ChatUtils.sendSystemMessage(serverSource, "Please wait while " + botName + " connects to " + llmClient.getProvider() + "'s servers.");
-                        LLMServiceHandler.sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4), llmClient);
+                        LLMServiceHandler.sendInitialResponse(bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS), llmClient);
 
                         new Thread(() -> {
                             LOGGER.info("Waiting for LLM Service Handler to initialize...");
@@ -1246,66 +1249,9 @@ public class modCommandRegistry {
 
                         break;
 
-                    case "ollama":
-                        ChatUtils.sendSystemMessage(serverSource, "Please wait while " + botName + " connects to the language model.");
-                        ollamaClient.initializeOllamaClient();
-
-                        new Thread(() -> {
-                            LOGGER.info("Waiting for Ollama client to initialize...");
-                            int waitCount = 0;
-                            while (!ollamaClient.isInitialized) {
-                                try {
-                                    Thread.sleep(500L);
-                                    waitCount++;
-                                    if (waitCount % 10 == 0) {
-                                        LOGGER.warn("Still waiting for Ollama initialization... ({} seconds)", waitCount / 2);
-                                    }
-                                    if (waitCount > 60) {
-                                        LOGGER.error("Ollama initialization timeout! Starting AutoFace anyway.");
-                                        AutoFaceEntity.startAutoFace(bot);
-                                        Thread.currentThread().interrupt();
-                                        return;
-                                    }
-                                } catch (InterruptedException e) {
-                                    LOGGER.error("Ollama client initialization interrupted.");
-                                    Thread.currentThread().interrupt();
-                                    break;
-                                }
-                            }
-
-                            LOGGER.info("Ollama client initialized! Starting AutoFace...");
-                            ollamaClient.sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
-                            AutoFaceEntity.startAutoFace(bot);
-
-                            Thread.currentThread().interrupt();
-
-                        }).start();
-
-                        break;
-
                     default:
-                        LOGGER.warn("Unsupported provider detected. Defaulting to Ollama client");
-                        ChatUtils.sendSystemMessage(serverSource, "Warning! Unsupported provider detected. Defaulting to Ollama client");
-                        ChatUtils.sendSystemMessage(serverSource, "Please wait while " + botName + " connects to the language model.");
-                        ollamaClient.initializeOllamaClient();
-
-                        new Thread(() -> {
-                            while (!ollamaClient.isInitialized) {
-                                try {
-                                    Thread.sleep(500L);
-                                } catch (InterruptedException e) {
-                                    LOGGER.error("Ollama client initialization interrupted.");
-                                    Thread.currentThread().interrupt();
-                                    break;
-                                }
-                            }
-
-                            ollamaClient.sendInitialResponse(bot.getCommandSource().withSilent().withMaxLevel(4));
-                            AutoFaceEntity.startAutoFace(bot);
-
-                            Thread.currentThread().interrupt();
-
-                        }).start();
+                        LOGGER.warn("Unsupported provider detected: {}", llmProvider);
+                        ChatUtils.sendSystemMessage(serverSource, "Unsupported provider. Set aiplayer.llmMode=custom and configure an OpenAI-compatible endpoint.");
 
                         break;
 
@@ -1327,27 +1273,27 @@ public class modCommandRegistry {
 
     }
 
-    private static void notImplementedMessage(CommandContext<ServerCommandSource> context) {
+    private static void notImplementedMessage(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
 
         String botName = StringArgumentType.getString(context, "bot_name");
 
-        ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+        ServerPlayer bot = server.getPlayerList().getPlayerByName(botName);
 
         if (bot == null) {
 
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
 
         }
 
         else {
 
-            ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
+            CommandSourceStack botSource = bot.createCommandSourceStack().withPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS).withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
-            server.getCommandManager().executeWithPrefix(botSource, "/say \u00a7cThis command has not been implemented yet and is a work in progress! ");
+            server.getCommands().performPrefixedCommand(botSource, "/say \u00a7cThis command has not been implemented yet and is a work in progress! ");
 
 
         }
@@ -1355,26 +1301,26 @@ public class modCommandRegistry {
 
     }
 
-    private static void teleportForward(CommandContext<ServerCommandSource> context) {
+    private static void teleportForward(CommandContext<CommandSourceStack> context) {
         MinecraftServer server = context.getSource().getServer();
 
-        ServerPlayerEntity bot = null;
-        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
+        ServerPlayer bot = null;
+        try {bot = EntityArgument.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
 
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
 
         }
 
         else {
-            String botName = bot.getName().getLiteralString();
+            String botName = bot.getName().tryCollapseToString();
 
-            BlockPos currentPosition = bot.getBlockPos();
-            BlockPos newPosition = currentPosition.add(1, 0, 0);
-            bot.teleport(bot.getServerWorld(), newPosition.getX(), newPosition.getY(), newPosition.getZ(), Set.of(), bot.getYaw(), bot.getPitch());
+            BlockPos currentPosition = bot.blockPosition();
+            BlockPos newPosition = currentPosition.offset(1, 0, 0);
+            bot.teleportTo(bot.level(), newPosition.getX(), newPosition.getY(), newPosition.getZ(), Set.of(), bot.getYRot(), bot.getXRot(), false);
 
             LOGGER.info("Teleported {} 1 positive block ahead", botName);
 
@@ -1382,29 +1328,29 @@ public class modCommandRegistry {
 
     }
 
-    private static void botWalk(CommandContext<ServerCommandSource> context) {
+    private static void botWalk(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
 
-        ServerPlayerEntity bot = null;
-        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
+        ServerPlayer bot = null;
+        try {bot = EntityArgument.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
         int travelTime = IntegerArgumentType.getInteger(context, "till");
 
 
         if (bot == null) {
 
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
 
         }
 
         else {
 
-            String botName = bot.getName().getLiteralString();
+            String botName = bot.getName().tryCollapseToString();
 
-            ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
+            CommandSourceStack botSource = bot.createCommandSourceStack().withPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS).withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
             moveForward(server, botSource, botName);
 
             scheduler.schedule(new BotStopTask(server, botSource, botName), travelTime, TimeUnit.SECONDS);
@@ -1415,27 +1361,27 @@ public class modCommandRegistry {
     }
 
 
-    private static void botJump(CommandContext<ServerCommandSource> context) {
+    private static void botJump(CommandContext<CommandSourceStack> context) {
 
         MinecraftServer server = context.getSource().getServer();
 
-        ServerPlayerEntity bot = null;
-        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
+        ServerPlayer bot = null;
+        try {bot = EntityArgument.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
 
         if (bot == null) {
 
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
 
         }
 
         else {
 
-            String botName = bot.getName().getLiteralString();
+            String botName = bot.getName().tryCollapseToString();
 
-            bot.jump();
+            bot.jumpFromGround();
 
             LOGGER.info("{} jumped!", botName);
 
@@ -1443,33 +1389,33 @@ public class modCommandRegistry {
 
     }
 
-    private static void testChatMessage(CommandContext<ServerCommandSource> context) {
+    private static void testChatMessage(CommandContext<CommandSourceStack> context) {
 
         String response = "I am doing great! It feels good to be able to chat with you again after a long time. So, how have you been doing? Are you enjoying the game world and having fun playing Minecraft with me? Let's continue chatting about whatever topic comes to mind! I love hearing from you guys and seeing your creations in the game. Don't hesitate to share anything with me, whether it's an idea, a problem, or simply something that makes you laugh. Cheers!";
 
         MinecraftServer server = context.getSource().getServer();
 
-        ServerPlayerEntity bot = null;
-        try {bot = EntityArgumentType.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
+        ServerPlayer bot = null;
+        try {bot = EntityArgument.getPlayer(context, "bot");} catch (CommandSyntaxException ignored) {}
 
         if (bot != null) {
 
-            ServerCommandSource botSource = bot.getCommandSource().withMaxLevel(4).withSilent();
+            CommandSourceStack botSource = bot.createCommandSourceStack().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS).withSuppressedOutput();
             ChatUtils.sendChatMessages(botSource, response);
 
         }
         else {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
 
         }
 
     }
 
-    private static void botGo(CommandContext<ServerCommandSource> context) {
+    private static void botGo(CommandContext<CommandSourceStack> context) {
         MinecraftServer server = context.getSource().getServer();
-        BlockPos position = BlockPosArgumentType.getBlockPos(context, "pos");
+        BlockPos position = BlockPosArgument.getBlockPos(context, "pos");
         String sprintFlag = StringArgumentType.getString(context, "sprint");
 
         boolean sprint;
@@ -1482,36 +1428,36 @@ public class modCommandRegistry {
         }
         else {
             sprint = false;
-            ChatUtils.sendChatMessages(server.getCommandSource(), "Wrong argument! Command is as follows: /bot go_to <botName> <xyz> <true/false (case insensitive)>");
+            ChatUtils.sendChatMessages(server.createCommandSourceStack(), "Wrong argument! Command is as follows: /bot go_to <botName> <xyz> <true/false (case insensitive)>");
         }
 
         int x_distance = position.getX();
         int y_distance = position.getY();
         int z_distance = position.getZ();
 
-        ServerWorld world = server.getOverworld();
+        ServerLevel world = server.overworld();
 
-        ServerPlayerEntity bot = null;
+        ServerPlayer bot = null;
         try {
-            bot = EntityArgumentType.getPlayer(context, "bot");
+            bot = EntityArgument.getPlayer(context, "bot");
         } catch (CommandSyntaxException ignored) {}
 
         if (bot == null) {
-            context.getSource().sendMessage(Text.of("The requested bot could not be found on the server!"));
-            server.sendMessage(Text.literal("Error! Bot not found!"));
+            context.getSource().sendSystemMessage(Component.nullToEmpty("The requested bot could not be found on the server!"));
+            server.sendSystemMessage(Component.literal("Error! Bot not found!"));
             LOGGER.error("The requested bot could not be found on the server!");
             return;
         }
 
-        String botName = bot.getName().getLiteralString();
-        ServerCommandSource botSource = bot.getCommandSource().withLevel(2).withSilent().withMaxLevel(4);
+        String botName = bot.getName().tryCollapseToString();
+        CommandSourceStack botSource = bot.createCommandSourceStack().withPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS).withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
-        server.sendMessage(Text.literal("Finding the shortest path to the target, please wait patiently if the game seems hung"));
+        server.sendSystemMessage(Component.literal("Finding the shortest path to the target, please wait patiently if the game seems hung"));
 
-        ServerPlayerEntity finalBot = bot;
+        ServerPlayer finalBot = bot;
 
         server.execute(() -> {
-            List<PathFinder.PathNode> rawPath = PathFinder.calculatePath(finalBot.getBlockPos(), new BlockPos(x_distance, y_distance, z_distance), world);
+            List<PathFinder.PathNode> rawPath = PathFinder.calculatePath(finalBot.blockPosition(), new BlockPos(x_distance, y_distance, z_distance), world);
 
             List<PathFinder.PathNode> finalPath = PathFinder.simplifyPath(rawPath, world);
 
@@ -1529,61 +1475,61 @@ public class modCommandRegistry {
 
 
 
-    public static void moveForward(MinecraftServer server, ServerCommandSource source, String botName) {
+    public static void moveForward(MinecraftServer server, CommandSourceStack source, String botName) {
 
         if (source.getPlayer() != null) {
 
-            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move forward");
+            server.getCommands().performPrefixedCommand(source, "/player " + botName + " move forward");
 
         }
 
     }
 
-    private static void moveBackward(MinecraftServer server, ServerCommandSource source, String botName) {
+    private static void moveBackward(MinecraftServer server, CommandSourceStack source, String botName) {
 
         if (source.getPlayer() != null) {
 
-            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move backward");
-
-        }
-
-
-    }
-
-    public static void stopMoving(MinecraftServer server, ServerCommandSource source, String botName) {
-
-        if (source.getPlayer() != null) {
-
-            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " stop");
+            server.getCommands().performPrefixedCommand(source, "/player " + botName + " move backward");
 
         }
 
 
     }
 
-    private static void moveLeft(MinecraftServer server, ServerCommandSource source, String botName) {
+    public static void stopMoving(MinecraftServer server, CommandSourceStack source, String botName) {
 
         if (source.getPlayer() != null) {
 
-            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move left");
+            server.getCommands().performPrefixedCommand(source, "/player " + botName + " stop");
+
+        }
+
+
+    }
+
+    private static void moveLeft(MinecraftServer server, CommandSourceStack source, String botName) {
+
+        if (source.getPlayer() != null) {
+
+            server.getCommands().performPrefixedCommand(source, "/player " + botName + " move left");
 
         }
 
     }
 
-    private static void moveRight(MinecraftServer server, ServerCommandSource source, String botName) {
+    private static void moveRight(MinecraftServer server, CommandSourceStack source, String botName) {
 
         if (source.getPlayer() != null) {
 
-            server.getCommandManager().executeWithPrefix(source, "/player " + botName + " move right");
+            server.getCommands().performPrefixedCommand(source, "/player " + botName + " move right");
 
         }
 
     }
 
 
-    private static @NotNull BlockPos getBlockPos(CommandContext<ServerCommandSource> context) {
-        ServerPlayerEntity player = context.getSource().getPlayer();
+    private static @NotNull BlockPos getBlockPos(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player = context.getSource().getPlayer();
 
 
         assert player != null;
@@ -1593,7 +1539,7 @@ public class modCommandRegistry {
     /**
      * Intelligently selects the highest threat target from a list of hostile entities.
      */
-    private static Entity selectHighestThreatTarget(ServerPlayerEntity bot, List<Entity> hostileEntities, boolean debugMode, ServerCommandSource botSource) {
+    private static Entity selectHighestThreatTarget(ServerPlayer bot, List<Entity> hostileEntities, boolean debugMode, CommandSourceStack botSource) {
         if (hostileEntities.isEmpty()) {
             return null;
         }
@@ -1602,10 +1548,10 @@ public class modCommandRegistry {
         double highestThreat = -1.0;
 
         for (Entity entity : hostileEntities) {
-            double distance = Math.sqrt(entity.squaredDistanceTo(bot));
+            double distance = Math.sqrt(entity.distanceToSqr(bot));
 
             double baseThreat;
-            if (entity instanceof net.minecraft.entity.player.PlayerEntity player) {
+            if (entity instanceof net.minecraft.world.entity.player.Player player) {
                 baseThreat = net.shasankp000.PlayerUtils.PlayerRetaliationTracker.getPlayerThreatLevel(bot, player);
             } else {
                 baseThreat = calculateBaseThreatForEntity(entity, distance);
@@ -1621,7 +1567,7 @@ public class modCommandRegistry {
                 else distanceModifier = -10.0;
             } else if (entityType.contains("skeleton") || entityType.contains("witch") ||
                      entityType.contains("blaze") || entityType.contains("pillager") ||
-                     (entity instanceof net.minecraft.entity.player.PlayerEntity)) {
+                     (entity instanceof net.minecraft.world.entity.player.Player)) {
                 if (distance < 3.0) distanceModifier = 5.0;
                 else if (distance < 8.0) distanceModifier = 10.0;
                 else if (distance < 15.0) distanceModifier = 5.0;
@@ -1639,7 +1585,7 @@ public class modCommandRegistry {
             double totalThreat = baseThreat + distanceModifier;
 
             if (debugMode) {
-                String entityCategory = entity instanceof net.minecraft.entity.player.PlayerEntity ? "HOSTILE PLAYER" : "MOB";
+                String entityCategory = entity instanceof net.minecraft.world.entity.player.Player ? "HOSTILE PLAYER" : "MOB";
                 LOGGER.info("Target analysis: {} ({}) at {}m - Base: {}, Distance modifier: {}, Total: {}",
                     entity.getName().getString(), entityCategory,
                     String.format("%.1f", distance), String.format("%.1f", baseThreat),
@@ -1654,7 +1600,7 @@ public class modCommandRegistry {
 
         if (highestThreatEntity != null && debugMode) {
             String targetName = highestThreatEntity.getName().getString();
-            double distance = Math.sqrt(highestThreatEntity.squaredDistanceTo(bot));
+            double distance = Math.sqrt(highestThreatEntity.distanceToSqr(bot));
 
             ChatUtils.sendChatMessages(botSource,
                 String.format("\u00a7c\u2694 Priority Target: \u00a7e%s \u00a77(Threat: \u00a7c%.1f\u00a77, Distance: \u00a7e%.1fm\u00a77)",
@@ -1714,7 +1660,7 @@ public class modCommandRegistry {
     }
 
     private static String getTargetSelectionReason(Entity entity, double distance) {
-        if (entity instanceof net.minecraft.entity.player.PlayerEntity) {
+        if (entity instanceof net.minecraft.world.entity.player.Player) {
             return "\u00a74Hostile player - armed and dangerous!";
         }
 

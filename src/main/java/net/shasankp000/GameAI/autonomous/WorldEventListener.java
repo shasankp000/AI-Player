@@ -1,6 +1,6 @@
 package net.shasankp000.GameAI.autonomous;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.GameAI.companion.BotStance;
 import net.shasankp000.GameAI.companion.CompanionController;
@@ -239,8 +239,8 @@ public class WorldEventListener {
     /**
      * Attempts to match {@code messageBody} against every {@link #STANCE_TRIGGERS}
      * entry.  On a match, resolves the target player name to a
-     * {@link ServerPlayerEntity} (required by
-     * {@link CompanionController#setStance(String, BotStance, ServerPlayerEntity)}),
+     * {@link ServerPlayer} (required by
+     * {@link CompanionController#setStance(String, BotStance, ServerPlayer)}),
      * delegates the stance change, and injects a brief acknowledgement goal.
      *
      * @param sender      The player who sent the chat message.
@@ -270,7 +270,7 @@ public class WorldEventListener {
                     }
 
                     // Resolve String -> ServerPlayerEntity
-                    ServerPlayerEntity targetPlayer = resolvePlayer(targetName);
+                    ServerPlayer targetPlayer = resolvePlayer(targetName);
                     if (targetPlayer == null) {
                         LOGGER.warn("[stance] FOLLOW requested but player '{}' is not online -- ignoring", targetName);
                         return true; // trigger matched, but player offline; suppress further processing
@@ -303,11 +303,11 @@ public class WorldEventListener {
     // -------------------------------------------------------------------------
 
     /**
-     * Resolves a player name to a live {@link ServerPlayerEntity}.
+     * Resolves a player name to a live {@link ServerPlayer}.
      * Returns {@code null} if the server is unavailable or the player is offline.
      */
-    private static ServerPlayerEntity resolvePlayer(String playerName) {
+    private static ServerPlayer resolvePlayer(String playerName) {
         if (AIPlayer.serverInstance == null) return null;
-        return AIPlayer.serverInstance.getPlayerManager().getPlayer(playerName);
+        return AIPlayer.serverInstance.getPlayerList().getPlayerByName(playerName);
     }
 }

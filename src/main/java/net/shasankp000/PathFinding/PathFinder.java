@@ -1,17 +1,16 @@
 package net.shasankp000.PathFinding;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3i;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 public class PathFinder {
 
@@ -70,7 +69,7 @@ public class PathFinder {
         }
     }
 
-    public static List<PathNode> calculatePath(BlockPos start, BlockPos target, ServerWorld world) {
+    public static List<PathNode> calculatePath(BlockPos start, BlockPos target, ServerLevel world) {
         LOGGER.info("Starting Bi-directional A* pathfinding with block tagging...");
 
         PriorityQueue<Node> openForward = new PriorityQueue<>();
@@ -162,7 +161,7 @@ public class PathFinder {
     }
 
 
-    public static List<PathNode> simplifyPath(List<PathNode> path, ServerWorld world) {
+    public static List<PathNode> simplifyPath(List<PathNode> path, ServerLevel world) {
         if (path.isEmpty()) return path;
 
         List<PathNode> simplifiedPath = new ArrayList<>();
@@ -171,9 +170,9 @@ public class PathFinder {
         for (PathNode current : path) {
             BlockPos pos = current.pos;
 
-            BlockPos feetPos = pos.down();
+            BlockPos feetPos = pos.below();
             BlockPos bodyPos = pos;
-            BlockPos headPos = pos.up();
+            BlockPos headPos = pos.above();
 
             boolean solidBelow = isSolidBlock(world, feetPos);
             boolean bodyClear = isPassable(world, bodyPos);
@@ -184,9 +183,9 @@ public class PathFinder {
 
             if (!canStand) {
                 // Try jumping up
-                BlockPos upFeetPos = feetPos.up();
-                BlockPos upBodyPos = bodyPos.up();
-                BlockPos upHeadPos = headPos.up();
+                BlockPos upFeetPos = feetPos.above();
+                BlockPos upBodyPos = bodyPos.above();
+                BlockPos upHeadPos = headPos.above();
 
                 boolean solidBelowUp = isSolidBlock(world, upFeetPos);
                 boolean bodyClearUp = isPassable(world, upBodyPos);
@@ -195,7 +194,7 @@ public class PathFinder {
                 if (solidBelowUp && bodyClearUp && headClearUp) {
                     canStand = true;
                     jumpNeeded = true;
-                    pos = pos.up(); // Adjust to landing position
+                    pos = pos.above(); // Adjust to landing position
                 } else {
                     LOGGER.info("Unwalkable multi-block obstacle at {}, skipping.", pos);
                     continue; // Completely blocked
@@ -357,14 +356,14 @@ public class PathFinder {
 //    }
 
 
-    private static List<PathNode> tagBlocks(List<BlockPos> rawPath, ServerWorld world) {
+    private static List<PathNode> tagBlocks(List<BlockPos> rawPath, ServerLevel world) {
         List<PathNode> taggedPath = new ArrayList<>();
 
         for (int i = 0; i < rawPath.size(); i++) {
             BlockPos pos = rawPath.get(i);
-            BlockPos feetPos = pos.down();
+            BlockPos feetPos = pos.below();
             BlockPos bodyPos = pos;
-            BlockPos headPos = pos.up();
+            BlockPos headPos = pos.above();
 
             boolean solidBelow = isSolidBlock(world, feetPos);
             boolean bodyIsSlab = isSlab(world, bodyPos);
@@ -376,7 +375,7 @@ public class PathFinder {
             boolean jumpRequired = false;
 
             BlockState bodyState = world.getBlockState(bodyPos);
-            boolean isCrop = bodyState.isIn(BlockTags.CROPS);
+            boolean isCrop = bodyState.is(BlockTags.CROPS);
 
             if (bodyClear && isCrop) {
                 LOGGER.info("Detected crops at {}, setting jumpRequired=false", pos);
@@ -400,7 +399,7 @@ public class PathFinder {
                 } else {
                     // Same level: check block in front
                     Vec3i dir = pos.subtract(prev);
-                    BlockPos forward = prev.add(dir.getX(), 0, dir.getZ());
+                    BlockPos forward = prev.offset(dir.getX(), 0, dir.getZ());
                     if (isSolidBlock(world, forward) && !isSlab(world, forward)) {
                         jumpRequired = true;
                     } else if (isSlab(world, forward)) {
@@ -411,15 +410,15 @@ public class PathFinder {
             }
 
             if (!canStand) {
-                BlockPos upFeet = feetPos.up();
-                BlockPos upBody = bodyPos.up();
-                BlockPos upHead = headPos.up();
+                BlockPos upFeet = feetPos.above();
+                BlockPos upBody = bodyPos.above();
+                BlockPos upHead = headPos.above();
 
                 boolean canStandUp = isSolidBlock(world, upFeet) && isPassable(world, upBody) && isPassable(world, upHead);
 
                 if (canStandUp) {
                     BlockState upHeadState = world.getBlockState(upHead);
-                    boolean isSlab = upHeadState.isIn(BlockTags.SLABS);
+                    boolean isSlab = upHeadState.is(BlockTags.SLABS);
                     boolean hasCollision = !upHeadState.getCollisionShape(world, upHead).isEmpty();
 
                     if (isSlab || hasCollision) {
@@ -429,7 +428,7 @@ public class PathFinder {
 
                     canStand = true;
                     jumpRequired = true;
-                    pos = pos.up();
+                    pos = pos.above();
                 } else {
                     continue; // skip fully blocked
                 }
@@ -448,22 +447,22 @@ public class PathFinder {
 
 
 
-    private static boolean isSlab(ServerWorld world, BlockPos pos) {
+    private static boolean isSlab(ServerLevel world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
-        return state.isIn(BlockTags.SLABS);
+        return state.is(BlockTags.SLABS);
     }
 
 
 
-    private static boolean isPassable(ServerWorld world, BlockPos pos) {
+    private static boolean isPassable(ServerLevel world, BlockPos pos) {
         BlockState blockState = world.getBlockState(pos);
-        return blockState.isAir() || blockState.isOf(Blocks.WATER) || !blockState.getCollisionShape(world, pos).isEmpty();
+        return blockState.isAir() || blockState.is(Blocks.WATER) || !blockState.getCollisionShape(world, pos).isEmpty();
     }
 
 
-    private static boolean isSolidBlock(ServerWorld world, BlockPos pos) {
+    private static boolean isSolidBlock(ServerLevel world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
-        return !state.isAir() && state.isOpaque();
+        return !state.isAir() && state.canOcclude();
     }
 
 
@@ -471,9 +470,9 @@ public class PathFinder {
         return blockType.equals("air") || blockType.contains("water");
     }
 
-    private static boolean isJumpableBlock(String blockType, ServerWorld world, BlockPos pos) {
+    private static boolean isJumpableBlock(String blockType, ServerLevel world, BlockPos pos) {
         // Example: if block is <= 1 block tall and you can jump over it
-        BlockPos above = pos.up();
+        BlockPos above = pos.above();
         Block aboveBlock = world.getBlockState(above).getBlock();
         String aboveType = aboveBlock.getName().getString().toLowerCase();
 
@@ -503,27 +502,27 @@ public class PathFinder {
         return path;
     }
 
-    private static List<BlockPos> getNeighbors(BlockPos pos, ServerWorld world) {
+    private static List<BlockPos> getNeighbors(BlockPos pos, ServerLevel world) {
         List<BlockPos> neighbors = new ArrayList<>();
 
         // Standard moves on same level
-        neighbors.add(pos.add(1, 0, 0));  // East
-        neighbors.add(pos.add(-1, 0, 0)); // West
-        neighbors.add(pos.add(0, 0, 1));  // South
-        neighbors.add(pos.add(0, 0, -1)); // North
-        neighbors.add(pos.add(0, -1, 0)); // Down
-        neighbors.add(pos.add(0, 1, 0));  // Up - careful: raw vertical climb
+        neighbors.add(pos.offset(1, 0, 0));  // East
+        neighbors.add(pos.offset(-1, 0, 0)); // West
+        neighbors.add(pos.offset(0, 0, 1));  // South
+        neighbors.add(pos.offset(0, 0, -1)); // North
+        neighbors.add(pos.offset(0, -1, 0)); // Down
+        neighbors.add(pos.offset(0, 1, 0));  // Up - careful: raw vertical climb
 
         // Smart step-up moves: only add if there's a block in front
         for (BlockPos flatNeighbor : List.of(
-                pos.add(1, 0, 0),
-                pos.add(-1, 0, 0),
-                pos.add(0, 0, 1),
-                pos.add(0, 0, -1))) {
+                pos.offset(1, 0, 0),
+                pos.offset(-1, 0, 0),
+                pos.offset(0, 0, 1),
+                pos.offset(0, 0, -1))) {
 
             BlockPos blockInFront = flatNeighbor;
-            BlockPos topOfBlock = blockInFront.up();
-            BlockPos headSpace = topOfBlock.up();
+            BlockPos topOfBlock = blockInFront.above();
+            BlockPos headSpace = topOfBlock.above();
 
             if (isSolidBlock(world, blockInFront) && isPassable(world, topOfBlock) && isPassable(world, headSpace)) {
                 neighbors.add(topOfBlock); // stepping onto it
@@ -535,6 +534,6 @@ public class PathFinder {
 
 
     private static double getDistance(BlockPos pos1, BlockPos pos2) {
-        return Math.sqrt(pos1.getSquaredDistance(pos2));
+        return Math.sqrt(pos1.distSqr(pos2));
     }
 }

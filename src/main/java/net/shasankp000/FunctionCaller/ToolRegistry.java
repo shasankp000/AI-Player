@@ -1,11 +1,10 @@
 package net.shasankp000.FunctionCaller;
 
-import net.minecraft.util.math.BlockPos;
-
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.core.BlockPos;
 
 public class ToolRegistry {
 

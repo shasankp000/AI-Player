@@ -30,23 +30,30 @@ public class GenericOpenAIModelFetcher implements ModelFetcher {
         if (baseUrl == null || baseUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("Base URL cannot be null or empty");
         }
-        String trimmedUrl = baseUrl.trim();
-        this.baseUrl = trimmedUrl.endsWith("/") ? trimmedUrl : trimmedUrl + "/";
+        this.baseUrl = normalizeBaseUrl(baseUrl);
+    }
+
+    private static String normalizeBaseUrl(String baseUrl) {
+        String normalized = baseUrl.trim().replaceAll("/+$", "");
+        normalized = normalized.replaceAll("/chat/completions$", "");
+        normalized = normalized.replaceAll("/completions$", "");
+        normalized = normalized.replaceAll("/embeddings$", "");
+        return normalized + "/";
     }
 
     @Override
     public List<String> fetchModels(String apiKey) {
         List<String> modelList = new ArrayList<>();
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            return modelList; // Return empty list if no API key is provided
-        }
-
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "models"))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .GET()
-                    .build();
+                    .GET();
+
+            if (apiKey != null && !apiKey.isBlank()) {
+                requestBuilder.header("Authorization", "Bearer " + apiKey);
+            }
+
+            HttpRequest request = requestBuilder.build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 

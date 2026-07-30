@@ -1,13 +1,5 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.ArrowEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.server.world.ServerWorld;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +8,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.projectile.arrow.Arrow;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Utility class for detecting incoming projectiles and calculating dodge/block strategies
@@ -34,29 +35,29 @@ public class ProjectileDefenseUtils {
      * Detected projectile with threat information
      */
     public static class IncomingProjectile {
-        public final ProjectileEntity projectile;
+        public final Projectile projectile;
         public final double distance;
-        public final Vec3d velocity;
+        public final Vec3 velocity;
         public final boolean isHeadedTowardsBot;
         public final double threatLevel; // 0.0 to 100.0
         public final String projectileType;
         public final Entity owner; // Who shot this projectile
 
-        public IncomingProjectile(ProjectileEntity projectile, ServerPlayerEntity bot) {
+        public IncomingProjectile(Projectile projectile, ServerPlayer bot) {
             this.projectile = projectile;
-            this.distance = Math.sqrt(projectile.squaredDistanceTo(bot));
-            this.velocity = projectile.getVelocity();
+            this.distance = Math.sqrt(projectile.distanceToSqr(bot));
+            this.velocity = projectile.getDeltaMovement();
             this.projectileType = getProjectileType(projectile);
             this.owner = projectile.getOwner(); // Track who shot it
 
             // Calculate if projectile is headed towards the bot
-            Vec3d projectilePos = projectile.getPos();
-            Vec3d botPos = bot.getPos();
-            Vec3d directionToBot = botPos.subtract(projectilePos).normalize();
-            Vec3d projectileDirection = velocity.normalize();
+            Vec3 projectilePos = projectile.position();
+            Vec3 botPos = bot.position();
+            Vec3 directionToBot = botPos.subtract(projectilePos).normalize();
+            Vec3 projectileDirection = velocity.normalize();
 
             // Dot product to check if projectile is moving towards bot
-            double dotProduct = projectileDirection.dotProduct(directionToBot);
+            double dotProduct = projectileDirection.dot(directionToBot);
 
             // Lower threshold to 0.3 to catch more projectiles (was 0.7)
             this.isHeadedTowardsBot = dotProduct > 0.3; // Threshold for "headed towards"
@@ -65,9 +66,9 @@ public class ProjectileDefenseUtils {
             this.threatLevel = calculateThreatLevel();
         }
 
-        private String getProjectileType(ProjectileEntity projectile) {
-            String name = projectile.getType().getName().getString();
-            if (projectile instanceof ArrowEntity) {
+        private String getProjectileType(Projectile projectile) {
+            String name = projectile.getType().getDescription().getString();
+            if (projectile instanceof Arrow) {
                 return "arrow";
             }
             return name.toLowerCase();
@@ -108,30 +109,30 @@ public class ProjectileDefenseUtils {
     /**
      * Detect all projectiles near the bot within detection range
      */
-    public static List<IncomingProjectile> detectIncomingProjectiles(ServerPlayerEntity bot) {
-        ServerWorld world = (ServerWorld) bot.getWorld();
-        Box searchBox = bot.getBoundingBox().expand(DETECTION_RANGE);
+    public static List<IncomingProjectile> detectIncomingProjectiles(ServerPlayer bot) {
+        ServerLevel world = (ServerLevel) bot.level();
+        AABB searchBox = bot.getBoundingBox().inflate(DETECTION_RANGE);
 
         // Find all projectile entities
-        List<ProjectileEntity> projectiles = world.getEntitiesByClass(
-            ProjectileEntity.class,
+        List<Projectile> projectiles = world.getEntitiesOfClass(
+            Projectile.class,
             searchBox,
             projectile -> {
                 // Exclude projectiles fired by the bot itself
                 Entity owner = projectile.getOwner();
-                if (owner != null && owner.getUuid().equals(bot.getUuid())) {
+                if (owner != null && owner.getUUID().equals(bot.getUUID())) {
                     return false;
                 }
 
                 // CRITICAL FIX: Exclude arrows stuck in ground/blocks
-                Vec3d velocity = projectile.getVelocity();
+                Vec3 velocity = projectile.getDeltaMovement();
                 double speed = velocity.length();
-                int age = projectile.age;
+                int age = projectile.tickCount;
 
                 // Debug: Log arrow properties
-                if (projectile instanceof ArrowEntity) {
+                if (projectile instanceof Arrow) {
                     LOGGER.debug("Arrow detected - Speed: {}, Age: {}, OnGround: {}, AttachedTo: {}",
-                        String.format("%.3f", speed), age, projectile.isOnGround(),
+                        String.format("%.3f", speed), age, projectile.onGround(),
                         projectile.getVehicle() != null ? projectile.getVehicle().getName().getString() : "none");
                 }
 
@@ -140,20 +141,20 @@ public class ProjectileDefenseUtils {
                 if (projectile.getVehicle() != null) {
                     Entity vehicle = projectile.getVehicle();
                     // If arrow is attached to the bot itself, ignore it
-                    if (vehicle.getUuid().equals(bot.getUuid())) {
+                    if (vehicle.getUUID().equals(bot.getUUID())) {
                         return false; // Arrow stuck on bot's body
                     }
                 }
 
                 // Filter 1b: Check if arrow is stuck IN the bot's body
                 // Arrows stuck in entities are within bounding box with near-zero velocity
-                if (projectile instanceof net.minecraft.entity.projectile.PersistentProjectileEntity persistentProjectile) {
-                    double distanceToBot = Math.sqrt(projectile.squaredDistanceTo(bot));
+                if (projectile instanceof net.minecraft.world.entity.projectile.arrow.AbstractArrow persistentProjectile) {
+                    double distanceToBot = Math.sqrt(projectile.distanceToSqr(bot));
 
                     // If arrow is VERY close to bot (within 0.8 blocks) with low velocity, it's stuck in bot
                     if (distanceToBot < 0.8 && speed < 0.5) {
                         // Additionally check if it's within bot's bounding box
-                        if (bot.getBoundingBox().expand(0.5).contains(projectile.getPos())) {
+                        if (bot.getBoundingBox().inflate(0.5).contains(projectile.position())) {
                             LOGGER.debug("Ignoring arrow stuck in bot's body (distance: {}, speed: {})",
                                 String.format("%.2f", distanceToBot), String.format("%.3f", speed));
                             return false;
@@ -162,7 +163,7 @@ public class ProjectileDefenseUtils {
                 }
 
                 // Filter 2: If projectile is on ground (touching a block), it's stuck
-                if (projectile.isOnGround()) {
+                if (projectile.onGround()) {
                     return false;
                 }
 
@@ -204,35 +205,35 @@ public class ProjectileDefenseUtils {
      * Calculate the best dodge direction to avoid a projectile
      * Returns a direction vector (normalized) or null if no dodge needed
      */
-    public static Vec3d calculateDodgeDirection(ServerPlayerEntity bot, IncomingProjectile projectile) {
+    public static Vec3 calculateDodgeDirection(ServerPlayer bot, IncomingProjectile projectile) {
         if (projectile.distance > IMMEDIATE_THREAT_DISTANCE) {
             return null; // No immediate dodge needed
         }
 
-        Vec3d botPos = bot.getPos();
-        Vec3d projectilePos = projectile.projectile.getPos();
-        Vec3d projectileVelocity = projectile.velocity;
+        Vec3 botPos = bot.position();
+        Vec3 projectilePos = projectile.projectile.position();
+        Vec3 projectileVelocity = projectile.velocity;
 
         // Calculate perpendicular direction to projectile velocity
         // This gives us the best direction to sidestep
-        Vec3d perpendicularDir = new Vec3d(
+        Vec3 perpendicularDir = new Vec3(
             -projectileVelocity.z, // Swap and negate for perpendicular
             0, // Don't dodge vertically
             projectileVelocity.x
         ).normalize();
 
         // Check which side has more clearance
-        Vec3d leftDodge = perpendicularDir;
-        Vec3d rightDodge = perpendicularDir.multiply(-1);
+        Vec3 leftDodge = perpendicularDir;
+        Vec3 rightDodge = perpendicularDir.scale(-1);
 
         // Simple clearance check - prefer the direction away from projectile source
-        Vec3d directionFromProjectile = botPos.subtract(projectilePos).normalize();
+        Vec3 directionFromProjectile = botPos.subtract(projectilePos).normalize();
 
         // Choose the dodge direction that's more aligned with moving away from projectile
-        double leftAlignment = leftDodge.dotProduct(directionFromProjectile);
-        double rightAlignment = rightDodge.dotProduct(directionFromProjectile);
+        double leftAlignment = leftDodge.dot(directionFromProjectile);
+        double rightAlignment = rightDodge.dot(directionFromProjectile);
 
-        Vec3d dodgeDirection = leftAlignment > rightAlignment ? leftDodge : rightDodge;
+        Vec3 dodgeDirection = leftAlignment > rightAlignment ? leftDodge : rightDodge;
 
         LOGGER.info("Calculated dodge direction: {} for {} at distance {}",
             dodgeDirection, projectile.projectileType, projectile.distance);
@@ -261,8 +262,8 @@ public class ProjectileDefenseUtils {
     /**
      * Check if bot has a shield in inventory (with caching to prevent lag)
      */
-    public static boolean hasShield(ServerPlayerEntity bot) {
-        UUID botId = bot.getUuid();
+    public static boolean hasShield(ServerPlayer bot) {
+        UUID botId = bot.getUUID();
 
         // Check cache first
         ShieldCache cached = shieldCache.get(botId);
@@ -277,10 +278,10 @@ public class ProjectileDefenseUtils {
         }
 
         // Check ALL inventory slots (0-40 covers everything)
-        int inventorySize = bot.getInventory().size();
+        int inventorySize = bot.getInventory().getContainerSize();
 
         for (int i = 0; i < inventorySize; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
+            ItemStack stack = bot.getInventory().getItem(i);
             if (!stack.isEmpty() && isShield(stack)) {
                 shieldCache.put(botId, new ShieldCache(true));
                 return true;
@@ -294,8 +295,8 @@ public class ProjectileDefenseUtils {
     /**
      * Check if bot has a shield equipped (offhand only)
      */
-    public static boolean hasShieldEquipped(ServerPlayerEntity bot) {
-        ItemStack offHand = bot.getOffHandStack();
+    public static boolean hasShieldEquipped(ServerPlayer bot) {
+        ItemStack offHand = bot.getOffhandItem();
         return isShield(offHand);
     }
 
@@ -308,19 +309,19 @@ public class ProjectileDefenseUtils {
         }
 
         // Check by item ID (most reliable)
-        String itemId = net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString();
+        String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
         if (itemId.contains("shield")) {
             return true;
         }
 
         // Fallback: Check by translation key
-        String translationKey = stack.getItem().getTranslationKey();
+        String translationKey = stack.getItem().getDescriptionId();
         if (translationKey != null && translationKey.toLowerCase().contains("shield")) {
             return true;
         }
 
         // Fallback: Check by display name
-        String displayName = stack.getItem().getName().getString().toLowerCase();
+        String displayName = stack.getHoverName().getString().toLowerCase();
         if (displayName.contains("shield")) {
             return true;
         }
@@ -332,14 +333,14 @@ public class ProjectileDefenseUtils {
      * Find shield slot in inventory (-1 if not found)
      * Checks entire inventory including hotbar, main inventory, and armor slots
      */
-    public static int findShieldInInventory(ServerPlayerEntity bot) {
+    public static int findShieldInInventory(ServerPlayer bot) {
         LOGGER.debug("🔍 Searching for shield in all inventory slots...");
 
-        int inventorySize = bot.getInventory().size();
+        int inventorySize = bot.getInventory().getContainerSize();
 
         // Check ALL slots
         for (int i = 0; i < inventorySize; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
+            ItemStack stack = bot.getInventory().getItem(i);
             if (isShield(stack)) {
                 String slotType = i < 9 ? "HOTBAR" : (i < 36 ? "MAIN INVENTORY" : "ARMOR/OFFHAND");
                 LOGGER.debug("✅ Found shield at slot {} ({})", i, slotType);
@@ -356,7 +357,7 @@ public class ProjectileDefenseUtils {
      * Strategy: Always move to hotbar first, then swap to offhand
      * Returns true if successful, false otherwise
      */
-    public static boolean equipShieldToOffhand(ServerPlayerEntity bot) {
+    public static boolean equipShieldToOffhand(ServerPlayer bot) {
         LOGGER.info("🛡 Starting shield equip process...");
 
         // Check if shield is already equipped
@@ -385,7 +386,7 @@ public class ProjectileDefenseUtils {
                 // Find an empty hotbar slot, or use slot 8 as fallback
                 targetHotbarSlot = 8;
                 for (int i = 0; i < 9; i++) {
-                    ItemStack stack = bot.getInventory().getStack(i);
+                    ItemStack stack = bot.getInventory().getItem(i);
                     if (stack.isEmpty()) {
                         targetHotbarSlot = i;
                         LOGGER.info("Found empty hotbar slot: {}", i);
@@ -396,23 +397,23 @@ public class ProjectileDefenseUtils {
                 LOGGER.info("Moving shield from slot {} to hotbar slot {}", shieldSlot, targetHotbarSlot);
 
                 // Swap shield to hotbar
-                ItemStack shieldStack = bot.getInventory().getStack(shieldSlot);
-                ItemStack hotbarStack = bot.getInventory().getStack(targetHotbarSlot);
-                bot.getInventory().setStack(shieldSlot, hotbarStack);
-                bot.getInventory().setStack(targetHotbarSlot, shieldStack);
+                ItemStack shieldStack = bot.getInventory().getItem(shieldSlot);
+                ItemStack hotbarStack = bot.getInventory().getItem(targetHotbarSlot);
+                bot.getInventory().setItem(shieldSlot, hotbarStack);
+                bot.getInventory().setItem(targetHotbarSlot, shieldStack);
 
                 LOGGER.info("✓ Shield moved to hotbar slot {}", targetHotbarSlot);
             }
 
             // Now equip from hotbar to main hand
             LOGGER.info("Selecting hotbar slot {} (shield)", targetHotbarSlot);
-            bot.getInventory().selectedSlot = targetHotbarSlot;
+            bot.getInventory().setSelectedSlot(targetHotbarSlot);
 
             // Verify shield is in main hand
-            ItemStack mainHand = bot.getMainHandStack();
+            ItemStack mainHand = bot.getMainHandItem();
             if (!isShield(mainHand)) {
                 LOGGER.error("❌ Shield not in main hand after selection! Got: {}",
-                    net.minecraft.registry.Registries.ITEM.getId(mainHand.getItem()));
+                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mainHand.getItem()));
                 return false;
             }
 
@@ -420,9 +421,9 @@ public class ProjectileDefenseUtils {
 
             // Swap main hand (shield) to offhand
             LOGGER.info("Swapping shield from main hand to offhand...");
-            ItemStack offHand = bot.getOffHandStack();
-            bot.getInventory().offHand.set(0, mainHand); // Shield goes to offhand
-            bot.getInventory().setStack(targetHotbarSlot, offHand); // Previous offhand item goes to hotbar
+            ItemStack offHand = bot.getOffhandItem();
+            bot.setItemSlot(EquipmentSlot.OFFHAND, mainHand); // Shield goes to offhand
+            bot.getInventory().setItem(targetHotbarSlot, offHand); // Previous offhand item goes to hotbar
 
 
             // Verify shield is now in offhand
@@ -444,7 +445,7 @@ public class ProjectileDefenseUtils {
     /**
      * Determine if bot should block or dodge based on shield availability and threat level
      */
-    public static String determineDefenseStrategy(ServerPlayerEntity bot, IncomingProjectile projectile) {
+    public static String determineDefenseStrategy(ServerPlayer bot, IncomingProjectile projectile) {
         LOGGER.info("🛡 Determining defense strategy - Distance: {}, Threat: {}",
             String.format("%.1f", projectile.distance), String.format("%.1f", projectile.threatLevel));
 
@@ -493,30 +494,30 @@ public class ProjectileDefenseUtils {
      * Returns distance in blocks until first obstacle (0-30 blocks)
      * Used to decide: clear path = direct sprint, obstacles = use pathfinder
      */
-    public static double checkObstacleClearance(ServerPlayerEntity bot, Vec3d direction, double maxDistance) {
-        ServerWorld world = (ServerWorld) bot.getWorld();
-        Vec3d startPos = bot.getPos().add(0, bot.getStandingEyeHeight(), 0); // From bot's eyes
+    public static double checkObstacleClearance(ServerPlayer bot, Vec3 direction, double maxDistance) {
+        ServerLevel world = (ServerLevel) bot.level();
+        Vec3 startPos = bot.position().add(0, bot.getEyeHeight(), 0); // From bot's eyes
 
         // Raytrace in the given direction
         for (double dist = 1.0; dist <= maxDistance; dist += 0.5) {
-            Vec3d checkPos = startPos.add(direction.multiply(dist));
-            net.minecraft.util.math.BlockPos blockPos = new net.minecraft.util.math.BlockPos(
+            Vec3 checkPos = startPos.add(direction.scale(dist));
+            net.minecraft.core.BlockPos blockPos = new net.minecraft.core.BlockPos(
                 (int) Math.floor(checkPos.x),
                 (int) Math.floor(checkPos.y),
                 (int) Math.floor(checkPos.z)
             );
 
             // Check if block is solid (obstacle)
-            net.minecraft.block.BlockState state = world.getBlockState(blockPos);
-            if (!state.isAir() && state.isSolidBlock(world, blockPos)) {
+            net.minecraft.world.level.block.state.BlockState state = world.getBlockState(blockPos);
+            if (!state.isAir() && state.isRedstoneConductor(world, blockPos)) {
                 LOGGER.debug("Obstacle detected at {} blocks: {}", dist, state.getBlock().getName().getString());
                 return dist; // Return distance to first obstacle
             }
 
             // Also check head clearance (one block up)
-            net.minecraft.util.math.BlockPos headPos = blockPos.up();
-            net.minecraft.block.BlockState headState = world.getBlockState(headPos);
-            if (!headState.isAir() && headState.isSolidBlock(world, headPos)) {
+            net.minecraft.core.BlockPos headPos = blockPos.above();
+            net.minecraft.world.level.block.state.BlockState headState = world.getBlockState(headPos);
+            if (!headState.isAir() && headState.isRedstoneConductor(world, headPos)) {
                 LOGGER.debug("Head clearance obstacle at {} blocks: {}", dist, headState.getBlock().getName().getString());
                 return dist;
             }
@@ -530,13 +531,13 @@ public class ProjectileDefenseUtils {
      * Detect incoming projectiles with world/server safety checks
      * Prevents detection when world is unloading or server is stopping
      */
-    public static List<IncomingProjectile> detectIncomingProjectilesSafe(ServerPlayerEntity bot) {
+    public static List<IncomingProjectile> detectIncomingProjectilesSafe(ServerPlayer bot) {
         // Safety checks before detection
         if (bot == null || !bot.isAlive()) {
             return List.of(); // Bot is dead
         }
 
-        ServerWorld world = (ServerWorld) bot.getWorld();
+        ServerLevel world = (ServerLevel) bot.level();
         if (world == null) {
             return List.of(); // World is null
         }
@@ -550,4 +551,3 @@ public class ProjectileDefenseUtils {
         return detectIncomingProjectiles(bot);
     }
 }
-

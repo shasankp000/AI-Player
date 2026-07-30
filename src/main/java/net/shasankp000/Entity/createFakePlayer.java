@@ -5,33 +5,31 @@ import carpet.patches.FakeClientConnection;
 import carpet.utils.Messenger;
 import com.google.gson.Gson;
 import com.mojang.authlib.GameProfile;
-import net.minecraft.block.BlockState;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.player.HungerManager;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.NetworkSide;
-import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
-import net.minecraft.network.packet.c2s.play.ClientStatusC2SPacket;
-import net.minecraft.network.packet.s2c.play.EntityPositionS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntitySetHeadYawS2CPacket;
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.game.ClientboundRotateHeadPacket;
+import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
+import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.ServerTask;
-import net.minecraft.server.network.ConnectedClientData;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableTextContent;
-import net.minecraft.util.UserCache;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.GameMode;
-import net.minecraft.world.TeleportTarget;
-import net.minecraft.world.World;
-
+import net.minecraft.server.level.ClientInformation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.food.FoodData;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.phys.Vec3;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -44,32 +42,26 @@ import net.shasankp000.AIPlayer;
 
 // Same as carpet's code for spawning fake players, only difference is that it will work even if the command executor is in offline mode
 
-public class createFakePlayer extends ServerPlayerEntity {
+public class createFakePlayer extends ServerPlayer {
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
     public boolean isAShadow;
 
 
     // constructor
-    private createFakePlayer(MinecraftServer server, ServerWorld worldIn, GameProfile profile, SyncedClientOptions cli, boolean shadow) {
+    private createFakePlayer(MinecraftServer server, ServerLevel worldIn, GameProfile profile, ClientInformation cli, boolean shadow) {
 
         super(server, worldIn, profile, cli);
         isAShadow = shadow;
 
     }
 
-    public static void createFake(String username, MinecraftServer server, Vec3d pos, double yaw, double pitch, RegistryKey<World> dimensionId, GameMode gamemode, boolean flying) {
+    public static void createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying) {
 
-        ServerWorld worldIn = server.getWorld(dimensionId);
-        UserCache.setUseRemote(false);
+        ServerLevel worldIn = server.getLevel(dimensionId);
         GameProfile gameProfile;
-        boolean useMojangAuth = server.isDedicated() && server.isOnlineMode();
+        boolean useMojangAuth = server.isDedicatedServer() && server.usesAuthentication();
 
-        try {
-            gameProfile = useMojangAuth ? server.getUserCache().findByName(username).orElse(null) : null;
-        }
-        finally {
-            UserCache.setUseRemote(useMojangAuth);
-        }
+        gameProfile = useMojangAuth ? null : null;
 
         Map<String, String> existingBotProfile = AIPlayer.CONFIG.getBotGameProfile();
 
@@ -80,7 +72,7 @@ public class createFakePlayer extends ServerPlayerEntity {
             if (!existingBotProfile.containsKey(username) || existingBotProfile.isEmpty()) {
                 gameProfile = new GameProfile(UUID.randomUUID(), username);
                 HashMap<String, String> botProfile = new HashMap<>();
-                botProfile.put(gameProfile.getName(), gameProfile.getId().toString());
+                botProfile.put(gameProfile.name(), gameProfile.id().toString());
 
                 System.out.println("New GameProfile: " + gameProfile);
 
@@ -112,7 +104,7 @@ public class createFakePlayer extends ServerPlayerEntity {
         if (useMojangAuth) {
 
             GameProfile finalGP = gameProfile;
-            fetchGameProfile(gameProfile.getName()).thenAccept(p -> {
+            fetchGameProfile(gameProfile.name()).thenAccept(p -> {
                 GameProfile current = p.orElse(finalGP);
                 spawnFake(server, worldIn, current, pos, yaw, pitch, gamemode, flying, dimensionId);
             });
@@ -126,16 +118,16 @@ public class createFakePlayer extends ServerPlayerEntity {
 
     }
 
-    private static void spawnFake(MinecraftServer server, ServerWorld worldIn, GameProfile gameprofile, Vec3d pos, double yaw, double pitch, GameMode gamemode, boolean flying, RegistryKey<World> dimensionId) {
-        createFakePlayer instance = new createFakePlayer(server, worldIn, gameprofile, SyncedClientOptions.createDefault(), false);
-        server.getPlayerManager().onPlayerConnect(new FakeClientConnection(NetworkSide.SERVERBOUND), instance, new ConnectedClientData(gameprofile, 0, instance.getClientOptions(), false));
-        instance.teleport(worldIn, pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
+    private static void spawnFake(MinecraftServer server, ServerLevel worldIn, GameProfile gameprofile, Vec3 pos, double yaw, double pitch, GameType gamemode, boolean flying, ResourceKey<Level> dimensionId) {
+        createFakePlayer instance = new createFakePlayer(server, worldIn, gameprofile, ClientInformation.createDefault(), false);
+        server.getPlayerList().placeNewPlayer(new FakeClientConnection(PacketFlow.SERVERBOUND), instance, new CommonListenerCookie(gameprofile, 0, instance.clientInformation(), false));
+        instance.teleportTo(worldIn, pos.x, pos.y, pos.z, Set.of(), (float) yaw, (float) pitch, false);
         instance.setHealth(20.0F);
         instance.unsetRemoved();
-        instance.interactionManager.changeGameMode(gamemode);
-        server.getPlayerManager().sendToDimension(new EntitySetHeadYawS2CPacket(instance, (byte) (instance.headYaw * 256 / 360)), dimensionId);
-        server.getPlayerManager().sendToDimension(new EntityPositionS2CPacket(instance), dimensionId);
-        instance.dataTracker.set(PLAYER_MODEL_PARTS, (byte) 0x7f);
+        instance.gameMode.changeGameModeForPlayer(gamemode);
+        server.getPlayerList().broadcastAll(new ClientboundRotateHeadPacket(instance, (byte) (instance.yHeadRot * 256 / 360)), dimensionId);
+        server.getPlayerList().broadcastAll(new ClientboundTeleportEntityPacket(instance.getId(), PositionMoveRotation.of(instance), Set.of(), instance.onGround()), dimensionId);
+        instance.entityData.set(DATA_PLAYER_MODE_CUSTOMISATION, (byte) 0x7f);
         instance.getAbilities().flying = flying;
     }
 
@@ -168,42 +160,39 @@ public class createFakePlayer extends ServerPlayerEntity {
 
 
     @Override
-    public void onEquipStack(final EquipmentSlot slot, final ItemStack previous, final ItemStack stack)
+    public void onEquipItem(final EquipmentSlot slot, final ItemStack previous, final ItemStack stack)
     {
-        if (!isUsingItem()) super.onEquipStack(slot, previous, stack);
+        if (!isUsingItem()) super.onEquipItem(slot, previous, stack);
     }
 
-    @Override
     public void kill()
     {
         kill(Messenger.s("Killed"));
     }
 
-    public void kill(Text reason)
+    public void kill(Component reason)
     {
         shakeOff();
 
-        if (reason.getContent() instanceof TranslatableTextContent text && text.getKey().equals("multiplayer.disconnect.duplicate_login")) {
-            this.networkHandler.disconnect(reason);
+        if (reason.getContents() instanceof TranslatableContents text && text.getKey().equals("multiplayer.disconnect.duplicate_login")) {
+            this.connection.disconnect(reason);
         } else {
-            this.server.send(new ServerTask(this.server.getTicks(), () -> {
-                this.networkHandler.disconnect(reason);
-            }));
+            createCommandSourceStack().getServer().execute(() -> this.connection.disconnect(reason));
         }
     }
 
     @Override
     public void tick()
     {
-        if (Objects.requireNonNull(this.getServer()).getTicks() % 10 == 0)
+        if (createCommandSourceStack().getServer().getTickCount() % 10 == 0)
         {
-            this.networkHandler.syncWithPlayerPosition();
-            this.getServerWorld().getChunkManager().updatePosition(this);
+            this.connection.resetPosition();
+            this.level().getChunkSource().move(this);
         }
         try
         {
             super.tick();
-            this.playerTick();
+            this.doTick();
         }
         catch (NullPointerException ignored)
         {
@@ -216,54 +205,54 @@ public class createFakePlayer extends ServerPlayerEntity {
 
     private void shakeOff()
     {
-        if (getVehicle() instanceof PlayerEntity) stopRiding();
-        for (Entity passenger : getPassengersDeep())
+        if (getVehicle() instanceof Player) stopRiding();
+        for (Entity passenger : getIndirectPassengers())
         {
-            if (passenger instanceof PlayerEntity) passenger.stopRiding();
+            if (passenger instanceof Player) passenger.stopRiding();
         }
     }
 
     @Override
-    public void onDeath(DamageSource cause)
+    public void die(DamageSource cause)
     {
         shakeOff();
-        super.onDeath(cause);
+        super.die(cause);
         setHealth(20);
-        this.hungerManager = new HungerManager();
-        kill(this.getDamageTracker().getDeathMessage());
+        this.foodData = new FoodData();
+        kill(this.getCombatTracker().getDeathMessage());
     }
 
     @Override
-    public String getIp()
+    public String getIpAddress()
     {
         return "127.0.0.1";
     }
 
     @Override
-    public boolean allowsServerListing() {
+    public boolean allowsListing() {
         return CarpetSettings.allowListingFakePlayers;
     }
 
     @Override
-    protected void fall(double y, boolean onGround, BlockState state, BlockPos pos) {
-        handleFall(0.0, y, 0.0, onGround);
+    protected void checkFallDamage(double y, boolean onGround, BlockState state, BlockPos pos) {
+        doCheckFallDamage(0.0, y, 0.0, onGround);
     }
 
     @Override
-    public Entity teleportTo(TeleportTarget target)
+    public ServerPlayer teleport(TeleportTransition target)
     {
-        Entity entity = super.teleportTo(target);
-        if (notInAnyWorld) {
-            ClientStatusC2SPacket p = new ClientStatusC2SPacket(ClientStatusC2SPacket.Mode.PERFORM_RESPAWN);
-            networkHandler.onClientStatus(p);
+        ServerPlayer entity = super.teleport(target);
+        if (wonGame) {
+            ServerboundClientCommandPacket p = new ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.PERFORM_RESPAWN);
+            connection.handleClientCommand(p);
         }
 
         // If above branch was taken, *this* has been removed and replaced, the new instance has been set
         // on 'our' connection (which is now theirs, but we still have a ref).
-        if (networkHandler.player.isInTeleportationState()) {
-            networkHandler.player.onTeleportationDone();
+        if (connection.player.isChangingDimension()) {
+            connection.player.hasChangedDimension();
         }
-        return networkHandler.player;
+        return connection.player;
     }
 
 

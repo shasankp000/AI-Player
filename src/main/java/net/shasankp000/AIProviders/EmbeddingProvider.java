@@ -58,11 +58,25 @@ public class EmbeddingProvider {
      */
     public EmbeddingProvider(String baseUrl, String apiKey, String embeddingModel, AIProviderType providerType) {
         this.ollamaAPI = null;
-        this.baseUrl = baseUrl;
+        this.baseUrl = normalizeOpenAIBaseUrl(baseUrl);
         this.apiKey = apiKey;
         this.embeddingModel = embeddingModel;
         this.providerType = providerType;
         LOGGER.info("📊 Embedding provider initialized: {} ({})", providerType, embeddingModel);
+    }
+
+    private static String normalizeOpenAIBaseUrl(String baseUrl) {
+        if (baseUrl == null) {
+            return "";
+        }
+        String normalized = baseUrl.trim().replaceAll("/+$", "");
+        normalized = normalized.replaceAll("/chat/completions$", "");
+        normalized = normalized.replaceAll("/completions$", "");
+        normalized = normalized.replaceAll("/embeddings$", "");
+        if (normalized.endsWith("/v1")) {
+            normalized = normalized.substring(0, normalized.length() - 3);
+        }
+        return normalized;
     }
 
     /**
@@ -300,4 +314,3 @@ public class EmbeddingProvider {
         return providerType;
     }
 }
-

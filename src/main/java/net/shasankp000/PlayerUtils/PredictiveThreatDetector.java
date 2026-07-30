@@ -1,21 +1,17 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.ArrowEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.RangedWeaponItem;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ProjectileWeaponItem;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Predictive threat detection - detects enemies BEFORE they shoot
@@ -36,34 +32,34 @@ public class PredictiveThreatDetector {
     public static class DrawingBowThreat {
         public final LivingEntity shooter;
         public final double distance;
-        public final Vec3d shooterPos;
-        public final Vec3d aimDirection;
+        public final Vec3 shooterPos;
+        public final Vec3 aimDirection;
         public final int drawTime; // How long bow has been drawn (in ticks)
         public final boolean fullyDrawn; // Is bow fully charged?
 
-        public DrawingBowThreat(LivingEntity shooter, ServerPlayerEntity bot) {
+        public DrawingBowThreat(LivingEntity shooter, ServerPlayer bot) {
             this.shooter = shooter;
-            this.shooterPos = shooter.getPos();
-            this.distance = Math.sqrt(shooter.squaredDistanceTo(bot));
+            this.shooterPos = shooter.position();
+            this.distance = Math.sqrt(shooter.distanceToSqr(bot));
 
             // Calculate aim direction based on shooter's look vector
-            Vec3d lookVec = shooter.getRotationVector();
+            Vec3 lookVec = shooter.getLookAngle();
             this.aimDirection = lookVec.normalize();
 
             // Get item use time (how long bow has been drawn)
-            this.drawTime = shooter.getItemUseTime();
+            this.drawTime = shooter.getTicksUsingItem();
             this.fullyDrawn = this.drawTime >= 20; // Bow is fully drawn at 20 ticks
         }
 
         /**
          * Check if shooter is aiming at the bot
          */
-        public boolean isAimingAtBot(ServerPlayerEntity bot) {
-            Vec3d botPos = bot.getPos();
-            Vec3d directionToBot = botPos.subtract(shooterPos).normalize();
+        public boolean isAimingAtBot(ServerPlayer bot) {
+            Vec3 botPos = bot.position();
+            Vec3 directionToBot = botPos.subtract(shooterPos).normalize();
 
             // Calculate dot product to see if aim direction aligns with bot direction
-            double dotProduct = aimDirection.dotProduct(directionToBot);
+            double dotProduct = aimDirection.dot(directionToBot);
 
             // If dot product > 0.8, shooter is aiming pretty close to bot
             return dotProduct > 0.8;
@@ -72,28 +68,28 @@ public class PredictiveThreatDetector {
         /**
          * Calculate where the arrow will go (predicted trajectory)
          */
-        public Vec3d predictArrowTrajectory() {
+        public Vec3 predictArrowTrajectory() {
             // Arrow travels in the direction the shooter is looking
             // Speed depends on draw time (max speed at 20 ticks)
             double speed = Math.min(drawTime / 20.0, 1.0) * 3.0; // Max 3.0 blocks/tick
-            return aimDirection.multiply(speed);
+            return aimDirection.scale(speed);
         }
     }
 
     /**
      * Detect all entities within range that are drawing bows
      */
-    public static List<DrawingBowThreat> detectDrawingBows(ServerPlayerEntity bot) {
-        ServerWorld world = (ServerWorld) bot.getWorld();
-        Box searchBox = bot.getBoundingBox().expand(THREAT_DETECTION_RANGE);
+    public static List<DrawingBowThreat> detectDrawingBows(ServerPlayer bot) {
+        ServerLevel world = (ServerLevel) bot.level();
+        AABB searchBox = bot.getBoundingBox().inflate(THREAT_DETECTION_RANGE);
 
         // Find all living entities within range
-        List<LivingEntity> nearbyEntities = world.getEntitiesByClass(
+        List<LivingEntity> nearbyEntities = world.getEntitiesOfClass(
             LivingEntity.class,
             searchBox,
             entity -> {
                 // Exclude the bot itself
-                if (entity.getUuid().equals(bot.getUuid())) {
+                if (entity.getUUID().equals(bot.getUUID())) {
                     return false;
                 }
 
@@ -103,8 +99,8 @@ public class PredictiveThreatDetector {
                 }
 
                 // Check if the item being used is a bow or crossbow
-                ItemStack activeItem = entity.getActiveItem();
-                return activeItem.getItem() instanceof RangedWeaponItem;
+                ItemStack activeItem = entity.getUseItem();
+                return activeItem.getItem() instanceof ProjectileWeaponItem;
             }
         );
 
@@ -140,24 +136,24 @@ public class PredictiveThreatDetector {
      * Calculate optimal evasive direction to dodge the predicted arrow
      * Returns a perpendicular direction to the arrow trajectory
      */
-    public static Vec3d calculateEvasiveDirection(DrawingBowThreat threat, ServerPlayerEntity bot) {
-        Vec3d arrowTrajectory = threat.predictArrowTrajectory();
+    public static Vec3 calculateEvasiveDirection(DrawingBowThreat threat, ServerPlayer bot) {
+        Vec3 arrowTrajectory = threat.predictArrowTrajectory();
 
         // Calculate perpendicular direction (90 degrees to trajectory)
         // For a vector (x, z), perpendicular is (-z, x) or (z, -x)
-        Vec3d perpendicular1 = new Vec3d(-arrowTrajectory.z, 0, arrowTrajectory.x).normalize();
-        Vec3d perpendicular2 = new Vec3d(arrowTrajectory.z, 0, -arrowTrajectory.x).normalize();
+        Vec3 perpendicular1 = new Vec3(-arrowTrajectory.z, 0, arrowTrajectory.x).normalize();
+        Vec3 perpendicular2 = new Vec3(arrowTrajectory.z, 0, -arrowTrajectory.x).normalize();
 
         // Choose the direction that moves bot away from shooter
-        Vec3d botPos = bot.getPos();
-        Vec3d shooterPos = threat.shooterPos;
-        Vec3d awayFromShooter = botPos.subtract(shooterPos).normalize();
+        Vec3 botPos = bot.position();
+        Vec3 shooterPos = threat.shooterPos;
+        Vec3 awayFromShooter = botPos.subtract(shooterPos).normalize();
 
         // Pick whichever perpendicular direction is more aligned with moving away
-        double dot1 = perpendicular1.dotProduct(awayFromShooter);
-        double dot2 = perpendicular2.dotProduct(awayFromShooter);
+        double dot1 = perpendicular1.dot(awayFromShooter);
+        double dot2 = perpendicular2.dot(awayFromShooter);
 
-        Vec3d evasiveDir = dot1 > dot2 ? perpendicular1 : perpendicular2;
+        Vec3 evasiveDir = dot1 > dot2 ? perpendicular1 : perpendicular2;
 
         LOGGER.info("📐 Calculated evasive direction: {} (perpendicular to arrow)", evasiveDir);
         return evasiveDir;
@@ -170,7 +166,7 @@ public class PredictiveThreatDetector {
      * The key insight: When shooter releases bow, isUsingItem() immediately becomes false
      * We detect this state change from "drawing" to "not drawing" = arrow fired!
      */
-    public static boolean detectArrowRelease(ServerPlayerEntity bot, DrawingBowThreat threat) {
+    public static boolean detectArrowRelease(ServerPlayer bot, DrawingBowThreat threat) {
         // Check if shooter stopped using the item (released the bow)
         // Note: We check this BEFORE validating threat in AutoFaceEntity
         boolean wasDrawing = threat.shooter.isUsingItem();
@@ -178,12 +174,12 @@ public class PredictiveThreatDetector {
         if (!wasDrawing) {
             // Shooter stopped drawing - arrow was either fired or cancelled
             // To distinguish: check if bow is still held in hand
-            ItemStack mainHand = threat.shooter.getMainHandStack();
-            ItemStack offHand = threat.shooter.getOffHandStack();
+            ItemStack mainHand = threat.shooter.getMainHandItem();
+            ItemStack offHand = threat.shooter.getOffhandItem();
 
             boolean stillHoldingBow =
-                (mainHand.getItem() instanceof RangedWeaponItem) ||
-                (offHand.getItem() instanceof RangedWeaponItem);
+                (mainHand.getItem() instanceof ProjectileWeaponItem) ||
+                (offHand.getItem() instanceof ProjectileWeaponItem);
 
             if (stillHoldingBow) {
                 // Still holding bow but not drawing = arrow was fired!

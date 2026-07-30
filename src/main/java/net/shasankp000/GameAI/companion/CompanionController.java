@@ -1,7 +1,7 @@
 package net.shasankp000.GameAI.companion;
 
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.GameAI.autonomous.AutonomousGoalEngine;
 import net.shasankp000.GameAI.autonomous.AutonomousManager;
@@ -76,7 +76,7 @@ public class CompanionController {
      * @param targetPlayer For {@link BotStance#FOLLOW}: the player to follow.
      *                     For {@link BotStance#STAY} and {@link BotStance#WANDER}: ignored (pass {@code null}).
      */
-    public void setStance(String botName, BotStance newStance, ServerPlayerEntity targetPlayer) {
+    public void setStance(String botName, BotStance newStance, ServerPlayer targetPlayer) {
         BotStance previous = stances.put(botName, newStance);
         LOGGER.info("[companion] Bot '{}' stance: {} → {}", botName,
                 previous == null ? "WANDER" : previous, newStance);
@@ -90,7 +90,7 @@ public class CompanionController {
                     stances.put(botName, BotStance.WANDER);
                     return;
                 }
-                followTargets.put(botName, targetPlayer.getUuid());
+                followTargets.put(botName, targetPlayer.getUUID());
                 anchorPos.remove(botName);
 
                 // Resume autonomous loop so navigation goals can execute
@@ -105,9 +105,9 @@ public class CompanionController {
 
             case STAY -> {
                 // Record current bot position as anchor
-                ServerPlayerEntity bot = resolveBot(botName);
+                ServerPlayer bot = resolveBot(botName);
                 if (bot != null) {
-                    anchorPos.put(botName, bot.getBlockPos());
+                    anchorPos.put(botName, bot.blockPosition());
                 }
                 followTargets.remove(botName);
 
@@ -146,12 +146,12 @@ public class CompanionController {
         UUID targetUUID = followTargets.get(botName);
         if (targetUUID == null) return;
 
-        ServerPlayerEntity bot = resolveBot(botName);
+        ServerPlayer bot = resolveBot(botName);
         if (bot == null) return;
 
         // Resolve target player
-        ServerPlayerEntity target = AIPlayer.serverInstance == null ? null
-                : AIPlayer.serverInstance.getPlayerManager().getPlayer(targetUUID);
+        ServerPlayer target = AIPlayer.serverInstance == null ? null
+                : AIPlayer.serverInstance.getPlayerList().getPlayer(targetUUID);
 
         if (target == null) {
             LOGGER.info("[companion] Follow target for '{}' has left the server — reverting to WANDER", botName);
@@ -159,7 +159,7 @@ public class CompanionController {
             return;
         }
 
-        double distanceSq = bot.squaredDistanceTo(target);
+        double distanceSq = bot.distanceToSqr(target);
 
         if (distanceSq > 25.0) { // 5 blocks
             AutonomousGoalEngine engine = AutonomousManager.getInstance().getEngine(botName);
@@ -181,10 +181,10 @@ public class CompanionController {
         BlockPos anchor = anchorPos.get(botName);
         if (anchor == null) return;
 
-        ServerPlayerEntity bot = resolveBot(botName);
+        ServerPlayer bot = resolveBot(botName);
         if (bot == null) return;
 
-        double drift = Math.sqrt(bot.squaredDistanceTo(
+        double drift = Math.sqrt(bot.distanceToSqr(
                 anchor.getX() + 0.5, bot.getY(), anchor.getZ() + 0.5));
 
         if (drift > 2.0) {
@@ -213,7 +213,7 @@ public class CompanionController {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private void injectFollowGoal(String botName, ServerPlayerEntity target, AutonomousGoalEngine engine) {
+    private void injectFollowGoal(String botName, ServerPlayer target, AutonomousGoalEngine engine) {
         if (engine == null) {
             LOGGER.warn("[companion] No engine found for bot '{}' — cannot inject follow goal", botName);
             return;
@@ -223,17 +223,17 @@ public class CompanionController {
         LOGGER.debug("[companion] Injected follow goal for '{}': '{}'", botName, goalText);
     }
 
-    private static ServerPlayerEntity resolveBot(String botName) {
+    private static ServerPlayer resolveBot(String botName) {
         if (AIPlayer.serverInstance == null) return null;
-        return AIPlayer.serverInstance.getPlayerManager().getPlayer(botName);
+        return AIPlayer.serverInstance.getPlayerList().getPlayerByName(botName);
     }
 
     private static void sendBotMessage(String botName, String message) {
-        ServerPlayerEntity bot = resolveBot(botName);
+        ServerPlayer bot = resolveBot(botName);
         if (bot == null) return;
         try {
             ChatUtils.sendChatMessages(
-                    bot.getCommandSource().withSilent().withMaxLevel(4),
+                    bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS),
                     message);
         } catch (Exception e) {
             LOGGER.warn("[companion] Could not send bot chat message: {}", e.getMessage());

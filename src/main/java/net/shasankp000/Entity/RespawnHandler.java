@@ -1,10 +1,10 @@
 package net.shasankp000.Entity;
 
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 
 public class RespawnHandler {
-    public static void registerRespawnListener(ServerPlayerEntity bot) {
+    public static void registerRespawnListener(ServerPlayer bot) {
 
         String botName = bot.getName().getString();
 

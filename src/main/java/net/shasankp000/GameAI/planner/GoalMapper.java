@@ -1,12 +1,7 @@
 package net.shasankp000.GameAI.planner;
 
-import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessage;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.FilingSystem.LLMClientFactory;
-import net.shasankp000.OllamaClient.OllamaAPIHelper;
-import net.shasankp000.OllamaClient.OllamaThinkingResponse;
 import net.shasankp000.ServiceLLMClients.LLMClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -193,7 +188,7 @@ public class GoalMapper {
      *  3. Hardcoded default: smollm2:135m
      */
     private static short parseGoalWithEdgeLLM(String naturalLanguageGoal) {
-        String llmProvider = System.getProperty("aiplayer.llmMode", "ollama");
+        String llmProvider = System.getProperty("aiplayer.llmMode", "custom");
 
         try {
             // Build goal list
@@ -216,21 +211,6 @@ public class GoalMapper {
                 "You classify Minecraft player goals. Reply with ONLY a single digit (0-9).";
 
             switch (llmProvider) {
-
-                case "ollama": {
-                    String modelName = resolveEdgeModel();
-                    if (modelName == null) return GOAL_UNKNOWN;
-
-                    String host = "http://localhost:11434";
-                    OllamaAPI ollamaAPI = new OllamaAPI(host);
-                    List<OllamaChatMessage> messages = List.of(
-                        new OllamaChatMessage(OllamaChatMessageRole.USER, prompt)
-                    );
-
-                    OllamaThinkingResponse response =
-                        OllamaAPIHelper.smartChat(ollamaAPI, host, modelName, messages);
-                    return extractGoalDigit(response.getContent());
-                }
 
                 case "openai", "gpt", "google", "gemini",
                      "anthropic", "claude", "xAI", "xai", "grok", "custom": {

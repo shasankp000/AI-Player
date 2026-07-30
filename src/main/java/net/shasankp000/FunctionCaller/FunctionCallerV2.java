@@ -24,25 +24,15 @@ import java.time.LocalDateTime;
 import java.util.regex.Matcher;
 
 import java.util.regex.Pattern;
-
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.MinecraftServer;
-
-import net.minecraft.server.command.ServerCommandSource;
-
-import net.minecraft.server.network.ServerPlayerEntity;
-
-import net.minecraft.server.world.ServerWorld;
-
-import net.minecraft.block.Block;
-
-import net.minecraft.block.Blocks;
-
-import net.minecraft.util.math.BlockPos;
-
-import net.minecraft.util.math.Box;
-
-import net.minecraft.util.math.Direction;
-
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.shasankp000.AIPlayer;
 
 import net.shasankp000.ChatUtils.ChatContextManager;
@@ -70,9 +60,7 @@ import net.shasankp000.PathFinding.GoTo;
 import net.shasankp000.PathFinding.PathTracer;
 
 import net.shasankp000.PlayerUtils.*;
-
-import net.shasankp000.PlayerUtils.BlockPlacementTool;
-
+import net.shasankp000.FilingSystem.LLMClientFactory;
 import net.shasankp000.ServiceLLMClients.LLMClient;
 
 import net.shasankp000.WebSearch.WebSearchTool;
@@ -89,7 +77,7 @@ public class FunctionCallerV2 {
 
     private static final Logger logger = LoggerFactory.getLogger("function-caller");
 
-    private static ServerCommandSource botSource = null;
+    private static CommandSourceStack botSource = null;
 
     private static final String DB_URL = "jdbc:sqlite:" + "./sqlite_databases/" + "memory_agent.db";
 
@@ -119,7 +107,7 @@ public class FunctionCallerV2 {
     private static HybridPlanner hybridPlanner = null;
     private static boolean useHybridPlanner = true; // Toggle between planners
 
-    public FunctionCallerV2(ServerCommandSource botSource, UUID playerUUID) {
+    public FunctionCallerV2(CommandSourceStack botSource, UUID playerUUID) {
         FunctionCallerV2.botSource = botSource;
         ollamaAPI.setRequestTimeoutSeconds(90);
         FunctionCallerV2.playerUUID = playerUUID;
@@ -129,7 +117,7 @@ public class FunctionCallerV2 {
      * Initialize the Markov planner system.
      * Should be called once during bot initialization.
      */
-    public static void initializePlanner(ServerPlayerEntity bot, net.shasankp000.GameAI.RLAgent rlAgent) {
+    public static void initializePlanner(ServerPlayer bot, net.shasankp000.GameAI.RLAgent rlAgent) {
         if (markovChain == null) {
             logger.info("[planner] Initializing Markov-based planner system...");
 
@@ -180,9 +168,9 @@ public class FunctionCallerV2 {
     public static CompletableFuture<Boolean> handleUserGoal(
             String naturalLanguageGoal,
             State currentState,
-            ServerPlayerEntity bot,
+            ServerPlayer bot,
             net.shasankp000.GameAI.RLAgent rlAgent,
-            ServerCommandSource botSource) {
+            CommandSourceStack botSource) {
 
         // ✅ Store botSource for function execution
         FunctionCallerV2.botSource = botSource;
@@ -267,21 +255,14 @@ public class FunctionCallerV2 {
                     "Please analyze the situation and generate an appropriate action pipeline. " +
                     "Consider the bot's current state and surroundings carefully.";
 
-                String response;
+                String llmProvider = System.getProperty("aiplayer.llmMode", "custom");
+                LLMClient client = LLMClientFactory.createClient(llmProvider);
+                if (client == null) {
+                    logger.error("[planner] No OpenAI-compatible LLM client configured for fallback.");
+                    return false;
+                }
 
-                // Use Ollama for LLM fallback
-                List<OllamaChatMessage> messages = new ArrayList<>();
-                messages.add(new OllamaChatMessage(OllamaChatMessageRole.SYSTEM, fullSystemPrompt));
-                messages.add(new OllamaChatMessage(OllamaChatMessageRole.USER, userPrompt));
-
-                net.shasankp000.OllamaClient.OllamaThinkingResponse thinkingResponse =
-                        net.shasankp000.OllamaClient.OllamaAPIHelper.smartChat(
-                                ollamaAPI,
-                                "http://localhost:11434",
-                                net.shasankp000.AIPlayer.CONFIG.getSelectedLanguageModel(),
-                                messages
-                        );
-                response = thinkingResponse.getContent();
+                String response = client.sendPrompt(fullSystemPrompt, userPrompt);
 
                 logger.info("[planner] Raw LLM response: {}", response);
 
@@ -327,7 +308,7 @@ public class FunctionCallerV2 {
                         playerUUID,
                         goal,
                         clarification,
-                        botSource.getName()
+                        botSource.getTextName()
                     );
                     sendMessageToPlayer(clarification);
                     return false;
@@ -398,9 +379,9 @@ public class FunctionCallerV2 {
                 // ✅ Ensure we have a valid result for parsing
                 if (result == null || result.trim().isEmpty()) {
                     // Fallback: get current bot position
-                    ServerPlayerEntity bot = botSource.getPlayer();
+                    ServerPlayer bot = botSource.getPlayer();
                     if (bot != null) {
-                        BlockPos pos = bot.getBlockPos();
+                        BlockPos pos = bot.blockPosition();
                         result = String.format("Bot position - x: %d y: %d z: %d",
                                 pos.getX(), pos.getY(), pos.getZ());
                     }
@@ -427,16 +408,16 @@ public class FunctionCallerV2 {
         /** faceEntity: look at entity **/
         private static void faceEntity(int targetX, int targetY, int targetZ) {
             System.out.println("Facing entity at: " + targetX + ", " + targetY + ", " + targetZ);
-            ServerPlayerEntity bot = Objects.requireNonNull(botSource.getPlayer());
+            ServerPlayer bot = Objects.requireNonNull(botSource.getPlayer());
             // Get the world
-            var world = bot.getWorld();
+            var world = bot.level();
             // Create a small bounding box around the coordinates to find nearby entities
-            var box = new Box(
+            var box = new AABB(
                     targetX - 1, targetY - 1, targetZ - 1,
                     targetX + 1, targetY + 1, targetZ + 1
             );
             // Get all entities except the bot itself
-            var entities = world.getOtherEntities(bot, box);
+            var entities = world.getEntities(bot, box);
             if (entities.isEmpty()) {
                 System.out.println("No entity found at given coordinates.");
                 getFunctionOutput("No entity found at given coordinates.");
@@ -475,18 +456,18 @@ public class FunctionCallerV2 {
         private static void turn(String direction) {
             System.out.println("Turning to: " + direction);
             MinecraftServer server = botSource.getServer();
-            String botName = botSource.getName();
-            server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " turn " + direction); // choosing the command route instead of calling function to check if the bug still exists.
-            getFunctionOutput("Now facing " + direction + " which is in " + Objects.requireNonNull(botSource.getPlayer()).getFacing().getName() + " in " + Objects.requireNonNull(botSource.getPlayer()).getFacing().getAxis().asString() + " axis.");
+            String botName = botSource.getTextName();
+            server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " turn " + direction); // choosing the command route instead of calling function to check if the bug still exists.
+            getFunctionOutput("Now facing " + direction + " which is in " + Objects.requireNonNull(botSource.getPlayer()).getNearestViewDirection().getName() + " in " + Objects.requireNonNull(botSource.getPlayer()).getNearestViewDirection().getAxis().getSerializedName() + " axis.");
         }
 
         /** look: change head facing direction **/
         private static void look(String cardinalDirection) {
             System.out.println("Looking at: " + cardinalDirection);
             MinecraftServer server = botSource.getServer();
-            String botName = botSource.getName();
-            server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look " + cardinalDirection); // choosing the command route instead of calling function to check if the bug still exists.
-            getFunctionOutput("Now facing cardinal direction: " + Objects.requireNonNull(botSource.getPlayer()).getFacing().getName() + " which is in " + Objects.requireNonNull(botSource.getPlayer()).getFacing().getAxis().asString() + " axis.");
+            String botName = botSource.getTextName();
+            server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " look " + cardinalDirection); // choosing the command route instead of calling function to check if the bug still exists.
+            getFunctionOutput("Now facing cardinal direction: " + Objects.requireNonNull(botSource.getPlayer()).getNearestViewDirection().getName() + " which is in " + Objects.requireNonNull(botSource.getPlayer()).getNearestViewDirection().getAxis().getSerializedName() + " axis.");
         }
 
         /** mineBlock: break block **/
@@ -579,7 +560,7 @@ public class FunctionCallerV2 {
                 return;
             }
             try {
-                ServerPlayerEntity bot = botSource.getPlayer();
+                ServerPlayer bot = botSource.getPlayer();
                 BlockPos result = net.shasankp000.Tools.SearchBlocks.searchBlock(
                         bot,
                         blockType,
@@ -594,7 +575,7 @@ public class FunctionCallerV2 {
                             result.getX(),
                             result.getY(),
                             result.getZ(),
-                            bot.getBlockPos().getManhattanDistance(result)));
+                            bot.blockPosition().distManhattan(result)));
                 } else {
                     getFunctionOutput(String.format("No %s found within %d blocks", blockType, maxRadius));
                 }
@@ -883,9 +864,9 @@ public class FunctionCallerV2 {
         } else {
             // first time call.
             assert botSource.getPlayer() != null;
-            Direction facingDir = botSource.getPlayer().getFacing();
+            Direction facingDir = botSource.getPlayer().getNearestViewDirection();
             sb.append("- Facing: ").append(facingDir.getName());
-            sb.append(" (axis: ").append(facingDir.getAxis().asString()).append(")");
+            sb.append(" (axis: ").append(facingDir.getAxis().getSerializedName()).append(")");
         }
 
         sb.append("- Selected Item: ").append(state.getSelectedItem()).append("\n");
@@ -975,6 +956,11 @@ public class FunctionCallerV2 {
         try {
             response = client.sendPrompt(fullSystemPrompt, userPrompt);
             logger.info("Raw LLM Response: {}", response);
+            if (response == null || response.isBlank() || response.startsWith("Error:")) {
+                logger.error("Function caller provider returned no usable response: {}", response);
+                sendMessageToPlayer("I couldn't plan that action because the AI provider returned an empty response. Please try another model.");
+                return;
+            }
             String cleanedResponse = stripThinkBlock(response);
             String jsonPart = extractJson(cleanedResponse);
             logger.info("Extracted JSON: {}", jsonPart);
@@ -1055,7 +1041,7 @@ public class FunctionCallerV2 {
                     System.out.println("Detected clarification");
                     String clarification = jsonObject.get("clarification").getAsString();
                     // Save the clarification state
-                    ChatContextManager.setPendingClarification(playerUUID, userInput, clarification, botSource.getName());
+                    ChatContextManager.setPendingClarification(playerUUID, userInput, clarification, botSource.getTextName());
                     // Relay to player in-game
                     sendMessageToPlayer(clarification);
                 } else {
@@ -1100,7 +1086,7 @@ public class FunctionCallerV2 {
                 } else if (jsonObject.has("clarification")) {
                     String clarification = jsonObject.get("clarification").getAsString();
                     // Save the clarification state
-                    ChatContextManager.setPendingClarification(playerUUID, userInput, clarification, botSource.getName());
+                    ChatContextManager.setPendingClarification(playerUUID, userInput, clarification, botSource.getTextName());
                     // Relay to player in-game
                     sendMessageToPlayer(clarification);
                 } else {
@@ -1113,7 +1099,7 @@ public class FunctionCallerV2 {
         }
     }
 
-    private static void processLLMOutput(String fullResponse, String botName, ServerCommandSource botSource) {
+    private static void processLLMOutput(String fullResponse, String botName, CommandSourceStack botSource) {
         logger.info("processLLMOutput called with response: '{}', botName: '{}'", fullResponse, botName);
         if (fullResponse == null || fullResponse.trim().isEmpty()) {
             logger.warn("fullResponse is null or empty");
@@ -1144,7 +1130,7 @@ public class FunctionCallerV2 {
     }
 
     private static void sendMessageToPlayer(String message) {
-        processLLMOutput(message, botSource.getName(), botSource);
+        processLLMOutput(message, botSource.getTextName(), botSource);
     }
 
     private static void runPipelineLoop(JsonArray pipeline) {
@@ -1229,7 +1215,7 @@ public class FunctionCallerV2 {
                     } else if (llmResponseObj.has("clarification")) {
                         logger.info("LLM requested clarification. Relaying to player.");
                         String clarification = llmResponseObj.get("clarification").getAsString();
-                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getName());
+                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getTextName());
                         sendMessageToPlayer(clarification);
                         break;
                     } else {
@@ -1256,7 +1242,7 @@ public class FunctionCallerV2 {
             }
 
             // Get bot entity
-            ServerPlayerEntity bot = botSource.getPlayer();
+            ServerPlayer bot = botSource.getPlayer();
             if (bot == null) {
                 logger.error("Bot entity not found for verification");
                 continue;
@@ -1318,7 +1304,7 @@ public class FunctionCallerV2 {
                     } else if (llmResponseObj.has("clarification")) {
                         logger.info("LLM requested clarification. Relaying to player.");
                         String clarification = llmResponseObj.get("clarification").getAsString();
-                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getName());
+                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getTextName());
                         sendMessageToPlayer(clarification);
                         break;
                     } else {
@@ -1408,7 +1394,7 @@ public class FunctionCallerV2 {
                     } else if (llmResponseObj.has("clarification")) {
                         logger.info("LLM requested clarification. Relaying to player.");
                         String clarification = llmResponseObj.get("clarification").getAsString();
-                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getName());
+                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getTextName());
                         sendMessageToPlayer(clarification);
                         break;
                     } else {
@@ -1433,7 +1419,7 @@ public class FunctionCallerV2 {
                 logger.warn("Interrupted during state settle wait");
             }
 
-            ServerPlayerEntity bot = botSource.getPlayer();
+            ServerPlayer bot = botSource.getPlayer();
             if (bot == null) {
                 logger.error("Bot entity not found for verification");
                 continue;
@@ -1489,7 +1475,7 @@ public class FunctionCallerV2 {
                     } else if (llmResponseObj.has("clarification")) {
                         logger.info("LLM requested clarification. Relaying to player.");
                         String clarification = llmResponseObj.get("clarification").getAsString();
-                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getName());
+                        ChatContextManager.setPendingClarification(playerUUID, "A recent action failed.", clarification, botSource.getTextName());
                         sendMessageToPlayer(clarification);
                         break;
                     } else {
@@ -1794,7 +1780,7 @@ public class FunctionCallerV2 {
 
                     // Call searchBlocks and capture the result
                     if (botSource != null && botSource.getPlayer() != null) {
-                        ServerPlayerEntity bot = botSource.getPlayer();
+                        ServerPlayer bot = botSource.getPlayer();
                         BlockPos result = net.shasankp000.Tools.SearchBlocks.searchBlock(
                             bot,
                             blockType,
@@ -2111,7 +2097,7 @@ public class FunctionCallerV2 {
                 Integer targetZ = (Integer) SharedStateUtils.getValue(sharedState, "found_block_z");
 
                 if (targetX != null && targetZ != null && botSource != null && botSource.getPlayer() != null) {
-                    BlockPos botPos = botSource.getPlayer().getBlockPos();
+                    BlockPos botPos = botSource.getPlayer().blockPosition();
                     double distance = Math.sqrt(Math.pow(botPos.getX() - (targetX + 1), 2) +
                                                Math.pow(botPos.getZ() - targetZ, 2));
 
@@ -2137,7 +2123,7 @@ public class FunctionCallerV2 {
                 if (blockX != null && blockY != null && blockZ != null && botSource != null) {
                     MinecraftServer server = botSource.getServer();
                     if (server != null) {
-                        ServerWorld world = server.getOverworld();
+                        ServerLevel world = server.overworld();
                         BlockPos blockPos = new BlockPos(blockX, blockY, blockZ);
                         Block block = world.getBlockState(blockPos).getBlock();
 

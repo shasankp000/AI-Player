@@ -1,7 +1,9 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.item.*;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,14 +50,14 @@ public class WeaponUtils {
      * Returns slot number (0-8 for hotbar, 9-35 for main inventory)
      * Returns -1 if no weapon found
      */
-    public static int findBestMeleeWeapon(ServerPlayerEntity bot) {
+    public static int findBestMeleeWeapon(ServerPlayer bot) {
         LOGGER.debug("🗡 Analyzing bot's inventory for best melee weapon...");
 
         List<WeaponAnalysis> weapons = new ArrayList<>();
 
         // Scan hotbar (slots 0-8) and main inventory (slots 9-35)
         for (int slot = 0; slot < 36; slot++) {
-            ItemStack stack = bot.getInventory().getStack(slot);
+            ItemStack stack = bot.getInventory().getItem(slot);
             if (stack.isEmpty()) continue;
 
             Item item = stack.getItem();
@@ -100,26 +102,28 @@ public class WeaponUtils {
      * Check if an item is a melee weapon
      */
     private static boolean isMeleeWeapon(Item item) {
-        return item instanceof SwordItem ||
-               item instanceof AxeItem ||
-               item instanceof TridentItem ||
-               item instanceof MaceItem ||
-               item instanceof PickaxeItem ||
-               item instanceof ShovelItem ||
-               item instanceof HoeItem;
+        String itemId = itemId(item);
+        return itemId.endsWith("_sword") ||
+               itemId.endsWith("_axe") ||
+               itemId.endsWith("_pickaxe") ||
+               itemId.endsWith("_shovel") ||
+               itemId.endsWith("_hoe") ||
+               itemId.endsWith("trident") ||
+               itemId.endsWith("mace");
     }
 
     /**
      * Get weapon type name
      */
     private static String getWeaponType(Item item) {
-        if (item instanceof SwordItem) return "Sword";
-        if (item instanceof AxeItem) return "Axe";
-        if (item instanceof TridentItem) return "Trident";
-        if (item instanceof MaceItem) return "Mace";
-        if (item instanceof PickaxeItem) return "Pickaxe";
-        if (item instanceof ShovelItem) return "Shovel";
-        if (item instanceof HoeItem) return "Hoe";
+        String itemId = itemId(item);
+        if (itemId.endsWith("_sword")) return "Sword";
+        if (itemId.endsWith("_axe")) return "Axe";
+        if (itemId.endsWith("trident")) return "Trident";
+        if (itemId.endsWith("mace")) return "Mace";
+        if (itemId.endsWith("_pickaxe")) return "Pickaxe";
+        if (itemId.endsWith("_shovel")) return "Shovel";
+        if (itemId.endsWith("_hoe")) return "Hoe";
         return "Unknown";
     }
 
@@ -127,59 +131,42 @@ public class WeaponUtils {
      * Get attack damage from item stack
      */
     private static double getAttackDamage(ItemStack stack) {
-        Item item = stack.getItem();
+        String itemId = itemId(stack.getItem());
+        if (itemId.endsWith("trident")) return 9.0;
+        if (itemId.endsWith("mace")) return 6.0;
 
-        // Get base attack damage from item attributes
-        double baseDamage = 1.0; // Default fist damage
-
-        if (item instanceof ToolItem toolItem) {
-            // Tools have attack damage from material
-            baseDamage = toolItem.getMaterial().getAttackDamage();
-        } else if (item instanceof SwordItem swordItem) {
-            // Swords have attack damage from material + bonus
-            baseDamage = swordItem.getMaterial().getAttackDamage() + 3.0; // Sword bonus
-        } else if (item instanceof TridentItem) {
-            baseDamage = 9.0; // Trident base damage
-        } else if (item instanceof MaceItem) {
-            baseDamage = 6.0; // Mace base damage (1.21+)
-        }
-
-        // Add Sharpness enchantment bonus (if present)
-        // Note: In 1.20.6+, enchantments are stored in components, not NBT
-        // For simplicity, we'll skip enchantment bonuses in base damage calculation
-        // since weapons will still be ranked correctly by material/type
-
-        return baseDamage;
+        double materialBonus = materialScore(itemId);
+        if (itemId.endsWith("_sword")) return materialBonus + 3.0;
+        if (itemId.endsWith("_axe")) return materialBonus + 5.0;
+        if (itemId.endsWith("_pickaxe") || itemId.endsWith("_shovel") || itemId.endsWith("_hoe")) return materialBonus + 1.0;
+        return 1.0;
     }
 
     /**
      * Get attack speed from item stack
      */
     private static double getAttackSpeed(ItemStack stack) {
-        Item item = stack.getItem();
+        String itemId = itemId(stack.getItem());
 
         // Default attack speeds for different weapon types
         double attackSpeed = 4.0; // Default (fist/no weapon)
 
-        if (item instanceof SwordItem) {
+        if (itemId.endsWith("_sword")) {
             attackSpeed = 1.6; // Swords are fast
-        } else if (item instanceof AxeItem) {
+        } else if (itemId.endsWith("_axe")) {
             // Axes are slower but hit harder
-            ToolMaterial material = ((AxeItem) item).getMaterial();
-            if (material == ToolMaterials.WOOD || material == ToolMaterials.GOLD) {
+            if (itemId.contains("wooden") || itemId.contains("golden") || itemId.contains("stone")) {
                 attackSpeed = 0.8;
-            } else if (material == ToolMaterials.STONE) {
-                attackSpeed = 0.8;
-            } else if (material == ToolMaterials.IRON) {
+            } else if (itemId.contains("iron")) {
                 attackSpeed = 0.9;
-            } else if (material == ToolMaterials.DIAMOND || material == ToolMaterials.NETHERITE) {
+            } else if (itemId.contains("diamond") || itemId.contains("netherite")) {
                 attackSpeed = 1.0;
             }
-        } else if (item instanceof TridentItem) {
+        } else if (itemId.endsWith("trident")) {
             attackSpeed = 1.1; // Trident is fairly fast
-        } else if (item instanceof MaceItem) {
+        } else if (itemId.endsWith("mace")) {
             attackSpeed = 0.7; // Mace is slow but powerful
-        } else if (item instanceof ToolItem) {
+        } else if (itemId.endsWith("_pickaxe") || itemId.endsWith("_shovel") || itemId.endsWith("_hoe")) {
             attackSpeed = 1.2; // Tools (pickaxe, shovel, hoe) are moderately fast
         }
 
@@ -194,36 +181,35 @@ public class WeaponUtils {
     private static int analyzeEnchantments(ItemStack stack) {
         int score = 0;
 
-        // Use material tier as enchantment proxy
-        // Higher tier items are more likely to have good enchantments
-        if (stack.getItem() instanceof ToolItem toolItem) {
-            ToolMaterial material = toolItem.getMaterial();
-            if (material == ToolMaterials.NETHERITE) {
-                score += 10; // Best material
-            } else if (material == ToolMaterials.DIAMOND) {
-                score += 8;
-            } else if (material == ToolMaterials.IRON) {
-                score += 5;
-            } else if (material == ToolMaterials.STONE) {
-                score += 3;
-            } else if (material == ToolMaterials.GOLD) {
-                score += 4; // Gold has enchantability but low durability
-            }
-        }
+        score += (int) materialScore(itemId(stack.getItem()));
 
         // Check for enchantment glint (indicates item is enchanted)
-        if (stack.hasGlint()) {
+        if (stack.hasFoil()) {
             score += 5; // Bonus for any enchantments
         }
 
         return score;
     }
 
+    private static String itemId(Item item) {
+        return BuiltInRegistries.ITEM.getKey(item).toString();
+    }
+
+    private static double materialScore(String itemId) {
+        if (itemId.contains("netherite")) return 10.0;
+        if (itemId.contains("diamond")) return 8.0;
+        if (itemId.contains("iron")) return 5.0;
+        if (itemId.contains("golden")) return 4.0;
+        if (itemId.contains("stone")) return 3.0;
+        if (itemId.contains("wooden")) return 2.0;
+        return 1.0;
+    }
+
     /**
      * Equip the best melee weapon from inventory
      * Returns true if weapon was successfully equipped, false otherwise
      */
-    public static boolean equipBestMeleeWeapon(ServerPlayerEntity bot) {
+    public static boolean equipBestMeleeWeapon(ServerPlayer bot) {
         int bestWeaponSlot = findBestMeleeWeapon(bot);
 
         if (bestWeaponSlot == -1) {
@@ -232,7 +218,7 @@ public class WeaponUtils {
         }
 
         // If weapon is already in hand, we're done
-        if (bot.getInventory().selectedSlot == bestWeaponSlot && bestWeaponSlot < 9) {
+        if (bot.getInventory().getSelectedSlot() == bestWeaponSlot && bestWeaponSlot < 9) {
             LOGGER.debug("✓ Best weapon already equipped");
             return true;
         }
@@ -243,24 +229,24 @@ public class WeaponUtils {
                 // Find empty hotbar slot or use slot 0
                 int targetHotbarSlot = 0;
                 for (int i = 0; i < 9; i++) {
-                    if (bot.getInventory().getStack(i).isEmpty()) {
+                    if (bot.getInventory().getItem(i).isEmpty()) {
                         targetHotbarSlot = i;
                         break;
                     }
                 }
 
                 // Swap weapon to hotbar
-                ItemStack weaponStack = bot.getInventory().getStack(bestWeaponSlot);
-                ItemStack hotbarStack = bot.getInventory().getStack(targetHotbarSlot);
-                bot.getInventory().setStack(bestWeaponSlot, hotbarStack);
-                bot.getInventory().setStack(targetHotbarSlot, weaponStack);
+                ItemStack weaponStack = bot.getInventory().getItem(bestWeaponSlot);
+                ItemStack hotbarStack = bot.getInventory().getItem(targetHotbarSlot);
+                bot.getInventory().setItem(bestWeaponSlot, hotbarStack);
+                bot.getInventory().setItem(targetHotbarSlot, weaponStack);
 
                 LOGGER.info("Moved weapon from slot {} to hotbar slot {}", bestWeaponSlot, targetHotbarSlot);
                 bestWeaponSlot = targetHotbarSlot;
             }
 
             // Select the hotbar slot with the best weapon
-            bot.getInventory().selectedSlot = bestWeaponSlot;
+            bot.getInventory().setSelectedSlot(bestWeaponSlot);
             LOGGER.info("✅ Equipped best melee weapon from slot {}", bestWeaponSlot);
             return true;
 
@@ -319,4 +305,3 @@ public class WeaponUtils {
         return minSpeed + (maxSpeed - minSpeed) * speedFraction;
     }
 }
-

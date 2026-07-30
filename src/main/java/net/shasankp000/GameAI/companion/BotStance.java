@@ -10,7 +10,7 @@ package net.shasankp000.GameAI.companion;
  *   <li>{@link #WANDER} — default; bot runs its normal autonomous goal loop freely.</li>
  * </ul>
  *
- * Changed via {@link CompanionController#setStance(String, BotStance, net.minecraft.server.network.ServerPlayerEntity)}
+ * Changed via {@link CompanionController#setStance(String, BotStance, net.minecraft.server.level.ServerPlayer)}
  * or the {@code /bot stance} command.
  */
 public enum BotStance {
@@ -22,7 +22,7 @@ public enum BotStance {
     FOLLOW,
 
     /**
-     * Bot holds position at a recorded anchor {@link net.minecraft.util.math.BlockPos}.
+     * Bot holds position at a recorded anchor {@link net.minecraft.core.BlockPos}.
      * The autonomous goal loop is paused while this stance is active.
      * If the bot drifts more than 2 blocks (e.g. knocked back) it automatically
      * injects a return-to-anchor goal.

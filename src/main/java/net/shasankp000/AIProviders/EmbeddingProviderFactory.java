@@ -17,13 +17,13 @@ public class EmbeddingProviderFactory {
      * This method automatically determines the correct embedding endpoint and model
      * based on the selected LLM provider from JVM arguments.
      *
-     * @param ollamaAPI Ollama API instance (used as fallback)
+     * @param ollamaAPI Ollama API instance (used only when the ollama provider is explicitly selected)
      * @return Configured EmbeddingProvider
      */
     public static EmbeddingProvider createEmbeddingProvider(OllamaAPI ollamaAPI) {
         try {
             // Get provider from JVM argument
-            String provider = System.getProperty("aiplayer.llmMode", "ollama");
+            String provider = System.getProperty("aiplayer.llmMode", "custom");
             LOGGER.info("🔍 Creating embedding provider for: {}", provider);
 
             String embeddingModel = getDefaultEmbeddingModel(provider);
@@ -38,8 +38,7 @@ public class EmbeddingProviderFactory {
                 case "openai":
                     apiKey = AIPlayer.CONFIG.getOpenAIKey();
                     if (apiKey == null || apiKey.isEmpty()) {
-                        LOGGER.warn("⚠ OpenAI API key not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+                        throw new IllegalStateException("OpenAI API key is not configured");
                     }
                     LOGGER.info("✅ Using OpenAI embedding model: {}", embeddingModel);
                     return new EmbeddingProvider(
@@ -52,8 +51,7 @@ public class EmbeddingProviderFactory {
                 case "gemini":
                     apiKey = AIPlayer.CONFIG.getGeminiKey();
                     if (apiKey == null || apiKey.isEmpty()) {
-                        LOGGER.warn("⚠ Gemini API key not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+                        throw new IllegalStateException("Gemini API key is not configured");
                     }
                     LOGGER.info("✅ Using Gemini embedding model: {}", embeddingModel);
                     return new EmbeddingProvider(
@@ -66,8 +64,7 @@ public class EmbeddingProviderFactory {
                 case "grok":
                     apiKey = AIPlayer.CONFIG.getGrokKey();
                     if (apiKey == null || apiKey.isEmpty()) {
-                        LOGGER.warn("⚠ Grok API key not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+                        throw new IllegalStateException("Grok API key is not configured");
                     }
                     LOGGER.info("✅ Using Grok (OpenAI-compatible) embedding model: {}", embeddingModel);
                     return new EmbeddingProvider(
@@ -82,8 +79,7 @@ public class EmbeddingProviderFactory {
                     apiKey = AIPlayer.CONFIG.getCustomApiKey();
 
                     if (endpoint == null || endpoint.isEmpty()) {
-                        LOGGER.warn("⚠ Custom endpoint not configured, falling back to Ollama");
-                        return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+                        throw new IllegalStateException("Custom OpenAI-compatible endpoint is not configured");
                     }
 
                     // If no API key is required for custom endpoint (e.g., LM Studio, local VLLM)
@@ -102,16 +98,14 @@ public class EmbeddingProviderFactory {
 
                 case "claude":
                 case "anthropic":
-                    LOGGER.warn("⚠ Anthropic/Claude does not provide embedding endpoints, falling back to Ollama");
-                    return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+                    throw new IllegalStateException("Anthropic/Claude does not provide embedding endpoints. Configure a custom OpenAI-compatible embedding endpoint.");
 
                 default:
-                    LOGGER.warn("⚠ Unknown provider '{}', falling back to Ollama", provider);
-                    return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+                    throw new IllegalStateException("Unknown embedding provider: " + provider);
             }
         } catch (Exception e) {
-            LOGGER.error("❌ Failed to create embedding provider, falling back to Ollama", e);
-            return new EmbeddingProvider(ollamaAPI, "nomic-embed-text");
+            LOGGER.error("❌ Failed to create embedding provider", e);
+            throw new IllegalStateException("Failed to create embedding provider", e);
         }
     }
 
@@ -128,8 +122,7 @@ public class EmbeddingProviderFactory {
                 // For OpenAI-compatible endpoints (Grok, LM Studio, VLLM, etc.)
                 // Use a common embedding model name that most providers support
                     "text-embedding-ada-002";
-            default -> "nomic-embed-text"; // Fallback to Ollama default
+            default -> "text-embedding-3-small";
         };
     }
 }
-

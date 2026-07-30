@@ -1,10 +1,10 @@
 package net.shasankp000.PathFinding;
 
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.Commands.modCommandRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,7 @@ public class PathTracer {
     public static class BotSegmentManager {
         private static final Queue<Segment> jobQueue = new LinkedList<>();
         private final MinecraftServer server;
-        private static ServerCommandSource botSource = null;
+        private static CommandSourceStack botSource = null;
         private final String botName;
         private int retries = 0;
         private static boolean isMoving = false;
@@ -44,7 +44,7 @@ public class PathTracer {
             return isMoving;
         }
 
-        public BotSegmentManager(MinecraftServer server, ServerCommandSource botSource, String botName) {
+        public BotSegmentManager(MinecraftServer server, CommandSourceStack botSource, String botName) {
             this.server = server;
             BotSegmentManager.botSource = botSource;
             this.botName = botName;
@@ -93,7 +93,7 @@ public class PathTracer {
                 // if was sprinting previously, set to false.
                 if (shouldSprint) {
                     shouldSprint = false; // reset the flag
-                    server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " unsprint");
+                    server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " unsprint");
                 }
 
                 // ✅ Complete the path and set final result
@@ -136,17 +136,17 @@ public class PathTracer {
             // Schedule jump if required, slightly before reaching the target to ensure proper timing
             if (segment.jump()) {
                 scheduler.schedule(() -> {
-                    server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " jump");
+                    server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " jump");
                     LOGGER.info(botName + " performed a jump!");
                 }, jumpDelay, TimeUnit.MILLISECONDS); // Jump 200ms before reaching target
             }
 
             if (segment.sprint()) {
-                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " sprint");
+                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " sprint");
             }
             else {
                 // if was set to sprint before, stop sprinting anyways.
-                server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " unsprint");
+                server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " unsprint");
             }
 
             scheduler.schedule(() -> {
@@ -161,7 +161,7 @@ public class PathTracer {
         }
 
         private void waitForSegmentCompletion(Segment completedSegment) {
-            ServerPlayerEntity player = botSource.getPlayer();
+            ServerPlayer player = botSource.getPlayer();
             if (player == null) {
                 LOGGER.error("Player is null, cannot continue pathfinding");
                 // ✅ Complete with error
@@ -173,7 +173,7 @@ public class PathTracer {
                 return;
             }
 
-            BlockPos currentPos = player.getBlockPos();
+            BlockPos currentPos = player.blockPosition();
 
             // Get the final destination for distance checking
             BlockPos finalDestination = getFinalDestination();
@@ -216,7 +216,7 @@ public class PathTracer {
             if (retries < MAX_RETRIES) {
                 LOGGER.info("Attempting re-pathfinding from {} to {}", currentPos, finalDestination);
 
-                ServerWorld world = botSource.getServer().getOverworld();
+                ServerLevel world = botSource.getServer().overworld();
                 List<PathFinder.PathNode> newPath = PathFinder.calculatePath(currentPos, finalDestination, world);
 
                 if (newPath.isEmpty()) {
@@ -273,7 +273,7 @@ public class PathTracer {
         private boolean isCloseToFinalDestination(BlockPos currentPos, BlockPos finalDestination) {
             if (finalDestination == null) return false;
 
-            double distance = Math.sqrt(currentPos.getSquaredDistance(finalDestination));
+            double distance = Math.sqrt(currentPos.distSqr(finalDestination));
             return distance <= 2.0; // Within 2 blocks is considered "close enough"
         }
 
@@ -311,13 +311,13 @@ public class PathTracer {
         }
 
         // ✅ Updated to return proper format for parsing
-        public static String tracePathOutput(ServerCommandSource botSource) {
+        public static String tracePathOutput(CommandSourceStack botSource) {
             if (botSource == null || botSource.getPlayer() == null) {
                 return "Bot not found";
             }
 
-            ServerPlayerEntity bot = botSource.getPlayer();
-            BlockPos currentPos = bot.getBlockPos();
+            ServerPlayer bot = botSource.getPlayer();
+            BlockPos currentPos = bot.blockPosition();
 
             // Return in the format expected by parseOutputValues
             return String.format("Bot moved to position - x: %d y: %d z: %d",
@@ -326,7 +326,7 @@ public class PathTracer {
 
         // Improved target reaching detection
         private boolean hasReachedTarget(BlockPos current, BlockPos target, Segment segment) {
-            ServerPlayerEntity player = botSource.getPlayer();
+            ServerPlayer player = botSource.getPlayer();
             if (player == null) return false;
 
             // Use entity position for more accurate checking
@@ -359,7 +359,7 @@ public class PathTracer {
 
         // Update calculateAxisAlignedDistance for precision
         private int calculateAxisAlignedDistance(BlockPos current, BlockPos target) {
-            ServerPlayerEntity player = botSource.getPlayer();
+            ServerPlayer player = botSource.getPlayer();
             if (player != null) {
                 double dx = Math.abs(player.getX() - (target.getX() + 0.5));
                 double dy = Math.abs(player.getY() - target.getY());
@@ -401,13 +401,13 @@ public class PathTracer {
                 lastDirection = direction;
             }
 
-            server.getCommandManager().executeWithPrefix(botSource, "/player " + botName + " look " + direction);
+            server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " look " + direction);
             LOGGER.info("{} is now facing {} (dx: {}, dy: {}, dz: {})", botName, direction, dx, dy, dz);
         }
     }
 
     // ✅ Updated to return CompletableFuture for proper async handling
-    public static CompletableFuture<String> tracePath(MinecraftServer server, ServerCommandSource botSource, String botName, Queue<Segment> segments, boolean sprint) {
+    public static CompletableFuture<String> tracePath(MinecraftServer server, CommandSourceStack botSource, String botName, Queue<Segment> segments, boolean sprint) {
         shouldSprint = sprint;
         segmentQueue = new LinkedList<>(segments); // Create a copy
 

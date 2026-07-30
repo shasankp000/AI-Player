@@ -1,11 +1,10 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.block.Block;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.BlockPos;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.Block;
 
 /**
  * Represents an internal 3D map of the blocks surrounding the bot.
@@ -18,7 +17,7 @@ import java.util.Map;
  */
 public class InternalMap {
 
-    private final ServerPlayerEntity player;
+    private final ServerPlayer player;
     private final int verticalRange;    // How many blocks above and below the bot to scan
     private final int horizontalRange;  // How many blocks outward (in x and z) from the bot to scan
     private final Block[][][] map;      // 3D array holding scanned block data
@@ -30,7 +29,7 @@ public class InternalMap {
      * @param verticalRange    The vertical range: scan from -verticalRange to +verticalRange.
      * @param horizontalRange  The horizontal range: scan from -horizontalRange to +horizontalRange in x and z.
      */
-    public InternalMap(ServerPlayerEntity player, int verticalRange, int horizontalRange) {
+    public InternalMap(ServerPlayer player, int verticalRange, int horizontalRange) {
         this.player = player;
         this.verticalRange = verticalRange;
         this.horizontalRange = horizontalRange;
@@ -43,13 +42,13 @@ public class InternalMap {
      * The bot's current position is treated as the center (offset 0,0,0) of the map.
      */
     public void updateMap() {
-        BlockPos botPos = player.getBlockPos();
+        BlockPos botPos = player.blockPosition();
         // Loop through all relative offsets within the defined ranges.
         for (int dy = -verticalRange; dy <= verticalRange; dy++) {
             for (int dx = -horizontalRange; dx <= horizontalRange; dx++) {
                 for (int dz = -horizontalRange; dz <= horizontalRange; dz++) {
-                    BlockPos pos = botPos.add(dx, dy, dz);
-                    Block block = player.getEntityWorld().getBlockState(pos).getBlock();
+                    BlockPos pos = botPos.offset(dx, dy, dz);
+                    Block block = player.level().getBlockState(pos).getBlock();
                     // Store the block in the map array at the corresponding shifted indices.
                     map[dy + verticalRange][dx + horizontalRange][dz + horizontalRange] = block;
                 }
@@ -121,7 +120,7 @@ public class InternalMap {
             int dz = directionOffsets[i][2];
 
             Block block = getBlockAt(dx, dy, dz);
-            String name = block != null ? block.getTranslationKey().replace("block.minecraft.", "") : "unknown";
+            String name = block != null ? block.getDescriptionId().replace("block.minecraft.", "") : "unknown";
             summary.put(directionNames[i], name);
         }
 

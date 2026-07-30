@@ -1,13 +1,13 @@
 package net.shasankp000.GameAI.handoff;
 
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import net.shasankp000.GameAI.BotEventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,14 +32,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Sessions expire after {@link TradeSession#EXPIRY_TICKS} ticks (~30 s).
  *
- * <p>In Fabric API 0.116.9+1.21.1 {@code PlayerPickupItemCallback} no longer
+ * <p>In Fabric API 0.155.2+26.2 {@code PlayerPickupItemCallback} no longer
  * exists.  Detection is done via {@link net.shasankp000.mixin.PlayerPickupMixin},
  * which injects into {@code PlayerEntity.pickUpItem(ItemEntity, int)} and calls
- * {@link #dispatch(PlayerEntity, ItemEntity)} directly.
+ * {@link #dispatch(Player, ItemEntity)} directly.
  *
- * <p><b>MC 1.21.1 note:</b> {@code ItemEntity} has no {@code getThrower()}
+ * <p><b>MC 26.2 note:</b> {@code ItemEntity} has no {@code getThrower()}
  * method.  Thrower identity is resolved via {@code itemEntity.getOwner()}:
- * if the owner is a {@link ServerPlayerEntity} it is treated as the thrower.
+ * if the owner is a {@link ServerPlayer} it is treated as the thrower.
  */
 public final class TradeListener {
 
@@ -90,41 +90,41 @@ public final class TradeListener {
      * @param itemEntity the item entity being picked up
      * @return {@code true} to suppress vanilla pickup, {@code false} to pass through
      */
-    public static boolean dispatch(PlayerEntity picker, ItemEntity itemEntity) {
+    public static boolean dispatch(Player picker, ItemEntity itemEntity) {
         if (!registered) return false;
 
-        // FIX: MC 1.21.1 has no ItemEntity#getThrower().
+        // FIX: MC 26.2 has no ItemEntity#getThrower().
         // Use getOwner(): if the entity owner is a ServerPlayerEntity we treat
         // them as the thrower.  getOwner() returns the Entity whose UUID was
         // stored via setOwner() when the item was thrown by a player.
-        ServerPlayerEntity thrower = null;
-        if (itemEntity.getOwner() instanceof ServerPlayerEntity ownerPlayer) {
+        ServerPlayer thrower = null;
+        if (itemEntity.getOwner() instanceof ServerPlayer ownerPlayer) {
             thrower = ownerPlayer;
         }
         if (thrower == null) return false;
 
-        UUID throwerUuid = thrower.getUuid();
+        UUID throwerUuid = thrower.getUUID();
 
-        ServerPlayerEntity bot = BotEventHandler.bot;
+        ServerPlayer bot = BotEventHandler.bot;
         if (bot == null) return false;
 
         // Ignore if the bot itself threw the item
-        if (throwerUuid.equals(bot.getUuid())) return false;
+        if (throwerUuid.equals(bot.getUUID())) return false;
 
         // We no longer need a separate getPlayerManager lookup — thrower is already resolved above.
         // Keep server reference only for potential future use.
-        MinecraftServer server = bot.getServer();
+        MinecraftServer server = bot.createCommandSourceStack().getServer();
         if (server == null) return false;
 
-        double distToBot = itemEntity.getPos().distanceTo(bot.getPos());
+        double distToBot = itemEntity.position().distanceTo(bot.position());
         if (distToBot > TRADE_RANGE) return false;
 
-        if (!thrower.isSneaking()) return false;
+        if (!thrower.isShiftKeyDown()) return false;
 
-        ItemStack thrown = itemEntity.getStack();
+        ItemStack thrown = itemEntity.getItem();
         if (thrown.isEmpty()) return false;
 
-        long currentTick = bot.getServerWorld().getTime();
+        long currentTick = bot.level().getGameTime();
         tickPrune(currentTick);
 
         TradeSession existing = SESSIONS.get(throwerUuid);
@@ -134,8 +134,8 @@ public final class TradeListener {
             ItemStack counterOffer = TradeEvaluator.evaluate(thrown, bot);
 
             if (counterOffer.isEmpty()) {
-                thrower.sendMessage(
-                    Text.literal("§e[" + bot.getName().getString() + "] §fSorry, I have nothing fair to offer for that."),
+                thrower.sendSystemMessage(
+                    Component.literal("§e[" + bot.getName().getString() + "] §fSorry, I have nothing fair to offer for that."),
                     false);
                 return false;
             }
@@ -146,8 +146,8 @@ public final class TradeListener {
             String botName = bot.getName().getString();
             String offName = TradeEvaluator.displayName(thrown);
             String ctrName = TradeEvaluator.displayName(counterOffer);
-            thrower.sendMessage(
-                Text.literal("§e[" + botName + "] §fI'll trade my §b" + ctrName
+            thrower.sendSystemMessage(
+                Component.literal("§e[" + botName + "] §fI'll trade my §b" + ctrName
                     + "§f for your §b" + offName
                     + "§f. Throw the §b" + offName + "§f again to confirm!"),
                 false);
@@ -161,30 +161,30 @@ public final class TradeListener {
         } else {
             // ── Phase 2: complete the trade ──────────────────────────────────
             if (thrown.getItem() != existing.offeredItem.getItem()) {
-                thrower.sendMessage(
-                    Text.literal("§e[" + bot.getName().getString() + "] §fThat's not what we agreed on."),
+                thrower.sendSystemMessage(
+                    Component.literal("§e[" + bot.getName().getString() + "] §fThat's not what we agreed on."),
                     false);
                 return false;
             }
 
             boolean removed = removeOneFromBotInventory(bot, existing.counterOfferItem);
             if (!removed) {
-                thrower.sendMessage(
-                    Text.literal("§e[" + bot.getName().getString()
+                thrower.sendSystemMessage(
+                    Component.literal("§e[" + bot.getName().getString()
                         + "] §fI can't find that item in my inventory anymore. Trade cancelled."),
                     false);
                 SESSIONS.remove(throwerUuid);
                 return false;
             }
 
-            bot.getInventory().insertStack(thrown.copy());
+            bot.getInventory().add(thrown.copy());
             itemEntity.discard();
 
             dropItemNearBot(bot, existing.counterOfferItem.copy());
 
             String botName = bot.getName().getString();
-            thrower.sendMessage(
-                Text.literal("§e[" + botName + "] §fDeal! Enjoy your §b"
+            thrower.sendSystemMessage(
+                Component.literal("§e[" + botName + "] §fDeal! Enjoy your §b"
                     + TradeEvaluator.displayName(existing.counterOfferItem) + "§f!"),
                 false);
 
@@ -201,13 +201,13 @@ public final class TradeListener {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static boolean removeOneFromBotInventory(ServerPlayerEntity bot, ItemStack template) {
-        for (int slot = 0; slot < bot.getInventory().size(); slot++) {
-            ItemStack stack = bot.getInventory().getStack(slot);
+    private static boolean removeOneFromBotInventory(ServerPlayer bot, ItemStack template) {
+        for (int slot = 0; slot < bot.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = bot.getInventory().getItem(slot);
             if (!stack.isEmpty() && stack.getItem() == template.getItem()) {
-                stack.decrement(1);
+                stack.shrink(1);
                 if (stack.isEmpty()) {
-                    bot.getInventory().setStack(slot, ItemStack.EMPTY);
+                    bot.getInventory().setItem(slot, ItemStack.EMPTY);
                 }
                 return true;
             }
@@ -215,12 +215,12 @@ public final class TradeListener {
         return false;
     }
 
-    private static void dropItemNearBot(ServerPlayerEntity bot, ItemStack stack) {
-        ServerWorld world = bot.getServerWorld();
-        Vec3d pos = bot.getPos().add(0, 0.5, 0);
+    private static void dropItemNearBot(ServerPlayer bot, ItemStack stack) {
+        ServerLevel world = bot.level();
+        Vec3 pos = bot.position().add(0, 0.5, 0);
         ItemEntity ie = new ItemEntity(world, pos.x, pos.y, pos.z, stack);
-        ie.setVelocity(0, 0.1, 0);
-        world.spawnEntity(ie);
+        ie.setDeltaMovement(0, 0.1, 0);
+        world.addFreshEntity(ie);
     }
 
     // ── Public session access ────────────────────────────────────────────────

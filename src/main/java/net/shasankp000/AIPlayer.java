@@ -8,7 +8,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.ChatUtils.BERTModel.BertModelManager;
 import net.shasankp000.ChatUtils.NLPProcessor;
 import net.shasankp000.Commands.configCommand;
@@ -64,7 +64,7 @@ public class AIPlayer implements ModInitializer {
 			LOGGER.info("Set DJL cache directory to: {}", djlCacheDir);
 		}
 
-		String llmProvider = System.getProperty("aiplayer.llmMode", "ollama");
+		String llmProvider = System.getProperty("aiplayer.llmMode", "custom");
 
 		System.out.println("Using provider: " + llmProvider);
 
@@ -80,10 +80,10 @@ public class AIPlayer implements ModInitializer {
 
         // registering the packets on the global entrypoint to recognise them
 
-		PayloadTypeRegistry.playC2S().register(SaveConfigPayload.ID, SaveConfigPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(OpenConfigPayload.ID, OpenConfigPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(SaveAPIKeyPayload.ID, SaveAPIKeyPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(SaveCustomProviderPayload.ID, SaveCustomProviderPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(SaveConfigPayload.ID, SaveConfigPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(OpenConfigPayload.ID, OpenConfigPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(SaveAPIKeyPayload.ID, SaveAPIKeyPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(SaveCustomProviderPayload.ID, SaveCustomProviderPayload.CODEC);
 
 
 		modCommandRegistry.register();
@@ -166,8 +166,8 @@ public class AIPlayer implements ModInitializer {
 		});
 
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
-            if (entity instanceof ServerPlayerEntity serverPlayer) {
-                if (BotEventHandler.bot != null && serverPlayer.getUuid().equals(BotEventHandler.bot.getUuid())) {
+            if (entity instanceof ServerPlayer serverPlayer) {
+                if (BotEventHandler.bot != null && serverPlayer.getUUID().equals(BotEventHandler.bot.getUUID())) {
                     // Save state first
                     QTableStorage.saveLastKnownState(BotEventHandler.getCurrentState(), BotEventHandler.qTableDir + "/lastKnownState.bin");
 
@@ -191,7 +191,7 @@ public class AIPlayer implements ModInitializer {
 
 		ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
 			// Check if the respawned player is the bot
-			if (oldPlayer instanceof ServerPlayerEntity && newPlayer instanceof ServerPlayerEntity && oldPlayer.getName().getString().equals(newPlayer.getName().getString())) {
+			if (oldPlayer instanceof ServerPlayer && newPlayer instanceof ServerPlayer && oldPlayer.getName().getString().equals(newPlayer.getName().getString())) {
 				System.out.println("Bot has respawned. Updating state...");
 				BotEventHandler.hasRespawned = true;
 				BotEventHandler.botSpawnCount++;
@@ -202,9 +202,9 @@ public class AIPlayer implements ModInitializer {
 		// Player retaliation tracking - track hits on bot players
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
 			// Check if the damaged entity is a bot player
-			if (entity instanceof ServerPlayerEntity bot) {
+			if (entity instanceof ServerPlayer bot) {
 				// Check if damage source is another player
-				if (source.getAttacker() instanceof net.minecraft.entity.player.PlayerEntity attacker) {
+				if (source.getEntity() instanceof net.minecraft.world.entity.player.Player attacker) {
 					// Record the hit for retaliation tracking
 					net.shasankp000.PlayerUtils.PlayerRetaliationTracker.recordPlayerHit(bot, attacker);
 				}

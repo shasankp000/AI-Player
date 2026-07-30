@@ -1,6 +1,6 @@
 package net.shasankp000.GameAI;
 
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 import net.shasankp000.Entity.EntityDetails;
 import net.shasankp000.PlayerUtils.SelectedItemDetails;
 

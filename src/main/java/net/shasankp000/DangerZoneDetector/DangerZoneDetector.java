@@ -1,6 +1,6 @@
 package net.shasankp000.DangerZoneDetector;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 
 public class DangerZoneDetector {
 
@@ -15,7 +15,7 @@ public class DangerZoneDetector {
      * @param cliffDepth   The downward range to check for solid blocks (cliff depth).
      * @return The effective danger distance (distance from lava + distance from cliff).
      */
-    public static double detectDangerZone(ServerPlayerEntity source, int lavaRange, int cliffRange, int cliffDepth) {
+    public static double detectDangerZone(ServerPlayer source, int lavaRange, int cliffRange, int cliffDepth) {
         // Detect nearby lava blocks
         double lavaDistance = LavaDetector.detectNearestLava(source, lavaRange, BOUNDING_BOX_SIZE);
         if (lavaDistance == Double.MAX_VALUE) {

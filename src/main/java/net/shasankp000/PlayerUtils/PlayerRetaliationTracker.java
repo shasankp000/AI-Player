@@ -1,8 +1,5 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.item.ItemStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,6 +7,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Tracks player aggression towards bot and determines if retaliation is warranted
@@ -76,9 +76,9 @@ public class PlayerRetaliationTracker {
      * Record a hit from a player to the bot
      * @return true if player should now be marked as hostile
      */
-    public static boolean recordPlayerHit(ServerPlayerEntity bot, PlayerEntity attacker) {
-        UUID botId = bot.getUuid();
-        UUID attackerId = attacker.getUuid();
+    public static boolean recordPlayerHit(ServerPlayer bot, Player attacker) {
+        UUID botId = bot.getUUID();
+        UUID attackerId = attacker.getUUID();
 
         // Get or create hit map for this bot
         Map<UUID, PlayerHitData> botHitMap = playerHits.computeIfAbsent(botId, k -> new ConcurrentHashMap<>());
@@ -112,9 +112,9 @@ public class PlayerRetaliationTracker {
     /**
      * Mark a player as hostile towards the bot
      */
-    public static void markPlayerHostile(ServerPlayerEntity bot, PlayerEntity player) {
-        UUID botId = bot.getUuid();
-        UUID playerId = player.getUuid();
+    public static void markPlayerHostile(ServerPlayer bot, Player player) {
+        UUID botId = bot.getUUID();
+        UUID playerId = player.getUUID();
 
         // Calculate threat level based on player's equipment
         double threat = calculatePlayerThreatLevel(bot, player);
@@ -129,13 +129,13 @@ public class PlayerRetaliationTracker {
     /**
      * Check if a player is hostile towards the bot
      */
-    public static boolean isPlayerHostile(ServerPlayerEntity bot, PlayerEntity player) {
-        Map<UUID, HostilePlayerData> botHostileMap = hostilePlayers.get(bot.getUuid());
+    public static boolean isPlayerHostile(ServerPlayer bot, Player player) {
+        Map<UUID, HostilePlayerData> botHostileMap = hostilePlayers.get(bot.getUUID());
         if (botHostileMap == null) {
             return false;
         }
 
-        HostilePlayerData hostileData = botHostileMap.get(player.getUuid());
+        HostilePlayerData hostileData = botHostileMap.get(player.getUUID());
         if (hostileData == null) {
             return false;
         }
@@ -144,7 +144,7 @@ public class PlayerRetaliationTracker {
         if (hostileData.shouldForgive()) {
             LOGGER.info("✓ Player {} forgiven by bot {} (60s no attacks)",
                 player.getName().getString(), bot.getName().getString());
-            botHostileMap.remove(player.getUuid());
+            botHostileMap.remove(player.getUUID());
             return false;
         }
 
@@ -157,13 +157,13 @@ public class PlayerRetaliationTracker {
     /**
      * Get threat level for a hostile player
      */
-    public static double getPlayerThreatLevel(ServerPlayerEntity bot, PlayerEntity player) {
-        Map<UUID, HostilePlayerData> botHostileMap = hostilePlayers.get(bot.getUuid());
+    public static double getPlayerThreatLevel(ServerPlayer bot, Player player) {
+        Map<UUID, HostilePlayerData> botHostileMap = hostilePlayers.get(bot.getUUID());
         if (botHostileMap == null) {
             return 0.0;
         }
 
-        HostilePlayerData hostileData = botHostileMap.get(player.getUuid());
+        HostilePlayerData hostileData = botHostileMap.get(player.getUUID());
         if (hostileData == null) {
             return 0.0;
         }
@@ -178,18 +178,18 @@ public class PlayerRetaliationTracker {
     /**
      * Calculate threat level based on player's equipment, health, distance
      */
-    private static double calculatePlayerThreatLevel(ServerPlayerEntity bot, PlayerEntity player) {
+    private static double calculatePlayerThreatLevel(ServerPlayer bot, Player player) {
         double baseThreat = 20.0; // Base threat for any hostile player
 
         // Distance factor (closer = more threatening)
-        double distance = Math.sqrt(player.squaredDistanceTo(bot));
+        double distance = Math.sqrt(player.distanceToSqr(bot));
         double distanceFactor = 30.0 / Math.max(distance, 1.0);
 
         // Weapon threat
         double weaponThreat = 0.0;
-        ItemStack mainHand = player.getMainHandStack();
+        ItemStack mainHand = player.getMainHandItem();
         if (!mainHand.isEmpty()) {
-            String itemId = net.minecraft.registry.Registries.ITEM.getId(mainHand.getItem()).toString();
+            String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(mainHand.getItem()).toString();
 
             // Ranged weapons (highest threat)
             if (itemId.contains("bow") || itemId.contains("crossbow")) {
@@ -211,9 +211,10 @@ public class PlayerRetaliationTracker {
 
         // Armor threat (well-armored player is more dangerous)
         double armorThreat = 0.0;
-        for (ItemStack armorPiece : player.getArmorItems()) {
+        for (net.minecraft.world.entity.EquipmentSlot slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST, net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+            ItemStack armorPiece = player.getItemBySlot(slot);
             if (!armorPiece.isEmpty()) {
-                String armorId = net.minecraft.registry.Registries.ITEM.getId(armorPiece.getItem()).toString();
+                String armorId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(armorPiece.getItem()).toString();
                 if (armorId.contains("diamond") || armorId.contains("netherite")) {
                     armorThreat += 3.0;
                 } else if (armorId.contains("iron")) {
@@ -244,10 +245,10 @@ public class PlayerRetaliationTracker {
     /**
      * Clear hostile status for a player (for testing or manual forgiveness)
      */
-    public static void clearHostileStatus(ServerPlayerEntity bot, PlayerEntity player) {
-        Map<UUID, HostilePlayerData> botHostileMap = hostilePlayers.get(bot.getUuid());
+    public static void clearHostileStatus(ServerPlayer bot, Player player) {
+        Map<UUID, HostilePlayerData> botHostileMap = hostilePlayers.get(bot.getUUID());
         if (botHostileMap != null) {
-            botHostileMap.remove(player.getUuid());
+            botHostileMap.remove(player.getUUID());
             LOGGER.info("✓ Cleared hostile status for player {} towards bot {}",
                 player.getName().getString(), bot.getName().getString());
         }
@@ -256,11 +257,10 @@ public class PlayerRetaliationTracker {
     /**
      * Clear all tracking data for a bot (when bot dies/leaves)
      */
-    public static void clearBotData(ServerPlayerEntity bot) {
-        UUID botId = bot.getUuid();
+    public static void clearBotData(ServerPlayer bot) {
+        UUID botId = bot.getUUID();
         playerHits.remove(botId);
         hostilePlayers.remove(botId);
         LOGGER.info("Cleared all retaliation data for bot {}", bot.getName().getString());
     }
 }
-

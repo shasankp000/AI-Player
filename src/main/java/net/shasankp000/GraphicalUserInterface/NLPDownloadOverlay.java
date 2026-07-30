@@ -1,9 +1,9 @@
 package net.shasankp000.GraphicalUserInterface;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
 import net.shasankp000.Overlay.NLPDownloadProgressManager;
 
 /**
@@ -20,12 +20,12 @@ public class NLPDownloadOverlay {
     /**
      * Render compact progress bar at bottom of screen (center-aligned)
      */
-    public static void render(DrawContext context, int screenWidth, int screenHeight) {
+    public static void render(GuiGraphicsExtractor context, int screenWidth, int screenHeight) {
         if (!NLPDownloadProgressManager.hasActivity()) {
             return; // Don't render if no download activity (includes auto-dismiss)
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
 
         // Current task text - compact format
         String taskText = NLPDownloadProgressManager.getCurrentTask();
@@ -39,8 +39,8 @@ public class NLPDownloadOverlay {
         // Shorten task text if too long
         int maxTextWidth = maxBarWidth - 100; // Leave space for percentage
         String displayText = taskText;
-        if (client.textRenderer.getWidth(displayText) > maxTextWidth) {
-            while (client.textRenderer.getWidth(displayText + "...") > maxTextWidth && displayText.length() > 10) {
+        if (client.font.width(displayText) > maxTextWidth) {
+            while (client.font.width(displayText + "...") > maxTextWidth && displayText.length() > 10) {
                 displayText = displayText.substring(0, displayText.length() - 1);
             }
             displayText += "...";
@@ -49,28 +49,28 @@ public class NLPDownloadOverlay {
         // Format: "Task... (X/Y - Z%)"
         String fullText = String.format("%s (%d/%d - %.0f%%)", displayText, currentStep, totalSteps, percentage);
 
-        Formatting textColor = NLPDownloadProgressManager.hasError() ? Formatting.RED :
-                               NLPDownloadProgressManager.isCompleted() ? Formatting.GREEN :
-                               Formatting.WHITE;
+        ChatFormatting textColor = NLPDownloadProgressManager.hasError() ? ChatFormatting.RED :
+                               NLPDownloadProgressManager.isCompleted() ? ChatFormatting.GREEN :
+                               ChatFormatting.WHITE;
 
-        Text text = Text.literal(fullText).formatted(textColor);
+        Component text = Component.literal(fullText).withStyle(textColor);
 
         // Calculate text width for centering
-        int textWidth = client.textRenderer.getWidth(fullText);
+        int textWidth = client.font.width(fullText);
 
         // Center the text
         int textX = (screenWidth - textWidth) / 2;
-        int textY = screenHeight - PROGRESS_BAR_HEIGHT - MARGIN_BOTTOM - TEXT_PADDING - client.textRenderer.fontHeight;
+        int textY = screenHeight - PROGRESS_BAR_HEIGHT - MARGIN_BOTTOM - TEXT_PADDING - client.font.lineHeight;
 
         // Draw semi-transparent dark background for text (centered)
         int bgX1 = textX - 2;
         int bgY1 = textY - 1;
         int bgX2 = textX + textWidth + 2;
-        int bgY2 = textY + client.textRenderer.fontHeight + 1;
+        int bgY2 = textY + client.font.lineHeight + 1;
         context.fill(bgX1, bgY1, bgX2, bgY2, 0xC0000000);
 
         // Draw text (centered)
-        context.drawTextWithShadow(client.textRenderer, text, textX, textY, 0xFFFFFF);
+        context.text(client.font, text, textX, textY, 0xFFFFFF);
 
         // Progress bar - centered and slightly narrower for better aesthetics
         int barWidth = Math.min(maxBarWidth, 600); // Max 600px wide for centering
@@ -100,7 +100,7 @@ public class NLPDownloadOverlay {
     /**
      * Render on any screen - this allows persistence across all screens
      */
-    public static void renderOnAnyScreen(DrawContext context, int screenWidth, int screenHeight) {
+    public static void renderOnAnyScreen(GuiGraphicsExtractor context, int screenWidth, int screenHeight) {
         render(context, screenWidth, screenHeight);
     }
 }

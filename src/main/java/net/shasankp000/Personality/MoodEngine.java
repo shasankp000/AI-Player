@@ -1,6 +1,6 @@
 package net.shasankp000.Personality;
 
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.GameAI.State;
 
 /**
@@ -30,7 +30,7 @@ public class MoodEngine {
      * @param afterState the State recorded *after* the action was executed
      * @return the newly computed mood
      */
-    public static AffectiveState update(ServerPlayerEntity bot, State afterState) {
+    public static AffectiveState update(ServerPlayer bot, State afterState) {
         AffectiveState computed = compute(bot, afterState);
         currentMood = computed;
         return computed;
@@ -66,11 +66,11 @@ public class MoodEngine {
      *  5. HAPPY      — health > 16 and hunger > 14 and no threats
      *  6. NEUTRAL    — everything else
      */
-    private static AffectiveState compute(ServerPlayerEntity bot, State state) {
+    private static AffectiveState compute(ServerPlayer bot, State state) {
         if (state == null) return AffectiveState.NEUTRAL;
 
         int health  = (int) bot.getHealth();
-        int hunger  = bot.getHungerManager().getFoodLevel();
+        int hunger  = bot.getFoodData().getFoodLevel();
         boolean hasHostiles = state.getNearbyEntities() != null &&
             state.getNearbyEntities().stream().anyMatch(
                 e -> e != null && e.isHostile());

@@ -2,9 +2,6 @@ package net.shasankp000.GameAI;
 
 import java.util.*;
 import java.util.stream.Collectors;
-
-
-import net.minecraft.item.ItemStack;
 import net.shasankp000.Database.QEntry;
 import net.shasankp000.Database.QTable;
 import net.shasankp000.Database.StateActionPair;
@@ -14,6 +11,7 @@ import net.shasankp000.PlayerUtils.ResourceEvaluator;
 import net.shasankp000.PlayerUtils.ThreatDetector;
 import net.shasankp000.PlayerUtils.ProjectileDefenseUtils;
 import net.shasankp000.PlayerUtils.MobThreatEvaluator;
+import net.minecraft.world.item.ItemStack;
 import net.shasankp000.Commands.modCommandRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -247,7 +245,7 @@ public class RLAgent {
 
 
     // Method to calculate the risk of a potential action based on the current state
-    public Map<Action, Double> calculateRisk(State currentState, List<Action> possibleActions, net.minecraft.server.network.ServerPlayerEntity bot) {
+    public Map<Action, Double> calculateRisk(State currentState, List<Action> possibleActions, net.minecraft.server.level.ServerPlayer bot) {
         Map<Action, Double> riskMap = new HashMap<>();
 
         List<EntityDetails> nearbyEntities = currentState.getNearbyEntities();
@@ -285,17 +283,17 @@ public class RLAgent {
         double creeperThreatBonus = 0.0;
 
         // Collect all nearby entities for evaluation
-        List<net.minecraft.entity.Entity> nearbyActualEntities = new ArrayList<>();
+        List<net.minecraft.world.entity.Entity> nearbyActualEntities = new ArrayList<>();
         for (EntityDetails entityDetails : nearbyEntities) {
             if (entityDetails.isHostile()) {
                 // Get actual entity reference - use proper entity lookup
-                net.minecraft.entity.Entity actualEntity = bot.getWorld().getEntityById(entityDetails.hashCode());
+                net.minecraft.world.entity.Entity actualEntity = bot.level().getEntity(entityDetails.hashCode());
                 if (actualEntity != null) {
                     nearbyActualEntities.add(actualEntity);
 
                     MobThreatEvaluator.MobThreatInfo mobThreat = MobThreatEvaluator.evaluateMobThreat(actualEntity, bot);
                     if (mobThreat != null) {
-                        mobThreatMap.put(actualEntity.getUuidAsString(), mobThreat);
+                        mobThreatMap.put(actualEntity.getStringUUID(), mobThreat);
 
                         // Track creeper-specific phase threats
                         if (mobThreat.creeperPhase != null) {
@@ -1573,7 +1571,7 @@ public class RLAgent {
                                StateActions.Action actionTaken, double risk, double pod) {
 
         boolean hasWoolItems = hotBarItems.stream()
-                .anyMatch(item -> item.getItem().getName().getString().toLowerCase().contains("wool") || item.getItem().getName().getString().toLowerCase().contains("carpet"));
+                .anyMatch(item -> item.getHoverName().getString().toLowerCase().contains("wool") || item.getHoverName().getString().toLowerCase().contains("carpet"));
 
         boolean hasWardenNearby = nearbyEntities.stream()
                 .anyMatch(entity -> "Warden".equals(entity.getName()));
@@ -1654,11 +1652,11 @@ public class RLAgent {
 
 
         // 4. Selected item and offhand
-        if (!hostileEntities.isEmpty() && selectedItem.contains("Sword") || selectedItem.contains("Bow") || selectedItem.contains("Axe") || selectedItem.contains("Crossbow") || selectedItem.contains("Trident") && offhandItem.getItem().getName().getString().equalsIgnoreCase("shield")) {
+        if (!hostileEntities.isEmpty() && selectedItem.contains("Sword") || selectedItem.contains("Bow") || selectedItem.contains("Axe") || selectedItem.contains("Crossbow") || selectedItem.contains("Trident") && offhandItem.getHoverName().getString().equalsIgnoreCase("shield")) {
             reward += 20; // Weapon and shield equipped
-        } else if (!hostileEntities.isEmpty() && selectedItem.contains("Pickaxe") || selectedItem.contains("Hoe") && offhandItem.getItem().getName().getString().equalsIgnoreCase("shield")) {
+        } else if (!hostileEntities.isEmpty() && selectedItem.contains("Pickaxe") || selectedItem.contains("Hoe") && offhandItem.getHoverName().getString().equalsIgnoreCase("shield")) {
             reward += 15; // lower value weapon and shield equipped
-        } else if (!hostileEntities.isEmpty() && selectedItem.contains("Air") && offhandItem.getItem().getName().getString().equalsIgnoreCase("shield")) {
+        } else if (!hostileEntities.isEmpty() && selectedItem.contains("Air") && offhandItem.getHoverName().getString().equalsIgnoreCase("shield")) {
             reward += 10; // only shield equipped
         } else {
             reward -= 5; // Irrelevant item selected
@@ -1997,7 +1995,7 @@ public class RLAgent {
      * Get the current state for a bot.
      * Creates a new State from the bot's current status.
      */
-    public State getCurrentState(net.minecraft.server.network.ServerPlayerEntity bot) {
+    public State getCurrentState(net.minecraft.server.level.ServerPlayer bot) {
         return net.shasankp000.GameAI.BotEventHandler.createInitialState(bot);
     }
 

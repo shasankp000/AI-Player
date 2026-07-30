@@ -2,12 +2,12 @@ package net.shasankp000.GraphicalUserInterface;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.toast.SystemToast;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.AIPlayerClient;
 import net.shasankp000.GraphicalUserInterface.Widgets.DropdownMenuWidget;
@@ -24,11 +24,11 @@ public class ConfigManager extends Screen {
     public static final Logger LOGGER = LoggerFactory.getLogger("ConfigMan");
     public Screen parent;
     private DropdownMenuWidget dropdownMenuWidget;
-    private TextFieldWidget searchField;
+    private EditBox searchField;
     private List<String> allModels;
     private List<String> filteredModels;
 
-    public ConfigManager(Text title, Screen parent) {
+    public ConfigManager(Component title, Screen parent) {
         super(title);
         this.parent = parent;
     }
@@ -53,67 +53,66 @@ public class ConfigManager extends Screen {
 
         int centerX = this.width / 2;
         int topMargin = 50;
-        int fieldWidth = 300;
+        int fieldWidth = Math.max(300, Math.min(520, this.width - 80));
         int fieldHeight = 20;
         int buttonWidth = 100;
         int spacing = 30;
 
-        searchField = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, topMargin, fieldWidth, fieldHeight, Text.of("Search models..."));
+        searchField = new EditBox(this.font, centerX - fieldWidth / 2, topMargin, fieldWidth, fieldHeight, Component.nullToEmpty("Search models..."));
         searchField.setMaxLength(256);
-        searchField.setPlaceholder(Text.of("Search models..."));
-        searchField.setChangedListener(this::onSearchChanged);
-        this.addDrawableChild(searchField);
-        this.addSelectableChild(searchField);
+        searchField.setHint(Component.nullToEmpty("Search models..."));
+        searchField.setResponder(this::onSearchChanged);
+        this.addRenderableWidget(searchField);
+        this.addWidget(searchField);
 
         int dropdownY = topMargin + spacing + 10;
-        dropdownMenuWidget = new DropdownMenuWidget(centerX - fieldWidth / 2, dropdownY, fieldWidth, fieldHeight, Text.of("List of available models"), filteredModels);
+        dropdownMenuWidget = new DropdownMenuWidget(centerX - fieldWidth / 2, dropdownY, fieldWidth, fieldHeight, Component.nullToEmpty("List of available models"), filteredModels);
         this.dropdownMenuWidget = dropdownMenuWidget;
-        this.addSelectableChild(dropdownMenuWidget);
+        this.addWidget(dropdownMenuWidget);
 
         int buttonY = this.height - 40;
         int buttonSpacing = buttonWidth + 20;
         int totalButtonWidth = buttonSpacing * 5 - 20;
         int buttonsStartX = centerX - totalButtonWidth / 2;
 
-        this.addDrawableChild(ButtonWidget.builder(Text.of("API Keys"), (btn) -> Objects.requireNonNull(this.client).setScreen(new APIKeysScreen(Text.of("API Keys"), this))).dimensions(buttonsStartX, buttonY, buttonWidth, fieldHeight).build());
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Reasoning Log"), (btn) -> Objects.requireNonNull(this.client).setScreen(new ReasoningLogScreen(this))).dimensions(buttonsStartX + buttonSpacing, buttonY, buttonWidth, fieldHeight).build());
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Refresh Models"), (btn) -> this.reloadModels()).dimensions(buttonsStartX + buttonSpacing * 2, buttonY, buttonWidth, fieldHeight).build());
+        this.addRenderableWidget(Button.builder(Component.nullToEmpty("API Keys"), (btn) -> Objects.requireNonNull(this.minecraft).gui.setScreen(new APIKeysScreen(Component.nullToEmpty("API Keys"), this))).bounds(buttonsStartX, buttonY, buttonWidth, fieldHeight).build());
+        this.addRenderableWidget(Button.builder(Component.nullToEmpty("Reasoning Log"), (btn) -> Objects.requireNonNull(this.minecraft).gui.setScreen(new ReasoningLogScreen(this))).bounds(buttonsStartX + buttonSpacing, buttonY, buttonWidth, fieldHeight).build());
+        this.addRenderableWidget(Button.builder(Component.nullToEmpty("Refresh Models"), (btn) -> this.reloadModels()).bounds(buttonsStartX + buttonSpacing * 2, buttonY, buttonWidth, fieldHeight).build());
         
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Save"), (btn1) -> {
+        this.addRenderableWidget(Button.builder(Component.nullToEmpty("Save"), (btn1) -> {
             this.saveToFile();
-            if (this.client != null) {
-                this.client.getToastManager().add(SystemToast.create(this.client, SystemToast.Type.NARRATOR_TOGGLE, Text.of("Settings saved!"), Text.of("Saved settings.")));
+            if (this.minecraft != null) {
+                this.minecraft.gui.toastManager().addToast(new SystemToast(SystemToast.SystemToastId.NARRATOR_TOGGLE, Component.nullToEmpty("Settings saved!"), Component.nullToEmpty("Saved settings.")));
             }
-        }).dimensions(buttonsStartX + buttonSpacing * 3, buttonY, buttonWidth, fieldHeight).build());
+        }).bounds(buttonsStartX + buttonSpacing * 3, buttonY, buttonWidth, fieldHeight).build());
 
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Close"), (btn1) -> this.close()).dimensions(buttonsStartX + buttonSpacing * 4, buttonY, buttonWidth, fieldHeight).build());
+        this.addRenderableWidget(Button.builder(Component.nullToEmpty("Close"), (btn1) -> this.onClose()).bounds(buttonsStartX + buttonSpacing * 4, buttonY, buttonWidth, fieldHeight).build());
 
-        this.addDrawableChild(dropdownMenuWidget);
+        this.addRenderableWidget(dropdownMenuWidget);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context, mouseX, mouseY, delta);
-
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         int centerX = this.width / 2;
-        String title = "AI-Player Mod Configuration Menu v1.0.5.4-release+1.21.1";
-        context.drawText(this.textRenderer, title, centerX - (this.textRenderer.getWidth(title) / 2), 20, 0xFFFFFFFF, true);
+        String title = "AI-Player Mod Configuration Menu v1.0.5.4-release+26.2";
+        context.text(this.font, title, centerX - (this.font.width(title) / 2), 20, 0xFFFFFFFF, true);
 
-        context.drawText(this.textRenderer, "Search Models:", centerX - 150, searchField.getY() - 15, 0xFFFFD700, true);
-        context.drawText(this.textRenderer, "Select Language Model:", centerX - 150, dropdownMenuWidget.getY() - 15, 0xFFFFD700, true);
+        int labelX = searchField.getX();
+        context.text(this.font, "Search Models:", labelX, searchField.getY() - 15, 0xFFFFD700, true);
+        context.text(this.font, "Select Language Model:", labelX, dropdownMenuWidget.getY() - 15, 0xFFFFD700, true);
 
         // Shifted an extra 10px down as requested
         int textOffset = dropdownMenuWidget.isExpanded() ? Math.min(filteredModels.size(), 10) * 14 + 20 : 40;
         int infoY = dropdownMenuWidget.getY() + textOffset;
 
         String currentModel = AIPlayer.CONFIG.getSelectedLanguageModel();
-        context.drawText(this.textRenderer, "Currently selected: " + (currentModel != null ? currentModel : "None"), centerX - 150, infoY, 0xFF00FF00, true);
-        context.drawText(this.textRenderer, "Showing " + filteredModels.size() + " of " + allModels.size() + " models", centerX - 150, infoY + 15, 0xFFADD8E6, true);
+        context.text(this.font, "Currently selected: " + (currentModel != null ? currentModel : "None"), labelX, infoY, 0xFF00FF00, true);
+        context.text(this.font, "Showing " + filteredModels.size() + " of " + allModels.size() + " models", labelX, infoY + 15, 0xFFADD8E6, true);
 
         String helpText = "Search to filter models • Select a model and click Save";
-        context.drawText(this.textRenderer, helpText, centerX - (this.textRenderer.getWidth(helpText) / 2), this.height - 65, 0xFFFFB6C1, true);
+        context.text(this.font, helpText, centerX - (this.font.width(helpText) / 2), this.height - 65, 0xFFFFB6C1, true);
 
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     private void onSearchChanged(String searchText) {
@@ -139,8 +138,8 @@ public class ConfigManager extends Screen {
         filteredModels = new ArrayList<>(allModels);
         dropdownMenuWidget.updateOptions(filteredModels);
         
-        if (this.client != null) {
-            this.client.getToastManager().add(SystemToast.create(this.client, SystemToast.Type.NARRATOR_TOGGLE, Text.of("Models Reloaded"), Text.of("Found " + allModels.size() + " models")));
+        if (this.minecraft != null) {
+            this.minecraft.gui.toastManager().addToast(new SystemToast(SystemToast.SystemToastId.NARRATOR_TOGGLE, Component.nullToEmpty("Models Reloaded"), Component.nullToEmpty("Found " + allModels.size() + " models")));
         }
     }
 
@@ -148,8 +147,8 @@ public class ConfigManager extends Screen {
         String modelName = this.dropdownMenuWidget.getSelectedOption();
         if (modelName == null || modelName.trim().isEmpty()) {
             LOGGER.warn("No model selected or model name is empty. Skipping save.");
-            if (this.client != null) {
-                this.client.getToastManager().add(SystemToast.create(this.client, SystemToast.Type.NARRATOR_TOGGLE, Text.of("Error"), Text.of("Please select a model first!")));
+            if (this.minecraft != null) {
+                this.minecraft.gui.toastManager().addToast(new SystemToast(SystemToast.SystemToastId.NARRATOR_TOGGLE, Component.nullToEmpty("Error"), Component.nullToEmpty("Please select a model first!")));
             }
             return;
         }
@@ -160,13 +159,13 @@ public class ConfigManager extends Screen {
         configNetworkManager.sendSaveConfigPacket(modelName);
 
         // Restored the indicator screen refresh logic
-        close();
-        assert this.client != null;
-        this.client.setScreen(new ConfigManager(Text.empty(), this.parent));
+        onClose();
+        assert this.minecraft != null;
+        this.minecraft.gui.setScreen(new ConfigManager(Component.empty(), this.parent));
     }
 
     @Override
-    public void close() {
-        if (this.client != null) this.client.setScreen(this.parent);
+    public void onClose() {
+        if (this.minecraft != null) this.minecraft.gui.setScreen(this.parent);
     }
 }

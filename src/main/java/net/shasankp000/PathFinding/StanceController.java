@@ -1,9 +1,9 @@
 package net.shasankp000.PathFinding;
 
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import net.shasankp000.AIPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +89,7 @@ public class StanceController {
         if (AIPlayer.serverInstance == null) return;
         MinecraftServer server = AIPlayer.serverInstance;
 
-        for (ServerPlayerEntity botEntity : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer botEntity : server.getPlayerList().getPlayers()) {
             String botName = botEntity.getName().getString();
             BotStance.StanceState stance = BotStance.getStance(botName);
 
@@ -105,7 +105,7 @@ public class StanceController {
     // STAY logic
     // -------------------------------------------------------------------------
 
-    private static void tickStay(MinecraftServer server, ServerPlayerEntity bot,
+    private static void tickStay(MinecraftServer server, ServerPlayer bot,
                                   String botName, BotStance.StanceState stance) {
         if (PathTracer.BotSegmentManager.getBotMovementStatus()) {
             return;
@@ -114,15 +114,15 @@ public class StanceController {
         BlockPos anchor = stance.anchorPos();
         if (anchor == null) return;
 
-        BlockPos current = bot.getBlockPos();
-        double dist = Math.sqrt(current.getSquaredDistance(anchor));
+        BlockPos current = bot.blockPosition();
+        double dist = Math.sqrt(current.distSqr(anchor));
 
         if (dist <= STAY_TRIGGER_DISTANCE) return;
 
         LOGGER.info("[StanceController] STAY correction for '{}': dist={} → pathing to anchor {}",
                 botName, String.format("%.2f", dist), anchor);
 
-        ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+        CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
         Thread.ofVirtual().name("stance-stay-" + botName).start(() -> {
             try {
@@ -137,7 +137,7 @@ public class StanceController {
     // FOLLOW logic
     // -------------------------------------------------------------------------
 
-    private static void tickFollow(MinecraftServer server, ServerPlayerEntity bot,
+    private static void tickFollow(MinecraftServer server, ServerPlayer bot,
                                     String botName, BotStance.StanceState stance) {
         if (PathTracer.BotSegmentManager.getBotMovementStatus()) {
             return;
@@ -146,21 +146,21 @@ public class StanceController {
         String targetName = stance.followTarget();
         if (targetName == null) return;
 
-        ServerPlayerEntity target = server.getPlayerManager().getPlayer(targetName);
+        ServerPlayer target = server.getPlayerList().getPlayerByName(targetName);
         if (target == null) {
             LOGGER.warn("[StanceController] FOLLOW target '{}' not found — stance kept", targetName);
             return;
         }
 
-        BlockPos botPos    = bot.getBlockPos();
-        BlockPos targetPos = target.getBlockPos();
-        double distToTarget = Math.sqrt(botPos.getSquaredDistance(targetPos));
+        BlockPos botPos    = bot.blockPosition();
+        BlockPos targetPos = target.blockPosition();
+        double distToTarget = Math.sqrt(botPos.distSqr(targetPos));
 
         if (distToTarget <= FOLLOW_TRIGGER_DISTANCE) return;
 
         BlockPos lastOrigin = lastFollowPathOrigin.get(botName);
         if (lastOrigin != null) {
-            double originToTarget = Math.sqrt(lastOrigin.getSquaredDistance(targetPos));
+            double originToTarget = Math.sqrt(lastOrigin.distSqr(targetPos));
             if (originToTarget < FOLLOW_TRIGGER_DISTANCE) return;
         }
 
@@ -169,7 +169,7 @@ public class StanceController {
 
         lastFollowPathOrigin.put(botName, targetPos);
 
-        ServerCommandSource botSource = bot.getCommandSource().withSilent().withMaxLevel(4);
+        CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 
         Thread.ofVirtual().name("stance-follow-" + botName).start(() -> {
             try {

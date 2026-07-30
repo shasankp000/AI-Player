@@ -1,18 +1,18 @@
 package net.shasankp000.PlayerUtils;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.shasankp000.Entity.LookController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +32,7 @@ public class BlockPlacementTool {
      * @param blockType The type of block to place (e.g., "minecraft:stone", "stone", "dirt")
      * @return CompletableFuture with result message
      */
-    public static CompletableFuture<String> placeBlock(ServerPlayerEntity bot, BlockPos targetPos, String blockType) {
+    public static CompletableFuture<String> placeBlock(ServerPlayer bot, BlockPos targetPos, String blockType) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Step 1: Normalize block type (add minecraft: prefix if missing)
@@ -40,8 +40,8 @@ public class BlockPlacementTool {
                 LOGGER.info("Attempting to place {} at {}", normalizedBlockType, targetPos);
 
                 // Step 2: Check if bot is within placement range
-                Vec3d botPos = bot.getPos();
-                double distance = Math.sqrt(targetPos.getSquaredDistance(botPos));
+                Vec3 botPos = bot.position();
+                double distance = Math.sqrt(targetPos.distToCenterSqr(botPos));
                 if (distance > MAX_PLACEMENT_DISTANCE) {
                     String error = String.format("❌ Too far from target position! Distance: %.2f blocks (max: %.2f)",
                             distance, MAX_PLACEMENT_DISTANCE);
@@ -66,13 +66,13 @@ public class BlockPlacementTool {
                 }
 
                 // Switch to that hotbar slot
-                bot.getInventory().selectedSlot = hotbarSlot;
+                bot.getInventory().setSelectedSlot(hotbarSlot);
                 LOGGER.info("Switched to hotbar slot {} with {}", hotbarSlot, normalizedBlockType);
 
                 // Step 5: Check if target position is valid for placement
-                World world = bot.getWorld();
+                Level world = bot.level();
                 BlockState targetState = world.getBlockState(targetPos);
-                if (!targetState.isAir() && !targetState.isReplaceable()) {
+                if (!targetState.isAir() && !targetState.canBeReplaced()) {
                     String error = "❌ Target position is already occupied by: " + targetState.getBlock().getName().getString();
                     LOGGER.warn(error);
                     return error;
@@ -86,16 +86,16 @@ public class BlockPlacementTool {
                     return error;
                 }
 
-                BlockPos adjacentPos = targetPos.offset(placementDirection);
+                BlockPos adjacentPos = targetPos.relative(placementDirection);
 
                 // Step 7: Look at the target position
                 LookController.faceBlock(bot, adjacentPos);
 
                 // Step 8: Perform block placement
-                Vec3d hitVec = Vec3d.ofCenter(adjacentPos).add(
-                        placementDirection.getOffsetX() * 0.5,
-                        placementDirection.getOffsetY() * 0.5,
-                        placementDirection.getOffsetZ() * 0.5
+                Vec3 hitVec = Vec3.atCenterOf(adjacentPos).add(
+                        placementDirection.getStepX() * 0.5,
+                        placementDirection.getStepY() * 0.5,
+                        placementDirection.getStepZ() * 0.5
                 );
 
                 BlockHitResult hitResult = new BlockHitResult(
@@ -106,9 +106,9 @@ public class BlockPlacementTool {
                 );
 
                 // Use the block item
-                ItemStack handStack = bot.getStackInHand(Hand.MAIN_HAND);
+                ItemStack handStack = bot.getItemInHand(InteractionHand.MAIN_HAND);
                 if (handStack.getItem() instanceof BlockItem) {
-                    bot.interactionManager.interactBlock(bot, world, handStack, Hand.MAIN_HAND, hitResult);
+                    bot.gameMode.useItemOn(bot, world, handStack, InteractionHand.MAIN_HAND, hitResult);
 
                     // Verify placement
                     BlockState placedState = world.getBlockState(targetPos);
@@ -149,17 +149,17 @@ public class BlockPlacementTool {
     /**
      * Finds a block item in the bot's inventory
      */
-    private static ItemStack findBlockInInventory(ServerPlayerEntity bot, String blockType) {
+    private static ItemStack findBlockInInventory(ServerPlayer bot, String blockType) {
         Identifier blockId = Identifier.tryParse(blockType);
         if (blockId == null) {
             LOGGER.warn("Invalid block type format: {}", blockType);
             return null;
         }
-        Block targetBlock = Registries.BLOCK.get(blockId);
+        Block targetBlock = BuiltInRegistries.BLOCK.getValue(blockId);
 
         // Search entire inventory (0-35 for player inventory, 0-8 for hotbar)
-        for (int i = 0; i < bot.getInventory().size(); i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
+        for (int i = 0; i < bot.getInventory().getContainerSize(); i++) {
+            ItemStack stack = bot.getInventory().getItem(i);
             if (!stack.isEmpty() && stack.getItem() instanceof BlockItem blockItem) {
                 if (blockItem.getBlock() == targetBlock) {
                     return stack;
@@ -173,17 +173,17 @@ public class BlockPlacementTool {
      * Ensures the block is in the hotbar, returns the hotbar slot index
      * If already in hotbar, returns that slot. Otherwise, tries to move it to an empty slot.
      */
-    private static int ensureBlockInHotbar(ServerPlayerEntity bot, String blockType) {
+    private static int ensureBlockInHotbar(ServerPlayer bot, String blockType) {
         Identifier blockId = Identifier.tryParse(blockType);
         if (blockId == null) {
             LOGGER.warn("Invalid block type format: {}", blockType);
             return -1;
         }
-        Block targetBlock = Registries.BLOCK.get(blockId);
+        Block targetBlock = BuiltInRegistries.BLOCK.getValue(blockId);
 
         // Check if already in hotbar (slots 0-8)
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
+            ItemStack stack = bot.getInventory().getItem(i);
             if (!stack.isEmpty() && stack.getItem() instanceof BlockItem blockItem) {
                 if (blockItem.getBlock() == targetBlock) {
                     return i;
@@ -194,7 +194,7 @@ public class BlockPlacementTool {
         // Find the stack in main inventory (slots 9-35)
         int inventorySlot = -1;
         for (int i = 9; i < 36; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
+            ItemStack stack = bot.getInventory().getItem(i);
             if (!stack.isEmpty() && stack.getItem() instanceof BlockItem blockItem) {
                 if (blockItem.getBlock() == targetBlock) {
                     inventorySlot = i;
@@ -211,7 +211,7 @@ public class BlockPlacementTool {
         // Find an empty hotbar slot
         int emptyHotbarSlot = -1;
         for (int i = 0; i < 9; i++) {
-            if (bot.getInventory().getStack(i).isEmpty()) {
+            if (bot.getInventory().getItem(i).isEmpty()) {
                 emptyHotbarSlot = i;
                 break;
             }
@@ -224,9 +224,9 @@ public class BlockPlacementTool {
         }
 
         // Move the stack from inventory to hotbar
-        ItemStack stackToMove = bot.getInventory().getStack(inventorySlot);
-        bot.getInventory().setStack(emptyHotbarSlot, stackToMove.copy());
-        bot.getInventory().setStack(inventorySlot, ItemStack.EMPTY);
+        ItemStack stackToMove = bot.getInventory().getItem(inventorySlot);
+        bot.getInventory().setItem(emptyHotbarSlot, stackToMove.copy());
+        bot.getInventory().setItem(inventorySlot, ItemStack.EMPTY);
 
         LOGGER.info("Moved {} from inventory slot {} to hotbar slot {}", blockType, inventorySlot, emptyHotbarSlot);
         return emptyHotbarSlot;
@@ -236,14 +236,14 @@ public class BlockPlacementTool {
      * Finds a suitable direction to place a block against an adjacent block
      * Returns the direction from the target position to the adjacent block
      */
-    private static Direction findPlacementDirection(World world, BlockPos targetPos) {
+    private static Direction findPlacementDirection(Level world, BlockPos targetPos) {
         // Check all 6 directions for a solid block to place against
         for (Direction direction : Direction.values()) {
-            BlockPos adjacentPos = targetPos.offset(direction);
+            BlockPos adjacentPos = targetPos.relative(direction);
             BlockState adjacentState = world.getBlockState(adjacentPos);
 
             // Check if the adjacent block is solid (can be placed against)
-            if (!adjacentState.isAir() && adjacentState.isSolidBlock(world, adjacentPos)) {
+            if (!adjacentState.isAir() && adjacentState.isRedstoneConductor(world, adjacentPos)) {
                 return direction;
             }
         }

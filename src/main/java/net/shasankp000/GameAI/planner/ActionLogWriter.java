@@ -25,12 +25,12 @@ public class ActionLogWriter implements Runnable {
 
     private final BlockingQueue<LogEntry> queue;
     private final MarkovChain2 markovChain;
-    private final net.minecraft.server.network.ServerPlayerEntity bot; // ✅ Store bot reference instead
+    private final net.minecraft.server.level.ServerPlayer bot; // ✅ Store bot reference instead
     private volatile boolean running;
     private final Thread writerThread;
     private BufferedWriter logWriter;
 
-    public ActionLogWriter(MarkovChain2 markovChain, net.minecraft.server.network.ServerPlayerEntity bot) {
+    public ActionLogWriter(MarkovChain2 markovChain, net.minecraft.server.level.ServerPlayer bot) {
         this.queue = new LinkedBlockingQueue<>(1000);
         this.markovChain = markovChain;
         this.bot = bot;

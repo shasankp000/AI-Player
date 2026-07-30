@@ -33,7 +33,7 @@ public class ManualConfig {
     // --- Configuration fields ---
     private List<String> modelList = new ArrayList<>();
     private String selectedLanguageModel;
-    private String llmMode = System.getProperty("aiplayer.llmMode", "ollama");
+    private String llmMode = System.getProperty("aiplayer.llmMode", "custom");
     private String openAIKey = "";
     private String claudeKey = "";
     private String geminiKey = "";
@@ -144,7 +144,7 @@ public class ManualConfig {
                 }
                 else {
                     if (modelFetcher != null) {
-                        if(apiKey.isEmpty()) {
+                        if(!llmMode.equals("custom") && apiKey.isEmpty()) {
                             // in the event that a user removes their api key but still have a service based provider set.
                             fetchedModels = new ArrayList<>();
                             selectedLanguageModel="No models available. Please enter an API key";
@@ -213,7 +213,7 @@ public class ManualConfig {
             Type type = new TypeToken<ManualConfig>(){}.getType();
             ManualConfig loadedConfig = gson.fromJson(reader, type);
             // After loading, ensure the model list is updated.
-            String currentProvider = System.getProperty("aiplayer.llmMode", "ollama");
+            String currentProvider = System.getProperty("aiplayer.llmMode", "custom");
             loadedConfig.checkAndUpdateProvider(currentProvider);
             // Ensure the persona map is non-null after deserialisation
             if (loadedConfig.botPersonaMap == null) {

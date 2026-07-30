@@ -1,34 +1,20 @@
 package net.shasankp000.ChatUtils.DecisionResolver;
 
-import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
-import io.github.amithkoujalgi.ollama4j.core.exceptions.OllamaBaseException;
 import io.github.amithkoujalgi.ollama4j.core.exceptions.ToolInvocationException;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatMessageRole;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestBuilder;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatRequestModel;
-import io.github.amithkoujalgi.ollama4j.core.models.chat.OllamaChatResult;
-import net.shasankp000.AIPlayer;
 import net.shasankp000.FilingSystem.LLMClientFactory;
 import net.shasankp000.ServiceLLMClients.LLMClient;
-import net.shasankp000.ServiceLLMClients.LLMServiceHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class DecisionResolver {
 
-    // Set to your Ollama server and desired model
-    private static final String OLLAMA_HOST = "http://localhost:11434/";
-    private static OllamaAPI ollamaAPI = new OllamaAPI(OLLAMA_HOST);
     private static final Pattern THINK_BLOCK = Pattern.compile("<think>([\\s\\S]*?)</think>");
     private static final Logger LOGGER = LoggerFactory.getLogger("DecisionResolver");
 
     public DecisionResolver() {
-        ollamaAPI = new OllamaAPI(OLLAMA_HOST);
-        ollamaAPI.setRequestTimeoutSeconds(300);
     }
 
     /**
@@ -60,7 +46,7 @@ public class DecisionResolver {
             String bertPred, double bertConf,
             String cartMainPred, double cartMainConf,
             String lidsNetPred, double lidsNetConf
-    ) throws OllamaBaseException, IOException, InterruptedException, ToolInvocationException {
+    ) throws InterruptedException, ToolInvocationException {
 
         String prompt = buildPrompt(
                 playerMessage,
@@ -69,14 +55,12 @@ public class DecisionResolver {
                 lidsNetPred, lidsNetConf
         );
 
-        String selectedLM = AIPlayer.CONFIG.getSelectedLanguageModel();
-
-        String llmProvider = System.getProperty("aiplayer.llmMode", "ollama");
+        String llmProvider = System.getProperty("aiplayer.llmMode", "custom");
 
         String answer = "";
 
         switch (llmProvider) {
-            case "openai", "claude", "grok", "gemini":
+            case "openai", "gpt", "claude", "anthropic", "grok", "xai", "xAI", "gemini", "google", "custom":
                 LLMClient llmClient = LLMClientFactory.createClient(llmProvider);
                 if (llmClient!=null) {
                     if (llmClient.isReachable()) {
@@ -90,20 +74,9 @@ public class DecisionResolver {
                     LOGGER.error("Error! {} client is null!", llmProvider);
                 }
                 break;
-            case "ollama":
-                OllamaChatRequestModel requestModel = OllamaChatRequestBuilder.getInstance(selectedLM)
-                        .withMessage(OllamaChatMessageRole.USER, prompt)
-                        .build();
-
-
-                OllamaChatResult response = ollamaAPI.chat(requestModel);
-
-                answer = response.getResponse().trim();
-
-                break;
 
             default:
-                LOGGER.warn("Unsupported provider detected.");
+                LOGGER.warn("Unsupported provider detected: {}", llmProvider);
                 return "UNSPECIFIED";
         }
 
