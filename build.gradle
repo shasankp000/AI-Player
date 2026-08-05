@@ -63,6 +63,10 @@ dependencies {
 	implementation 'org.apache.commons:commons-compress:1.28.0'
 	implementation 'org.jsoup:jsoup:1.21.1'
 
+	testImplementation platform('org.junit:junit-bom:5.11.4')
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
 	// DJL dependencies
 	implementation "ai.djl:api:0.29.0"
 	implementation "ai.djl.huggingface:tokenizers:0.29.0"
@@ -116,6 +120,11 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
+}
+
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
+	workingDir temporaryDir
 }
 
 java {
