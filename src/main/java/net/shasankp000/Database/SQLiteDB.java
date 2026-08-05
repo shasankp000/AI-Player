@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class SQLiteDB {
 
@@ -31,21 +30,7 @@ public class SQLiteDB {
         config.enableLoadExtension(true);
 
         try (Connection conn = DriverManager.getConnection(DB_URL, config.toProperties())) {
-            Path extPath = VectorExtensionHelper.ensureSqliteVecPresent();
-            VectorExtensionHelper.loadSqliteVecExtension(conn, extPath);
-
-            String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-            if (!osName.contains("win")) {
-                logger.info("✅ Detected Linux/MacOS — using sqlite-vss native extension");
-                Path extPath2 = VectorExtensionHelper.ensureSqliteVssPresent();
-                // vector0 must be loaded before vss0
-                Path vssDir = FabricLoader.getInstance().getConfigDir().resolve("sqlite_vector/sqlite-vss");
-                VectorExtensionHelper.loadSqliteVector0Extension(conn, vssDir);
-                VectorExtensionHelper.loadSqliteVssExtension(conn, extPath2);
-            } else {
-                logger.info("✅ Detected Windows — using fallback cosine_distance UDF");
-                VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
-            }
+            loadVectorExtension(conn);
 
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("PRAGMA foreign_keys = ON;");
@@ -106,7 +91,7 @@ public class SQLiteDB {
         List<Memory> results = new ArrayList<>();
         String sql = """
             SELECT id, type, timestamp, prompt, response,
-                   1 - cosine_distance(embedding, ?) AS similarity
+                   1 - vec_distance_cosine(embedding, ?) AS similarity
             FROM memories
             WHERE type = ?
             ORDER BY similarity DESC
@@ -117,12 +102,7 @@ public class SQLiteDB {
         config.enableLoadExtension(true);
 
         try (Connection conn = DriverManager.getConnection(DB_URL, config.toProperties())) {
-
-            // ✅ Register fallback cosine_distance BEFORE prepareStatement
-            String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-            if (osName.contains("win")) {
-                VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
-            }
+            loadVectorExtension(conn);
 
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setString(1, vectorToLiteral(queryEmbedding));
@@ -142,9 +122,11 @@ public class SQLiteDB {
                 }
             }
 
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             logger.error("❌ Vector search failed: SQLState={}, ErrorCode={}, Message={}",
-                    e.getSQLState(), e.getErrorCode(), e.getMessage());
+                    e instanceof SQLException sqlException ? sqlException.getSQLState() : null,
+                    e instanceof SQLException sqlException ? sqlException.getErrorCode() : 0,
+                    e.getMessage());
         }
 
         return results;
@@ -190,6 +172,11 @@ public class SQLiteDB {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    private static void loadVectorExtension(Connection conn) throws IOException, SQLException {
+        Path extensionPath = VectorExtensionHelper.ensureSqliteVecPresent();
+        VectorExtensionHelper.loadSqliteVecExtension(conn, extensionPath);
     }
 
     public record Memory(
