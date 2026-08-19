@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class SQLiteDB {
 
@@ -34,18 +33,8 @@ public class SQLiteDB {
             Path extPath = VectorExtensionHelper.ensureSqliteVecPresent();
             VectorExtensionHelper.loadSqliteVecExtension(conn, extPath);
 
-            String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-            if (!osName.contains("win")) {
-                logger.info("✅ Detected Linux/MacOS — using sqlite-vss native extension");
-                Path extPath2 = VectorExtensionHelper.ensureSqliteVssPresent();
-                // vector0 must be loaded before vss0
-                Path vssDir = FabricLoader.getInstance().getConfigDir().resolve("sqlite_vector/sqlite-vss");
-                VectorExtensionHelper.loadSqliteVector0Extension(conn, vssDir);
-                VectorExtensionHelper.loadSqliteVssExtension(conn, extPath2);
-            } else {
-                logger.info("✅ Detected Windows — using fallback cosine_distance UDF");
-                VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
-            }
+            VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
+            logger.info("✅ Using portable cosine_distance UDF for memory similarity");
 
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("PRAGMA foreign_keys = ON;");
@@ -118,11 +107,8 @@ public class SQLiteDB {
 
         try (Connection conn = DriverManager.getConnection(DB_URL, config.toProperties())) {
 
-            // ✅ Register fallback cosine_distance BEFORE prepareStatement
-            String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-            if (osName.contains("win")) {
-                VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
-            }
+            // SQLite functions are connection-local, so register this for every search connection.
+            VectorExtensionHelper.registerCosineDistanceIfNeeded(conn);
 
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setString(1, vectorToLiteral(queryEmbedding));
@@ -183,6 +169,9 @@ public class SQLiteDB {
     }
 
     private static String vectorToLiteral(List<Double> vec) {
+        if (vec == null || vec.isEmpty()) {
+            return "[]";
+        }
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < vec.size(); i++) {
             sb.append(vec.get(i));

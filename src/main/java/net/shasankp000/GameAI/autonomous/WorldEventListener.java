@@ -4,6 +4,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.GameAI.companion.BotStance;
 import net.shasankp000.GameAI.companion.CompanionController;
+import net.shasankp000.GameAI.proximity.GreetingCooldownTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +52,7 @@ import java.util.regex.Pattern;
 public class WorldEventListener {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("world-event-listener");
+    private static final Pattern PLAYER_JOINED_PATTERN = Pattern.compile("^(\\S+) joined the game");
 
     // -------------------------------------------------------------------------
     // Event pattern descriptors
@@ -93,12 +95,6 @@ public class WorldEventListener {
         new EventPattern(
             Pattern.compile("^(\\S+) (drowned|fell|blew up|burned|froze|starved|suffocated|was shot|was pummeled|was killed|went up in flames|tried to swim in lava|died)"),
             m -> "express sympathy to " + m.group(1) + " who " + m.group(2) + " in chat"
-        ),
-
-        // Player joined
-        new EventPattern(
-            Pattern.compile("^(\\S+) joined the game"),
-            m -> "greet " + m.group(1) + " in chat"
         ),
 
         // Player left
@@ -220,7 +216,21 @@ public class WorldEventListener {
             }
         }
 
-        // -- 2. Social event goal injection ------------------------------------
+        // -- 2. Join greeting (shared cooldown with proximity greetings) -------
+        Matcher joinedMatcher = PLAYER_JOINED_PATTERN.matcher(stripped);
+        if (joinedMatcher.find()) {
+            String playerName = joinedMatcher.group(1);
+            if (GreetingCooldownTracker.tryAcquire(botName, playerName)) {
+                String goal = "greet " + playerName + " in chat";
+                LOGGER.info("[world-event] '{}' -> injecting goal: '{}'", stripped, goal);
+                engine.injectUrgentGoal(goal);
+            } else {
+                LOGGER.debug("[world-event] Suppressed repeat greeting for '{}'", playerName);
+            }
+            return;
+        }
+
+        // -- 3. Social event goal injection ------------------------------------
         for (EventPattern ep : PATTERNS) {
             Matcher m = ep.pattern().matcher(stripped);
             if (m.find()) {

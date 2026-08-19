@@ -86,9 +86,12 @@ public class HybridPlanner {
         LOGGER.info("[HybridPlanner] executeGoal called -- bot='{}', goalId={}, goal='{}'",
                 bot.getName().getString(), goalId, goalText);
 
-        // 1. Obtain the current bot State snapshot from BotEventHandler
-        // FIX: getCurrentState() takes no arguments
+        // 1. Obtain the current bot State snapshot from BotEventHandler. In autonomous
+        //    mode the snapshot may not exist yet, so fall back to building a fresh one.
         State currentState = BotEventHandler.getCurrentState();
+        if (currentState == null) {
+            currentState = BotEventHandler.createInitialState(bot);
+        }
         if (currentState == null) {
             LOGGER.warn("[HybridPlanner] Could not obtain State for bot '{}' -- skipping goal '{}'",
                     bot.getName().getString(), goalText);
@@ -100,6 +103,8 @@ public class HybridPlanner {
         //      (no static ActionGraph.buildDefault() exists)
         GoalVector goalVector             = new GoalVector();
         ActionGraph actionGraph           = new ActionGraph(goalVector);
+        ActionRegistry.ensureInitialized();
+        actionGraph.buildFromRegistry();
         MarkovChain2 markovChain          = new MarkovChain2();
         // FIX: getRLAgent() takes no arguments
         RLAgent rlAgent                   = BotEventHandler.getRLAgent();

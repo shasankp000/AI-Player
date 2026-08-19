@@ -109,8 +109,7 @@ public class RAG2 {
         }
     }
 
-    private static String getBestContextAnswer(String userPrompt, List<Double> queryEmbedding) {
-        String webAnswer = WebSearchTool.search(userPrompt).trim();
+    private static String getBestContextAnswer(String userPrompt, List<Double> queryEmbedding) {        String webAnswer = WebSearchTool.search(userPrompt).trim();
         logger.info("🌐 Web search result: {}", webAnswer);
 
         List<SQLiteDB.Memory> localMemories = SQLiteDB.findRelevantMemories(queryEmbedding, "conversation", 1);
@@ -120,9 +119,9 @@ public class RAG2 {
 
         logger.info("🔍 Local similarity: {}", localSimilarity);
 
-        // Decide which to trust
         String bestAnswer;
-        if (!webAnswer.isBlank()) {
+        boolean webUsable = !webAnswer.isBlank() && !webAnswer.startsWith("❌");
+        if (webUsable) {
             if (!webAnswer.equalsIgnoreCase(localAnswer)) {
                 bestAnswer = webAnswer;
                 logger.info("✅ Using web answer, overwriting local DB");
@@ -133,7 +132,7 @@ public class RAG2 {
             }
         } else if (hasLocal && localSimilarity >= 0.8) {
             bestAnswer = localAnswer;
-            logger.info("✅ Using local answer, web empty");
+            logger.info("✅ Using local answer, web empty/errored");
         } else {
             bestAnswer = "❌ No relevant info found.";
             logger.warn("⚠️ Both web and local empty or not confident");

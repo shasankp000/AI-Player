@@ -3,6 +3,7 @@ package net.shasankp000.GameAI;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.HostileEntity;
+import net.minecraft.entity.mob.Monster;
 import net.minecraft.entity.mob.SlimeEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.RegistryKey;
@@ -27,6 +28,7 @@ import net.shasankp000.Entity.EntityDetails;
 import net.shasankp000.WorldUitls.isBlockItem;
 import net.shasankp000.GameAI.mood.MoodEngine;
 import net.shasankp000.GameAI.persona.PersonaRegistry;
+import net.shasankp000.GameAI.autonomous.NearbyBedSleepController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +77,13 @@ public class BotEventHandler {
     private static State previousState = null;
     private static StateActions.Action previousAction = null;
     private static double previousReward = 0.0;
+    private static volatile boolean lastSleepActionSucceeded = false;
+    private static volatile FoodConsumptionTool.ConsumptionResult lastFoodConsumption =
+            FoodConsumptionTool.ConsumptionResult.notAttempted();
+    private static final Map<UUID, Long> lastNightSleepDecision = new HashMap<>();
+    private static final long NIGHT_SLEEP_DECISION_INTERVAL_MS = TimeUnit.SECONDS.toMillis(15);
+    private static final Map<UUID, Long> lastLowHungerDecision = new HashMap<>();
+    private static final long LOW_HUNGER_DECISION_INTERVAL_MS = TimeUnit.SECONDS.toMillis(2);
 
     // Singleton RLAgent – lazily created and cached for external callers
     private static RLAgent cachedRLAgent = null;
@@ -86,9 +95,16 @@ public class BotEventHandler {
 
 
     public BotEventHandler(MinecraftServer server, ServerPlayerEntity bot) {
+        setActiveBot(server, bot);
+    }
+
+    /**
+     * Records the active AI bot as soon as its lifecycle starts. Survival
+     * controllers must not have to wait for a combat event to discover it.
+     */
+    public static void setActiveBot(MinecraftServer server, ServerPlayerEntity bot) {
         BotEventHandler.server = server;
         BotEventHandler.bot = bot;
-
     }
 
     // ── Mood / Persona lifecycle ──────────────────────────────────────────────
@@ -99,6 +115,11 @@ public class BotEventHandler {
      * state does not bleed into the next spawn.
      */
     public static void onBotDespawn(String botName) {
+        if (bot != null && bot.getName().getString().equals(botName)) {
+            synchronized (lastLowHungerDecision) {
+                lastLowHungerDecision.remove(bot.getUuid());
+            }
+        }
         MoodEngine.evict(botName);
         PersonaRegistry.evict(botName);
         LOGGER.info("[mood/persona] Evicted state for bot '{}'", botName);
@@ -134,6 +155,124 @@ public class BotEventHandler {
             cachedRLAgent = new RLAgent(savedEpsilon, null);
         }
         return cachedRLAgent;
+    }
+
+    /**
+     * Gives the learned policy an opportunity to select {@link StateActions.Action#SLEEP}
+     * during a safe night.  This deliberately does not invoke sleeping directly: the
+     * action must first be selected by the RL policy and its result is then learned.
+     */
+    public static void considerNightSleep(RLAgent rlAgentHook, QTable qTable, ServerPlayerEntity candidateBot) {
+        if (rlAgentHook == null || qTable == null || candidateBot == null
+                || !candidateBot.isAlive() || candidateBot.isSleeping()
+                || GetTime.getTimeOfWorld(candidateBot) < 12000) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        synchronized (lastNightSleepDecision) {
+            long previous = lastNightSleepDecision.getOrDefault(candidateBot.getUuid(), 0L);
+            if (now - previous < NIGHT_SLEEP_DECISION_INTERVAL_MS) return;
+            lastNightSleepDecision.put(candidateBot.getUuid(), now);
+        }
+
+        List<Entity> nearby = AutoFaceEntity.detectNearbyEntities(candidateBot, 32);
+        boolean hostileNearby = nearby.stream().anyMatch(entity -> entity instanceof Monster
+                || (entity instanceof net.minecraft.entity.player.PlayerEntity player
+                    && !player.getUuid().equals(candidateBot.getUuid())
+                    && net.shasankp000.PlayerUtils.PlayerRetaliationTracker.isPlayerHostile(candidateBot, player)));
+        if (hostileNearby) return;
+
+        State state = createInitialState(candidateBot);
+        List<StateActions.Action> candidates = rlAgentHook.suggestPotentialActions(state);
+        Map<StateActions.Action, Double> allRisks = rlAgentHook.calculateRisk(state, candidates, candidateBot);
+        Map<StateActions.Action, Double> risks = new EnumMap<>(StateActions.Action.class);
+        risks.put(StateActions.Action.USE_ITEM,
+                allRisks.getOrDefault(StateActions.Action.USE_ITEM, 0.0));
+        risks.put(StateActions.Action.STAY,
+                allRisks.getOrDefault(StateActions.Action.STAY, 0.0));
+        Map<StateActions.Action, Double> choice = rlAgentHook.chooseAction(
+                state, rlAgentHook.calculateRiskAppetite(state), risks, transitionHistory);
+        Map.Entry<StateActions.Action, Double> selected = choice.entrySet().iterator().next();
+        if (selected.getKey() != StateActions.Action.SLEEP) return;
+
+        ServerCommandSource source = candidateBot.getCommandSource().withSilent().withMaxLevel(4);
+        executeAction(StateActions.Action.SLEEP, source);
+
+        State nextState = createInitialState(candidateBot);
+        double reward = lastSleepActionSucceeded ? 50.0 : -20.0;
+        double qValue = rlAgentHook.calculateQValue(
+                state, StateActions.Action.SLEEP, reward, nextState, qTable);
+        qTable.addEntry(state, StateActions.Action.SLEEP, qValue, nextState);
+        transitionHistory.addTransition(new StateTransition(
+                state, nextState, StateActions.Action.SLEEP, reward,
+                nextState.getPodMap().getOrDefault(StateActions.Action.SLEEP, 0.0), false, -1));
+        rlAgentHook.decayEpsilon();
+        QTableStorage.saveQTable(qTable, "qtable.bin");
+        try {
+            QTableStorage.saveEpsilon(rlAgentHook.getEpsilon(),
+                    qTableDir + File.separator + "epsilon.bin");
+        } catch (IOException e) {
+            LOGGER.warn("Could not persist sleep-action epsilon", e);
+        }
+        LOGGER.info("RL selected SLEEP for '{}': {}", candidateBot.getName().getString(),
+                lastSleepActionSucceeded ? "slept" : "could not sleep");
+    }
+
+    /** Gives the learned policy an opportunity to select USE_ITEM at low hunger. */
+    public static void considerLowHunger(RLAgent rlAgentHook, QTable qTable, ServerPlayerEntity candidateBot) {
+        if (rlAgentHook == null || qTable == null || candidateBot == null
+                || !candidateBot.isAlive() || candidateBot.isSleeping()
+                || candidateBot.getHungerManager().getFoodLevel() > 8
+                || !FoodConsumptionTool.hasSafeFood(candidateBot)) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        synchronized (lastLowHungerDecision) {
+            long previous = lastLowHungerDecision.getOrDefault(candidateBot.getUuid(), 0L);
+            if (now - previous < LOW_HUNGER_DECISION_INTERVAL_MS) return;
+            lastLowHungerDecision.put(candidateBot.getUuid(), now);
+        }
+
+        State state = createInitialState(candidateBot);
+        List<StateActions.Action> candidates = rlAgentHook.suggestPotentialActions(state);
+        Map<StateActions.Action, Double> risks = rlAgentHook.calculateRisk(state, candidates, candidateBot);
+        Map<StateActions.Action, Double> choice = rlAgentHook.chooseAction(
+                state, rlAgentHook.calculateRiskAppetite(state), risks, transitionHistory);
+        Map.Entry<StateActions.Action, Double> selected = choice.entrySet().iterator().next();
+        StateActions.Action chosenAction = selected.getKey();
+
+        ServerCommandSource source = candidateBot.getCommandSource().withSilent().withMaxLevel(4);
+        executeAction(chosenAction, source);
+
+        State nextState = createInitialState(candidateBot);
+        double reward = chosenAction == StateActions.Action.USE_ITEM
+                ? applyFoodReward(chosenAction, 0.0)
+                : -10.0;
+        Map<StateActions.Action, Double> podMap = rlAgentHook.assessRiskOutcome(
+                state, nextState, chosenAction);
+        nextState.setPodMap(podMap);
+        double qValue = rlAgentHook.calculateQValue(
+                state, chosenAction, reward, nextState, qTable);
+        qTable.addEntry(state, chosenAction, qValue, nextState);
+        transitionHistory.addTransition(new StateTransition(
+                state, nextState, chosenAction, reward,
+                nextState.getPodMap().getOrDefault(chosenAction, 0.0), false, -1));
+        rlAgentHook.decayEpsilon();
+        QTableStorage.saveQTable(qTable, "qtable.bin");
+        try {
+            QTableStorage.saveEpsilon(rlAgentHook.getEpsilon(),
+                    qTableDir + File.separator + "epsilon.bin");
+        } catch (IOException e) {
+            LOGGER.warn("Could not persist food-action epsilon", e);
+        }
+        LOGGER.info("RL low-hunger decision for '{}': {} (result={}, reward={})",
+                candidateBot.getName().getString(), chosenAction,
+                chosenAction == StateActions.Action.USE_ITEM
+                        ? lastFoodConsumption.message()
+                        : "remained hungry",
+                reward);
     }
 
     /**
@@ -371,6 +510,9 @@ public class BotEventHandler {
                         actionPodMap.getOrDefault(chosenAction, 0.0)
                 );
 
+                reward = applySleepReward(chosenAction, reward);
+                reward = applyFoodReward(chosenAction, reward);
+
                 System.out.println("Reward: " + reward);
 
                 // Check for death risk patterns before updating Q-value
@@ -528,6 +670,9 @@ public class BotEventHandler {
                         actionPodMap.getOrDefault(chosenAction, 0.0)
                 );
 
+                reward = applySleepReward(chosenAction, reward);
+                reward = applyFoodReward(chosenAction, reward);
+
                 System.out.println("Reward: " + reward);
 
                 // Check for death risk patterns before updating Q-value (danger zone case)
@@ -645,11 +790,11 @@ public class BotEventHandler {
                     // Gather state information
                     State currentState = createInitialState(bot);
 
-//                double riskAppetite = currentState.getRiskAppetite();
-//
-                    Map<StateActions.Action, Double> riskMap = currentState.getRiskMap();
-
-
+                    // Build a real risk map (like training mode does) so play mode can
+                    // actually select a non-STAY action. The initial state's risk map is
+                    // empty, which would otherwise make chooseActionPlayMode always return STAY.
+                    List<StateActions.Action> potentialActionList = rlAgentHook.suggestPotentialActions(currentState);
+                    Map<StateActions.Action, Double> riskMap = rlAgentHook.calculateRisk(currentState, potentialActionList, bot);
 
                     // Choose action
                     StateActions.Action chosenAction = rlAgentHook.chooseActionPlayMode(currentState, qTable, riskMap, "detectAndReactPlayMode", transitionHistory);
@@ -666,8 +811,9 @@ public class BotEventHandler {
                     // Gather state information
                     State currentState = createInitialState(bot);
 
-                    Map<StateActions.Action, Double> riskMap = currentState.getRiskMap();
-
+                    // Build a real risk map (see note above).
+                    List<StateActions.Action> potentialActionList = rlAgentHook.suggestPotentialActions(currentState);
+                    Map<StateActions.Action, Double> riskMap = rlAgentHook.calculateRisk(currentState, potentialActionList, bot);
 
                     // Choose action
                     StateActions.Action chosenAction = rlAgentHook.chooseActionPlayMode(currentState, qTable, riskMap, "detectAndReactPlayMode", transitionHistory);
@@ -698,6 +844,8 @@ public class BotEventHandler {
     }
 
     private static void executeAction(StateActions.Action chosenAction, ServerCommandSource botSource) {
+        lastSleepActionSucceeded = false;
+        lastFoodConsumption = FoodConsumptionTool.ConsumptionResult.notAttempted();
         switch (chosenAction) {
             case MOVE_FORWARD -> performAction("moveForward", botSource);
             case MOVE_BACKWARD -> performAction("moveBackward", botSource);
@@ -709,11 +857,27 @@ public class BotEventHandler {
             case STOP_SNEAKING -> performAction("unsneak", botSource);
             case STOP_SPRINTING -> performAction("unsprint", botSource);
             case STOP_MOVING -> performAction("stopMoving", botSource);
-            case USE_ITEM -> performAction("useItem", botSource);
+            case USE_ITEM -> {
+                ServerPlayerEntity actingBot = botSource.getPlayer();
+                if (actingBot != null
+                        && actingBot.getHungerManager().getFoodLevel() <= 13
+                        && FoodConsumptionTool.hasSafeFood(actingBot)) {
+                    lastFoodConsumption = FoodConsumptionTool.consumeBestFood(actingBot);
+                    LOGGER.info("RL food action for '{}': {}", botSource.getName(),
+                            lastFoodConsumption.message());
+                } else {
+                    performAction("useItem", botSource);
+                }
+            }
             case EQUIP_ARMOR -> armorUtils.autoEquipArmor(bot);
             case ATTACK -> performAction("attack", botSource);
             case SHOOT_ARROW -> performAction("shootArrow", botSource);
             case EVADE -> performAction("evade", botSource);
+            case SLEEP -> {
+                lastSleepActionSucceeded = NearbyBedSleepController.attemptFromRl(botSource.getPlayer());
+                LOGGER.info("RL sleep action for '{}' {}", botSource.getName(),
+                        lastSleepActionSucceeded ? "succeeded" : "did not find a usable bed");
+            }
             case HOTBAR_1 -> performAction("hotbar1", botSource);
             case HOTBAR_2 -> performAction("hotbar2", botSource);
             case HOTBAR_3 -> performAction("hotbar3", botSource);
@@ -725,6 +889,18 @@ public class BotEventHandler {
             case HOTBAR_9 -> performAction("hotbar9", botSource);
             case STAY -> System.out.println("Performing action: Stay and do nothing");
         }
+    }
+
+    private static double applySleepReward(StateActions.Action action, double reward) {
+        if (action != StateActions.Action.SLEEP) return reward;
+        return reward + (lastSleepActionSucceeded ? 50.0 : -20.0);
+    }
+
+    private static double applyFoodReward(StateActions.Action action, double reward) {
+        if (action != StateActions.Action.USE_ITEM) return reward;
+        if (!lastFoodConsumption.attempted()) return reward;
+        if (!lastFoodConsumption.success()) return reward - 15.0;
+        return reward + 20.0 + (lastFoodConsumption.hungerGained() * 4.0);
     }
 
 

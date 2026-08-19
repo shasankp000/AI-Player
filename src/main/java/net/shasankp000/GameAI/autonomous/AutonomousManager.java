@@ -1,5 +1,6 @@
 package net.shasankp000.GameAI.autonomous;
 
+import net.shasankp000.GameAI.proximity.GreetingCooldownTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +87,7 @@ public class AutonomousManager {
         AutonomousGoalEngine engine = engines.remove(botName);
         AutonomousScheduler scheduler = schedulers.remove(botName);
         listeners.remove(botName);
+        GreetingCooldownTracker.clearBot(botName);
 
         if (scheduler != null) scheduler.shutdown();
         if (engine    != null) engine.shutdown();

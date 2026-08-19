@@ -96,7 +96,7 @@ public class Planner {
         drafts.sort(Comparator.comparingDouble(sp -> sp.score));
 
         ScoredPlan bestDraft = drafts.get(0);
-        LOGGER.info("Generated {} drafts, best score: %.2f", drafts.size(), bestDraft.score);
+        LOGGER.info("Generated {} drafts, best score: {}", drafts.size(), String.format("%.2f", bestDraft.score));
 
         // Log best draft's actions for debugging
         if (LOGGER.isDebugEnabled() && !bestDraft.steps.isEmpty()) {
@@ -140,7 +140,7 @@ public class Planner {
             // Check for improvement
             if (beam.get(0).score < bestPlan.score) {
                 bestPlan = beam.get(0);
-                LOGGER.debug("Improved plan score: %.2f", bestPlan.score);
+                LOGGER.debug("Improved plan score: {}", String.format("%.2f", bestPlan.score));
             }
 
             // Early stop if safe enough
@@ -151,7 +151,7 @@ public class Planner {
         }
 
         long duration = System.currentTimeMillis() - startTime;
-        LOGGER.info("Planning completed in {}ms, final score: %.2f", duration, bestPlan.score);
+        LOGGER.info("Planning completed in {}ms, final score: {}", duration, String.format("%.2f", bestPlan.score));
 
         // Create final plan object
         if (bestPlan.score < 200.0) { // Reject plans that are too risky
@@ -167,7 +167,7 @@ public class Planner {
 
             return plan;
         } else {
-            LOGGER.warn("Best plan score too high (%.2f), rejecting", bestPlan.score);
+            LOGGER.warn("Best plan score too high ({}), rejecting", String.format("%.2f", bestPlan.score));
             return null;
         }
     }

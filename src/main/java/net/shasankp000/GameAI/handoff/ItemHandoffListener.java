@@ -3,12 +3,13 @@ package net.shasankp000.GameAI.handoff;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.shasankp000.GameAI.BotEventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -26,10 +27,20 @@ public final class ItemHandoffListener {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("item-handoff-listener");
 
-    /** Debounce window so one physical pickup does not fire multiple reactions. */
-    private static final long HANDOFF_DEBOUNCE_MS = 1500L;
+    /**
+     * playerTouch can run for the same ItemEntity on several consecutive ticks
+     * before vanilla pickup removes it. Remember handled entities so one gift
+     * produces one reaction and one mood update.
+     */
+    private static final Map<UUID, Long> HANDLED_ITEMS = new ConcurrentHashMap<>();
 
-    private static final ConcurrentHashMap<String, Long> LAST_HANDOFF = new ConcurrentHashMap<>();
+    /**
+     * Several item entities may belong to one gift (for example, blocks thrown
+     * in quick succession). Collapse those into a single acknowledgement.
+     */
+    private static final Map<UUID, Long> LAST_ACKNOWLEDGEMENT = new ConcurrentHashMap<>();
+    private static final long ACKNOWLEDGEMENT_COOLDOWN_MS = 3_000L;
+    private static final long HANDLED_ITEM_RETENTION_MS = 60_000L;
 
     private ItemHandoffListener() {}
 
@@ -63,20 +74,9 @@ public final class ItemHandoffListener {
         ItemStack stack = itemEntity.getStack();
         if (stack.isEmpty()) return;
 
-        // Debounce: same bot + same item type within HANDOFF_DEBOUNCE_MS → ignore
-        String debounceKey = serverPlayer.getUuid() + "|" + Registries.ITEM.getId(stack.getItem());
-        long now = System.currentTimeMillis();
-        Long last = LAST_HANDOFF.get(debounceKey);
-        if (last != null && (now - last) < HANDOFF_DEBOUNCE_MS) {
-            LOGGER.debug("[handoff-listener] debounced pickup of '{}'", stack.getName().getString());
-            return;
-        }
-        LAST_HANDOFF.put(debounceKey, now);
-
         // Resolve the original thrower.
-        // In 1.21.1, ItemEntity no longer exposes getThrower().
-        // We use getOwner() as the primary signal (set when a player throws an item)
-        // and fall back to checking the entity's NBT thrower UUID via the owner entity.
+        // In 1.21.x, ItemEntity no longer exposes getThrower(); getOwner() is the
+        // reliable signal (set when a player throws an item).
         ServerPlayerEntity thrower = null;
 
         // Primary: getOwner() returns the entity that "owns" the item (set on throw)
@@ -85,13 +85,23 @@ public final class ItemHandoffListener {
             thrower = ownerPlayer;
         }
 
-        // Fallback: scan the item entity's NBT for the Thrower UUID written by vanilla
-        // (net.minecraft.entity.ItemEntity stores it under the "Thrower" key).
-        // Note: reading from a fresh empty NbtCompound never worked; only getOwner()
-        // is reliable on 1.21.x, so this block intentionally stays a no-op if owner was null.
-        if (thrower == null) {
-            // Reserved for a future data-component / entity-data path if Mojang exposes
-            // thrower UUID again without getOwner().
+        // Ignore repeated collision callbacks for the same dropped item.
+        long now = System.currentTimeMillis();
+        if (HANDLED_ITEMS.putIfAbsent(itemEntity.getUuid(), now) != null) {
+            return;
+        }
+
+        // A burst of separately thrown items is still one handoff from the
+        // player's perspective, so acknowledge the burst only once.
+        boolean sendAcknowledgement = true;
+        if (thrower != null) {
+            Long previousAcknowledgement = LAST_ACKNOWLEDGEMENT.put(thrower.getUuid(), now);
+            if (previousAcknowledgement != null
+                    && now - previousAcknowledgement < ACKNOWLEDGEMENT_COOLDOWN_MS) {
+                sendAcknowledgement = false;
+                LOGGER.debug("[handoff-listener] Suppressed duplicate acknowledgement for '{}'",
+                        thrower.getName().getString());
+            }
         }
 
         LOGGER.debug("[handoff-listener] bot '{}' picked up '{}' (thrower={})",
@@ -99,6 +109,13 @@ public final class ItemHandoffListener {
                 stack.getName().getString(),
                 thrower != null ? thrower.getName().getString() : "none");
 
-        ItemHandoffHandler.onBotPickedUpItem(serverPlayer, thrower, stack);
+        ItemHandoffHandler.onBotPickedUpItem(
+                serverPlayer, thrower, stack, sendAcknowledgement);
+        cleanupHandledItems(now);
+    }
+
+    private static void cleanupHandledItems(long now) {
+        HANDLED_ITEMS.entrySet().removeIf(
+                entry -> now - entry.getValue() > HANDLED_ITEM_RETENTION_MS);
     }
 }

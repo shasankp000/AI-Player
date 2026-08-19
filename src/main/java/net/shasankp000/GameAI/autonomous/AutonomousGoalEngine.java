@@ -61,6 +61,12 @@ public class AutonomousGoalEngine {
     /** True once shutdown() has been called. */
     private final AtomicBoolean stopped = new AtomicBoolean(false);
 
+    /** True while a goal (world-event or plan) is being executed. */
+    private final AtomicBoolean goalExecuting = new AtomicBoolean(false);
+
+    /** Deterministic per-bot sleep controller (see PR 77). */
+    private final NearbyBedSleepController sleepController;
+
     /**
      * Priority queue — higher {@link GoalQueueEntry#priority()} values are
      * dequeued first.  Capacity is a soft hint; we enforce MAX_QUEUE_DEPTH
@@ -80,6 +86,7 @@ public class AutonomousGoalEngine {
     public AutonomousGoalEngine(String botName, UUID botUUID) {
         this.botName  = botName;
         this.botUUID  = botUUID;
+        this.sleepController = new NearbyBedSleepController(botName, playerControlled::get);
     }
 
     /**
@@ -96,6 +103,7 @@ public class AutonomousGoalEngine {
     public void shutdown() {
         stopped.set(true);
         goalQueue.clear();
+        sleepController.shutdown();
         executor.shutdownNow();
         LOGGER.info("[autonomous] Shut down for bot '{}'", botName);
     }
@@ -157,6 +165,16 @@ public class AutonomousGoalEngine {
     /** Returns the current number of queued goals. */
     public int queueSize() {
         return goalQueue.size();
+    }
+
+    /** True while a goal (world-event or plan) is being executed. */
+    boolean isExecutingGoal() {
+        return goalExecuting.get();
+    }
+
+    /** True if the bot is currently asleep in a bed. */
+    boolean isBotSleeping() {
+        return sleepController.isBotSleeping();
     }
 
     /**
@@ -238,11 +256,22 @@ public class AutonomousGoalEngine {
                     continue;
                 }
 
+                // Yield while the bot is asleep in a bed (RL sleep action in progress)
+                if (sleepController.isBotSleeping()) {
+                    Thread.sleep(500);
+                    continue;
+                }
+
                 // Block up to 5 s waiting for a goal
                 GoalQueueEntry entry = goalQueue.poll(5, TimeUnit.SECONDS);
                 if (entry == null) continue;
 
-                executeGoal(entry);
+                goalExecuting.set(true);
+                try {
+                    executeGoal(entry);
+                } finally {
+                    goalExecuting.set(false);
+                }
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

@@ -30,6 +30,7 @@ import net.shasankp000.Database.QTableExporter;
 import net.shasankp000.Entity.*;
 import net.shasankp000.FilingSystem.LLMClientFactory;
 import net.shasankp000.GameAI.BotEventHandler;
+import net.shasankp000.GameAI.autonomous.AutonomousManager;
 import net.shasankp000.OllamaClient.ollamaClient;
 import net.shasankp000.PathFinding.BotStance;
 import net.shasankp000.PathFinding.ChartPathToBlock;
@@ -37,6 +38,8 @@ import net.shasankp000.PathFinding.PathFinder;
 import net.shasankp000.PathFinding.PathTracer;
 import net.shasankp000.PathFinding.Segment;
 import net.shasankp000.PathFinding.StanceController;
+import net.shasankp000.PathFinding.NavigationDebugSnapshot;
+import net.shasankp000.PathFinding.NavigationService;
 import net.shasankp000.PlayerUtils.*;
 import net.shasankp000.ServiceLLMClients.LLMClient;
 import net.shasankp000.ServiceLLMClients.LLMServiceHandler;
@@ -404,7 +407,7 @@ public class modCommandRegistry {
 
                                                     Vec3d aimPosition;
                                                     if (isMovingFast) {
-                                                        aimPosition = RangedWeaponUtils.calculateLeadPosition(target, projectileSpeed);
+                                                        aimPosition = RangedWeaponUtils.calculateLeadPosition(bot, target, projectileSpeed);
                                                         LOGGER.info("Applied lead compensation for fast-moving target");
                                                     } else {
                                                         aimPosition = target.getPos().add(0, target.getHeight() * 0.6, 0);
@@ -448,7 +451,7 @@ public class modCommandRegistry {
                                                         if (finalTarget.isAlive()) {
                                                             Vec3d finalAimPosition;
                                                             if (isMovingFast) {
-                                                                finalAimPosition = RangedWeaponUtils.calculateLeadPosition(finalTarget, finalProjectileSpeed);
+                                                                finalAimPosition = RangedWeaponUtils.calculateLeadPosition(bot, finalTarget, finalProjectileSpeed);
                                                             } else {
                                                                 finalAimPosition = finalTarget.getPos().add(0, finalTarget.getHeight() * 0.6, 0);
                                                             }
@@ -891,9 +894,9 @@ public class modCommandRegistry {
 
                                     ChatUtils.sendSystemMessage(serverSource, "Exporting Q-table to JSON. Please wait.... ");
 
-                                    QTableExporter.exportQTable(BotEventHandler.qTableDir + "/qtable.bin", BotEventHandler.qTableDir + "./fullQTable.json");
+                                    QTableExporter.exportQTable(BotEventHandler.qTableDir + "/qtable.bin", BotEventHandler.qTableDir + "/fullQTable.json");
 
-                                    ChatUtils.sendSystemMessage(serverSource, "Q-table has been successfully exported to a json file at: " + BotEventHandler.qTableDir + "./fullQTable.json" );
+                                    ChatUtils.sendSystemMessage(serverSource, "Q-table has been successfully exported to a json file at: " + BotEventHandler.qTableDir + "/fullQTable.json" );
 
                                     return 1;
                                 })
@@ -1039,6 +1042,40 @@ public class modCommandRegistry {
 
                                 })
                         )
+                        .then(literal("navigation_debug")
+                                .then(CommandManager.argument("bot", StringArgumentType.word())
+                                        .then(literal("toggle")
+                                                .executes(ctx -> {
+                                                    String botName = ctx.getArgument("bot", String.class);
+                                                    MinecraftServer server = ctx.getSource().getServer();
+                                                    ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+                                                    if (bot == null) {
+                                                        ChatUtils.sendSystemMessage(ctx.getSource(), "Bot not found");
+                                                        return 0;
+                                                    }
+                                                    boolean currentlyEnabled = NavigationService.isNavigating(bot.getUuid());
+                                                    NavigationService.setParticleDebug(bot.getUuid(), !currentlyEnabled);
+                                                    ChatUtils.sendSystemMessage(ctx.getSource(),
+                                                            "Navigation debug " + (!currentlyEnabled ? "enabled" : "disabled") + " for " + botName);
+                                                    return 1;
+                                                })
+                                        )
+                                        .then(literal("route")
+                                                .executes(ctx -> {
+                                                    String botName = ctx.getArgument("bot", String.class);
+                                                    MinecraftServer server = ctx.getSource().getServer();
+                                                    ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+                                                    if (bot == null) {
+                                                        ChatUtils.sendSystemMessage(ctx.getSource(), "Bot not found");
+                                                        return 0;
+                                                    }
+                                                    NavigationDebugSnapshot snapshot = NavigationService.debugSnapshot(bot);
+                                                    ChatUtils.sendSystemMessage(ctx.getSource(), snapshot.toString());
+                                                    return 1;
+                                                })
+                                        )
+                                )
+                        )
         ));
     }
 
@@ -1158,6 +1195,8 @@ public class modCommandRegistry {
 
             if (bot!=null) {
 
+                BotEventHandler.setActiveBot(server, bot);
+
                 Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
 
                 RespawnHandler.registerRespawnListener(bot);
@@ -1190,6 +1229,10 @@ public class modCommandRegistry {
             System.out.println("Preparing for connection to language model....");
 
             if (bot!=null) {
+
+                final String spawnedBotName = bot.getName().getString();
+
+                BotEventHandler.setActiveBot(server, bot);
 
                 Objects.requireNonNull(bot.getAttributeInstance(EntityAttributes.KNOCKBACK_RESISTANCE)).setBaseValue(0.0);
 
@@ -1236,8 +1279,16 @@ public class modCommandRegistry {
                                 }
                             }
 
-                            LOGGER.info("LLM Service Handler initialized! Starting AutoFace...");
-                            AutoFaceEntity.startAutoFace(bot);
+                            LOGGER.info("LLM Service Handler initialized! Starting autonomous systems for '{}'...", spawnedBotName);
+                            server.execute(() -> {
+                                ServerPlayerEntity activeBot = server.getPlayerManager().getPlayer(spawnedBotName);
+                                if (activeBot == null) {
+                                    LOGGER.warn("Bot '{}' despawned before autonomous systems could start", spawnedBotName);
+                                    return;
+                                }
+                                AutonomousManager.getInstance().startBot(spawnedBotName, activeBot.getUuid());
+                                AutoFaceEntity.startAutoFace(activeBot);
+                            });
 
                             Thread.currentThread().interrupt();
 

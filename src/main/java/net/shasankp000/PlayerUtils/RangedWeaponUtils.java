@@ -457,12 +457,12 @@ public class RangedWeaponUtils {
     /**
      * Calculate lead compensation for moving targets
      */
-    public static Vec3d calculateLeadPosition(Entity target, double projectileSpeed) {
+    public static Vec3d calculateLeadPosition(ServerPlayerEntity bot, Entity target, double projectileSpeed) {
         if (!(target instanceof LivingEntity)) {
             return target.getPos();
         }
 
-        Vec3d targetPos = target.getPos();
+        Vec3d targetPos = target.getPos().add(0, target.getHeight() * 0.6, 0);
         Vec3d targetVelocity = target.getVelocity();
 
         // If target is not moving much, no need to lead
@@ -472,13 +472,20 @@ public class RangedWeaponUtils {
 
         // Calculate time for projectile to reach target (simplified)
         // Actual calculation would need to solve quadratic equation
-        double distance = targetPos.distanceTo(targetPos);
+        double distance = bot.getPos().distanceTo(target.getPos());
         double timeToImpact = distance / projectileSpeed;
 
         // Lead the target based on its velocity
         Vec3d leadOffset = targetVelocity.multiply(timeToImpact * 0.8); // 0.8 factor for tuning
 
         return targetPos.add(leadOffset);
+    }
+
+    public static Vec3d calculateLeadPosition(Entity target, double projectileSpeed) {
+        if (!(target instanceof LivingEntity)) {
+            return target.getPos();
+        }
+        return target.getPos().add(0, target.getHeight() * 0.6, 0);
     }
 
     /**

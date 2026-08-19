@@ -166,6 +166,19 @@ public class ToolRegistry {
             ),
 
             new Tool(
+                    "equipArmor",
+                    """
+                    Equips the best available armor pieces from the bot's inventory.
+                    Also replaces currently equipped armor when a better piece is available.
+                    """,
+                    List.of(),
+                    Set.of(),
+                    (sharedState, paramMap, result) -> {
+                        // The equipped armor is verified directly from the bot entity.
+                    }
+            ),
+
+            new Tool(
                 "webSearch",
                     """
                     Searches the web for the input query via an automatically pre-configured provider. Meant to be used as a standalone method and not in a pipeline.

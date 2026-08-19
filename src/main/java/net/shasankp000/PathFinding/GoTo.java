@@ -1,80 +1,39 @@
 package net.shasankp000.PathFinding;
 
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
-import net.shasankp000.PathFinding.PathFinder.PathNode;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.TimeUnit;
 
-import static net.shasankp000.PathFinding.PathFinder.*;
+/** Blocking compatibility adapter for tool calls that already run away from the server thread. */
+public final class GoTo {
+    private static final Logger LOGGER = LoggerFactory.getLogger("ai-player");
+    private GoTo() {}
 
-public class GoTo {
-
-    public static String goTo(ServerCommandSource botSource, int x, int y, int z, boolean sprint) {
-        MinecraftServer server = botSource.getServer();
-        ServerPlayerEntity bot = botSource.getPlayer();
-        ServerWorld world = server.getOverworld();
-        String botName = botSource.getName();
-
-        if (bot == null) {
-            System.out.println("Bot not found!");
-            return "Bot not found!";
+    public static String goTo(ServerCommandSource source, int x, int y, int z, boolean sprint) {
+        ServerPlayerEntity bot = source.getPlayer();
+        if (bot == null) return "Bot not found!";
+        MinecraftServer server = source.getServer();
+        if (!server.isOnThread()) {
+            // Off-thread: hand off to NavigationService and return immediately
+            NavigationService.navigate(bot, new BlockPos(x, y, z), NavigationOptions.of(sprint));
+            return "Bot navigation started";
         }
-
-        System.out.println("Found bot: " + botSource.getName());
-
         try {
-            // Calculate the path
-            List<PathNode> rawPath = calculatePath(bot.getBlockPos(), new BlockPos(x, y, z), world);
-
-            // Simplify + filter
-            List<PathNode> finalPath = simplifyPath(rawPath, world);
-            LOGGER.info("Path output: {}", finalPath);
-
-            Queue<Segment> segments = convertPathToSegments(finalPath, sprint);
-            LOGGER.info("Generated segments: {}", segments);
-
-            // ✅ Trace the path and wait for completion
-            CompletableFuture<String> pathFuture = PathTracer.tracePath(server, botSource, botName, segments, sprint);
-
-
-            // Wait for path completion with timeout
-            String result = pathFuture.get(60, TimeUnit.SECONDS);
-
-            String finalOutput = "";
-
-            if (result.equals("Path cleared")) {
-                finalOutput = String.format("Bot moved to position - x: %d y: %d z: %d",
-                        (int) bot.getX(), (int) bot.getY(), (int) bot.getZ());
+            NavigationResult result = NavigationService.navigate(bot, new BlockPos(x, y, z),
+                    NavigationOptions.of(sprint)).get(5, TimeUnit.MINUTES);
+            BlockPos finalPos = result.finalPosition();
+            if (result.reached()) {
+                return String.format("Bot moved to position - x: %d y: %d z: %d",
+                        finalPos.getX(), finalPos.getY(), finalPos.getZ());
             }
-            else if (result.equals("Player not found")){
-                finalOutput = "Error. Player not found";
-            }
-            else if (result.equals("Max retries exceeded")) {
-                finalOutput = String.format("Bot moved to position - x: %d y: %d z: %d",
-                        (int) bot.getX(), (int) bot.getY(), (int) bot.getZ());
-            }
-            else if (result.equals("Re-pathing failed")) {
-                finalOutput = String.format("Bot moved to position - x: %d y: %d z: %d",
-                        (int) bot.getX(), (int) bot.getY(), (int) bot.getZ());
-            }
-            else if (result.contains("Path processing failed: ")) {
-                finalOutput = "Error. Path tracer failed to process the pathfinder's data";
-            }
-            else {
-                finalOutput = PathTracer.BotSegmentManager.tracePathOutput(botSource);
-            }
-
-            System.out.println("Path tracer output: " + result);
-            System.out.println("Final path output: " + finalOutput);
-
-            return finalOutput; // Already in proper format from PathTracer
-
+            return String.format("Navigation %s at x: %d y: %d z: %d - %s",
+                    result.status().name().toLowerCase(), finalPos.getX(), finalPos.getY(), finalPos.getZ(),
+                    result.message());
         } catch (Exception e) {
             LOGGER.error("Error executing goTo: ", e);
             return "Failed to execute goTo: " + e.getMessage();

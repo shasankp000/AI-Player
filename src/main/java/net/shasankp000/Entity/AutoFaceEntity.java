@@ -100,6 +100,8 @@ public class AutoFaceEntity {
 
         MinecraftServer server = bot.getServer();
 
+        BotEventHandler.setActiveBot(server, bot);
+
         // Load Q-table from storage
         try {
             qTable = QTableStorage.loadQTable();
@@ -133,6 +135,7 @@ public class AutoFaceEntity {
             catch (Exception e) {
 
                 System.err.println("No existing epsilon found. Starting fresh.");
+                rlAgent = new RLAgent(1.0, qTable);
 
             }
 
@@ -448,22 +451,18 @@ public class AutoFaceEntity {
 
                     double distanceToHostileEntity = 0.0;
 
-                    try {
-
+                    if (hostileEntities != null && !hostileEntities.isEmpty()) {
                         // Find the closest hostile entity
                         Entity closestHostile = hostileEntities.stream()
                                 .min(Comparator.comparingDouble(e -> e.squaredDistanceTo(bot.getPos())))
-                                .orElseThrow(); // Use orElseThrow since empty case is already handled
+                                .orElse(null);
+                        if (closestHostile != null) {
+                            distanceToHostileEntity = Math.sqrt(closestHostile.squaredDistanceTo(bot.getPos()));
 
-                        distanceToHostileEntity = Math.sqrt(closestHostile.squaredDistanceTo(bot.getPos()));
-
-                        // Log details of the detected hostile entity
-                        System.out.println("Closest hostile entity: " + closestHostile.getName().getString()
-                                + " at distance: " + distanceToHostileEntity);
-
-                    } catch (Exception e) {
-                        System.out.println("An exception occurred while calculating detecting hostile entities nearby" + e.getMessage());
-                        System.out.println(e.getStackTrace());
+                            // Log details of the detected hostile entity
+                            System.out.println("Closest hostile entity: " + closestHostile.getName().getString()
+                                    + " at distance: " + distanceToHostileEntity);
+                        }
                     }
 
                     // first check if bot is moving, and if so, then stop moving.
@@ -534,6 +533,16 @@ public class AutoFaceEntity {
                     // Clear hostile entity flags
                     botBusy = false;
                     hostileEntityInFront = false;
+
+                    // Low hunger is evaluated by the RL policy. USE_ITEM is not
+                    // forced: its observed hunger gain is learned as a Q transition.
+                    BotEventHandler.considerLowHunger(finalRlAgent, qTable, bot);
+
+                    // Safe nighttime has no combat trigger, so explicitly let the learned policy
+                    // evaluate its SLEEP action while the bot is idle.
+                    if (!((PathTracer.BotSegmentManager.getBotMovementStatus() || isBotMoving) || blockDetectionUnit.getBlockDetectionStatus() || isBotExecutingTask())) {
+                        BotEventHandler.considerNightSleep(finalRlAgent, qTable, bot);
+                    }
 
                     // Face nearby entities (players, passive mobs, etc.) - but only if bot is NOT busy with tasks
                     if (!((PathTracer.BotSegmentManager.getBotMovementStatus() || isBotMoving) || blockDetectionUnit.getBlockDetectionStatus() || isBotExecutingTask())) {

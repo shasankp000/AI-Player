@@ -9,12 +9,15 @@ import java.io.*;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 public class VectorExtensionHelper {
@@ -22,11 +25,11 @@ public class VectorExtensionHelper {
     private static final Logger LOGGER = LoggerFactory.getLogger(VectorExtensionHelper.class);
 
     // === SQLITE-VEC download URLs ===
-    private static final String WINDOWS_VEC_URL        = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.6/sqlite-vec-0.1.6-loadable-windows-x86_64.tar.gz";
-    private static final String LINUX_X86_VEC_URL      = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.6/sqlite-vec-0.1.6-loadable-linux-x86_64.tar.gz";
-    private static final String LINUX_ARM64_VEC_URL    = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.6/sqlite-vec-0.1.6-loadable-linux-aarch64.tar.gz";
-    private static final String MACOS_X86_VEC_URL      = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.6/sqlite-vec-0.1.6-loadable-macos-x86_64.tar.gz";
-    private static final String MACOS_ARM64_VEC_URL    = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.6/sqlite-vec-0.1.6-loadable-macos-aarch64.tar.gz";
+    private static final String WINDOWS_VEC_URL        = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-windows-x86_64.tar.gz";
+    private static final String LINUX_X86_VEC_URL      = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-linux-x86_64.tar.gz";
+    private static final String LINUX_ARM64_VEC_URL    = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-linux-aarch64.tar.gz";
+    private static final String MACOS_X86_VEC_URL      = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-macos-x86_64.tar.gz";
+    private static final String MACOS_ARM64_VEC_URL    = "https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/sqlite-vec-0.1.9-loadable-macos-aarch64.tar.gz";
 
     private static final String VECTOR_FILENAME_WINDOWS = "vec0.dll";
     private static final String VECTOR_FILENAME_LINUX   = "vec0.so";
@@ -41,17 +44,103 @@ public class VectorExtensionHelper {
     private static final String VSS_FILENAME_LINUX = "vss0.so";
     private static final String VSS_FILENAME_MACOS = "vss0.dylib";
 
-    // =========================================================================
-    // Architecture helpers
-    // =========================================================================
+    enum OperatingSystem {
+        WINDOWS, LINUX, MACOS
+    }
 
-    /**
-     * Returns true if the JVM is running on an ARM64 / Apple-Silicon CPU.
-     * Checks os.arch for: aarch64, arm64, armv8.
-     */
-    private static boolean isArm64() {
-        String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ENGLISH);
-        return arch.contains("aarch64") || arch.contains("arm64") || arch.contains("armv8");
+    enum CpuArchitecture {
+        X86_64, ARM64
+    }
+
+    record Platform(OperatingSystem operatingSystem, CpuArchitecture architecture) {
+        @Override
+        public String toString() {
+            return operatingSystem.name().toLowerCase(Locale.ENGLISH) + "/"
+                    + architecture.name().toLowerCase(Locale.ENGLISH);
+        }
+    }
+
+    record NativeLibraryValidation(boolean compatible, String reason) {
+        static NativeLibraryValidation success() {
+            return new NativeLibraryValidation(true, "compatible");
+        }
+
+        static NativeLibraryValidation failure(String reason) {
+            return new NativeLibraryValidation(false, reason);
+        }
+    }
+
+    private record ExtensionAsset(String downloadUrl, String fileName, String dependencyFileName) {
+    }
+
+    static Platform detectPlatform(String osNameValue, String archValue) {
+        String osName = osNameValue == null ? "" : osNameValue.toLowerCase(Locale.ENGLISH).trim();
+        String arch = archValue == null ? "" : archValue.toLowerCase(Locale.ENGLISH).trim();
+
+        OperatingSystem operatingSystem;
+
+        if (osName.contains("win")) {
+            operatingSystem = OperatingSystem.WINDOWS;
+        } else if (osName.contains("linux") || osName.contains("nux") || osName.contains("nix")) {
+            operatingSystem = OperatingSystem.LINUX;
+        } else if (osName.contains("mac") || osName.contains("darwin")) {
+            operatingSystem = OperatingSystem.MACOS;
+        } else {
+            throw new UnsupportedOperationException("Unsupported operating system for SQLite extensions: '"
+                    + osNameValue + "'");
+        }
+
+        CpuArchitecture architecture;
+        if (arch.equals("amd64") || arch.equals("x86_64") || arch.equals("x86-64") || arch.equals("x64")) {
+            architecture = CpuArchitecture.X86_64;
+        } else if (arch.equals("aarch64") || arch.equals("arm64") || arch.startsWith("armv8")) {
+            architecture = CpuArchitecture.ARM64;
+        } else if (arch.matches("(?:x86|i[3-6]86|x86_32|arm|arm32|armv7.*)")) {
+            throw new UnsupportedOperationException("32-bit JVM architecture '" + archValue
+                    + "' is not supported; sqlite-vec requires a 64-bit JVM and native library");
+        } else {
+            throw new UnsupportedOperationException("Unsupported CPU architecture for SQLite extensions: '"
+                    + archValue + "'");
+        }
+
+        return new Platform(operatingSystem, architecture);
+    }
+
+    private static Platform currentPlatform() {
+        return detectPlatform(System.getProperty("os.name"), System.getProperty("os.arch"));
+    }
+
+    private static ExtensionAsset sqliteVecAsset(Platform platform) {
+        return switch (platform.operatingSystem()) {
+            case WINDOWS -> {
+                if (platform.architecture() != CpuArchitecture.X86_64) {
+                    throw new UnsupportedOperationException("sqlite-vec does not publish a Windows ARM64 loadable extension");
+                }
+                yield new ExtensionAsset(WINDOWS_VEC_URL, VECTOR_FILENAME_WINDOWS, null);
+            }
+            case LINUX -> new ExtensionAsset(
+                    platform.architecture() == CpuArchitecture.ARM64 ? LINUX_ARM64_VEC_URL : LINUX_X86_VEC_URL,
+                    VECTOR_FILENAME_LINUX,
+                    null);
+            case MACOS -> new ExtensionAsset(
+                    platform.architecture() == CpuArchitecture.ARM64 ? MACOS_ARM64_VEC_URL : MACOS_X86_VEC_URL,
+                    VECTOR_FILENAME_MACOS,
+                    null);
+        };
+    }
+
+    private static ExtensionAsset sqliteVssAsset(Platform platform) {
+        return switch (platform.operatingSystem()) {
+            case LINUX -> new ExtensionAsset(
+                    platform.architecture() == CpuArchitecture.ARM64 ? VSS_LINUX_ARM64_URL : VSS_LINUX_X86_URL,
+                    VSS_FILENAME_LINUX,
+                    "vector0.so");
+            case MACOS -> new ExtensionAsset(
+                    platform.architecture() == CpuArchitecture.ARM64 ? VSS_MACOS_ARM64_URL : VSS_MACOS_X86_URL,
+                    VSS_FILENAME_MACOS,
+                    "vector0.dylib");
+            case WINDOWS -> throw new UnsupportedOperationException("sqlite-vss is not supported on Windows");
+        };
     }
 
     // =========================================================================
@@ -75,63 +164,187 @@ public class VectorExtensionHelper {
         }
     }
 
+    static NativeLibraryValidation validateNativeLibrary(Path library, Platform platform) throws IOException {
+        byte[] header = readPrefix(library, 64 * 1024);
+        if (header.length < 4) {
+            return NativeLibraryValidation.failure("file is too small to contain a native-library header");
+        }
+
+        return switch (platform.operatingSystem()) {
+            case LINUX -> validateElf(header, platform.architecture());
+            case MACOS -> validateMachO(header, platform.architecture());
+            case WINDOWS -> validatePortableExecutable(header, platform.architecture());
+        };
+    }
+
+    static boolean isReusableCachedLibrary(Path library, Platform platform) throws IOException {
+        if (!Files.isRegularFile(library)) {
+            return false;
+        }
+
+        NativeLibraryValidation validation = validateNativeLibrary(library, platform);
+        if (validation.compatible()) {
+            LOGGER.info("✅ Reusing compatible native extension: {} ({})", library, platform);
+            return true;
+        }
+
+        LOGGER.warn("⚠️ Removing incompatible native extension {}: {} (expected {})",
+                library, validation.reason(), platform);
+        Files.delete(library);
+        return false;
+    }
+
+    private static byte[] readPrefix(Path file, int maximumBytes) throws IOException {
+        long size = Files.size(file);
+        int bytesToRead = (int) Math.min(size, maximumBytes);
+        ByteBuffer buffer = ByteBuffer.allocate(bytesToRead);
+        try (SeekableByteChannel channel = Files.newByteChannel(file, StandardOpenOption.READ)) {
+            while (buffer.hasRemaining() && channel.read(buffer) != -1) {
+                // Keep reading until the prefix is full or EOF is reached.
+            }
+        }
+        byte[] result = new byte[buffer.position()];
+        buffer.flip();
+        buffer.get(result);
+        return result;
+    }
+
+    private static NativeLibraryValidation validateElf(byte[] header, CpuArchitecture architecture) {
+        if (header.length < 20 || header[0] != 0x7f || header[1] != 'E'
+                || header[2] != 'L' || header[3] != 'F') {
+            return NativeLibraryValidation.failure("not an ELF library");
+        }
+
+        int elfClass = Byte.toUnsignedInt(header[4]);
+        if (elfClass != 2) {
+            return NativeLibraryValidation.failure(elfClass == 1
+                    ? "32-bit ELF (ELFCLASS32)"
+                    : "unknown ELF class " + elfClass);
+        }
+
+        ByteOrder byteOrder = switch (Byte.toUnsignedInt(header[5])) {
+            case 1 -> ByteOrder.LITTLE_ENDIAN;
+            case 2 -> ByteOrder.BIG_ENDIAN;
+            default -> null;
+        };
+        if (byteOrder == null) {
+            return NativeLibraryValidation.failure("unknown ELF byte order " + Byte.toUnsignedInt(header[5]));
+        }
+
+        int machine = Short.toUnsignedInt(ByteBuffer.wrap(header, 18, 2).order(byteOrder).getShort());
+        int expectedMachine = architecture == CpuArchitecture.X86_64 ? 62 : 183;
+        if (machine != expectedMachine) {
+            return NativeLibraryValidation.failure("ELF machine " + machine
+                    + " does not match " + architecture.name().toLowerCase(Locale.ENGLISH));
+        }
+        return NativeLibraryValidation.success();
+    }
+
+    private static NativeLibraryValidation validateMachO(byte[] header, CpuArchitecture architecture) {
+        int magic = ByteBuffer.wrap(header, 0, 4).order(ByteOrder.BIG_ENDIAN).getInt();
+        int expectedCpu = architecture == CpuArchitecture.X86_64 ? 0x01000007 : 0x0100000c;
+
+        if (magic == 0xfeedfacf || magic == 0xcffaedfe) {
+            if (header.length < 8) {
+                return NativeLibraryValidation.failure("truncated 64-bit Mach-O header");
+            }
+            ByteOrder order = magic == 0xfeedfacf ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
+            int cpuType = ByteBuffer.wrap(header, 4, 4).order(order).getInt();
+            return cpuType == expectedCpu
+                    ? NativeLibraryValidation.success()
+                    : NativeLibraryValidation.failure("Mach-O CPU type 0x"
+                    + Integer.toHexString(cpuType) + " does not match "
+                    + architecture.name().toLowerCase(Locale.ENGLISH));
+        }
+
+        if (magic == 0xfeedface || magic == 0xcefaedfe) {
+            return NativeLibraryValidation.failure("32-bit Mach-O library");
+        }
+
+        boolean fat64;
+        ByteOrder order;
+        if (magic == 0xcafebabe || magic == 0xcafebabf) {
+            fat64 = magic == 0xcafebabf;
+            order = ByteOrder.BIG_ENDIAN;
+        } else if (magic == 0xbebafeca || magic == 0xbfbafeca) {
+            fat64 = magic == 0xbfbafeca;
+            order = ByteOrder.LITTLE_ENDIAN;
+        } else {
+            return NativeLibraryValidation.failure("not a Mach-O library");
+        }
+
+        if (header.length < 8) {
+            return NativeLibraryValidation.failure("truncated universal Mach-O header");
+        }
+
+        ByteBuffer buffer = ByteBuffer.wrap(header).order(order);
+        long architectureCount = Integer.toUnsignedLong(buffer.getInt(4));
+        int entrySize = fat64 ? 32 : 20;
+        long requiredBytes = 8L + architectureCount * entrySize;
+        if (architectureCount == 0 || requiredBytes > header.length) {
+            return NativeLibraryValidation.failure("truncated or invalid universal Mach-O architecture table");
+        }
+        for (int index = 0; index < architectureCount; index++) {
+            if (buffer.getInt(8 + index * entrySize) == expectedCpu) {
+                return NativeLibraryValidation.success();
+            }
+        }
+        return NativeLibraryValidation.failure("universal Mach-O does not contain "
+                + architecture.name().toLowerCase(Locale.ENGLISH));
+    }
+
+    private static NativeLibraryValidation validatePortableExecutable(byte[] header, CpuArchitecture architecture) {
+        if (header.length < 64 || header[0] != 'M' || header[1] != 'Z') {
+            return NativeLibraryValidation.failure("not a Windows PE library");
+        }
+
+        int peOffset = ByteBuffer.wrap(header, 0x3c, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
+        if (peOffset < 0 || peOffset + 26 > header.length
+                || header[peOffset] != 'P' || header[peOffset + 1] != 'E'
+                || header[peOffset + 2] != 0 || header[peOffset + 3] != 0) {
+            return NativeLibraryValidation.failure("truncated or invalid Windows PE header");
+        }
+
+        int machine = Short.toUnsignedInt(ByteBuffer.wrap(header, peOffset + 4, 2)
+                .order(ByteOrder.LITTLE_ENDIAN).getShort());
+        int optionalHeaderMagic = Short.toUnsignedInt(ByteBuffer.wrap(header, peOffset + 24, 2)
+                .order(ByteOrder.LITTLE_ENDIAN).getShort());
+        int expectedMachine = architecture == CpuArchitecture.X86_64 ? 0x8664 : 0xaa64;
+        if (optionalHeaderMagic != 0x20b) {
+            return NativeLibraryValidation.failure("32-bit or unknown Windows PE optional header");
+        }
+
+        if (machine != expectedMachine) {
+            return NativeLibraryValidation.failure("Windows PE machine 0x" + Integer.toHexString(machine)
+                    + " does not match " + architecture.name().toLowerCase(Locale.ENGLISH));
+        }
+        return NativeLibraryValidation.success();
+    }
+
     // =========================================================================
     // SQLITE-VEC
     // =========================================================================
 
     public static Path ensureSqliteVecPresent() throws IOException {
-        String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-        boolean arm64  = isArm64();
-
-        String downloadUrl;
-        String targetFileName;
-
-        if (osName.contains("win")) {
-            // Windows ARM64 builds are not yet published by asg017; x86_64 runs
-            // under emulation on Windows on ARM so use it as a fallback.
-            downloadUrl    = WINDOWS_VEC_URL;
-            targetFileName = VECTOR_FILENAME_WINDOWS;
-        } else if (osName.contains("nux") || osName.contains("nix")) {
-            downloadUrl    = arm64 ? LINUX_ARM64_VEC_URL : LINUX_X86_VEC_URL;
-            targetFileName = VECTOR_FILENAME_LINUX;
-        } else if (osName.contains("mac")) {
-            downloadUrl    = arm64 ? MACOS_ARM64_VEC_URL : MACOS_X86_VEC_URL;
-            targetFileName = VECTOR_FILENAME_MACOS;
-        } else {
-            throw new UnsupportedOperationException("Unsupported OS for SQLite-Vec: " + osName);
-        }
-
-        LOGGER.info("💻 Detected OS='{}' arch='{}' arm64={}",
-                osName, System.getProperty("os.arch"), arm64);
+        Platform platform = currentPlatform();
+        ExtensionAsset asset = sqliteVecAsset(platform);
+        LOGGER.info("💻 Detected SQLite extension platform: {} (os.name='{}', os.arch='{}')",
+                platform, System.getProperty("os.name"), System.getProperty("os.arch"));
 
         Path configDir = FabricLoader.getInstance().getConfigDir();
         Path vecDir    = configDir.resolve("sqlite_vector/sqlite-vec");
-        if (!Files.exists(vecDir)) Files.createDirectories(vecDir);
+        Files.createDirectories(vecDir);
 
-        Path outputPath = vecDir.resolve(targetFileName);
+        Path outputPath = vecDir.resolve(asset.fileName());
 
-        cleanupOldVecFiles(vecDir, targetFileName);
+        cleanupOldVecFiles(vecDir, asset.fileName());
 
-        if (Files.exists(outputPath)) {
-            LOGGER.info("✅ sqlite-vec already present at: {}", outputPath);
+        if (isReusableCachedLibrary(outputPath, platform)) {
             return outputPath;
         }
 
-        LOGGER.info("⬇️ Downloading sqlite-vec from {}", downloadUrl);
-        Path gzPath  = vecDir.resolve("sqlite-vec.tar.gz");
-        Path tarPath = vecDir.resolve("sqlite-vec.tar");
-
-        try (InputStream in = URI.create(downloadUrl).toURL().openStream()) {
-            Files.copy(in, gzPath, StandardCopyOption.REPLACE_EXISTING);
-        }
-        try (GZIPInputStream gzipIn = new GZIPInputStream(Files.newInputStream(gzPath));
-             OutputStream out = Files.newOutputStream(tarPath)) {
-            gzipIn.transferTo(out);
-        }
-        try (InputStream tarIn = Files.newInputStream(tarPath)) {
-            boolean found = safeExtractTar(tarIn, targetFileName, outputPath);
-            if (!found) throw new IOException("❌ sqlite-vec extraction failed!");
-        }
+        downloadAndInstall(asset.downloadUrl(), vecDir, "sqlite-vec", platform,
+                Map.of(asset.fileName(), outputPath));
 
         LOGGER.info("✅ sqlite-vec ready at: {}", outputPath);
         return outputPath;
@@ -142,70 +355,28 @@ public class VectorExtensionHelper {
     // =========================================================================
 
     public static Path ensureSqliteVssPresent() throws IOException {
-        String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-        boolean arm64  = isArm64();
-
-        String downloadUrl;
-        String targetFileName;
-
-        if (osName.contains("nux") || osName.contains("nix")) {
-            downloadUrl    = arm64 ? VSS_LINUX_ARM64_URL : VSS_LINUX_X86_URL;
-            targetFileName = VSS_FILENAME_LINUX;
-        } else if (osName.contains("mac")) {
-            downloadUrl    = arm64 ? VSS_MACOS_ARM64_URL : VSS_MACOS_X86_URL;
-            targetFileName = VSS_FILENAME_MACOS;
-        } else {
-            throw new UnsupportedOperationException("sqlite-vss is not supported on this OS: " + osName);
-        }
-
-        LOGGER.info("💻 Detected OS='{}' arch='{}' arm64={}",
-                osName, System.getProperty("os.arch"), arm64);
+        Platform platform = currentPlatform();
+        ExtensionAsset asset = sqliteVssAsset(platform);
+        LOGGER.info("💻 Detected SQLite extension platform: {} (os.name='{}', os.arch='{}')",
+                platform, System.getProperty("os.name"), System.getProperty("os.arch"));
 
         Path configDir = FabricLoader.getInstance().getConfigDir();
         Path vssDir    = configDir.resolve("sqlite_vector/sqlite-vss");
-        if (!Files.exists(vssDir)) Files.createDirectories(vssDir);
+        Files.createDirectories(vssDir);
 
-        Path outputPath = vssDir.resolve(targetFileName);
+        Path outputPath = vssDir.resolve(asset.fileName());
+        Path vector0OutputPath = vssDir.resolve(asset.dependencyFileName());
 
-        // Clean up stale files
-        try {
-            String[] unwantedFiles = {"vector0.so", "vector0.dylib"};
-            for (String unwanted : unwantedFiles) {
-                Path f = vssDir.resolve(unwanted);
-                if (Files.exists(f)) { Files.delete(f); LOGGER.info("🧹 Cleaned up: {}", f); }
-            }
-        } catch (IOException e) {
-            LOGGER.warn("⚠️ Failed to clean up unwanted files: {}", e.getMessage());
-        }
-
-        String vector0FileName = osName.contains("nux") || osName.contains("nix") ? "vector0.so" : "vector0.dylib";
-        Path   vector0OutputPath = vssDir.resolve(vector0FileName);
-
-        if (Files.exists(outputPath) && Files.exists(vector0OutputPath)) {
-            LOGGER.info("✅ sqlite-vss already present at: {}", outputPath);
+        boolean vssReusable = isReusableCachedLibrary(outputPath, platform);
+        boolean vectorReusable = isReusableCachedLibrary(vector0OutputPath, platform);
+        if (vssReusable && vectorReusable) {
             return outputPath;
         }
 
-        LOGGER.info("⬇️ Downloading sqlite-vss from {}", downloadUrl);
-        Path gzPath  = vssDir.resolve("sqlite-vss.tar.gz");
-        Path tarPath = vssDir.resolve("sqlite-vss.tar");
-
-        try (InputStream in = URI.create(downloadUrl).toURL().openStream()) {
-            Files.copy(in, gzPath, StandardCopyOption.REPLACE_EXISTING);
-        }
-        try (GZIPInputStream gzipIn = new GZIPInputStream(Files.newInputStream(gzPath));
-             OutputStream out = Files.newOutputStream(tarPath)) {
-            gzipIn.transferTo(out);
-        }
-        try (InputStream tarIn = Files.newInputStream(tarPath)) {
-            boolean found = safeExtractTar(tarIn, targetFileName, outputPath);
-            if (!found) throw new IOException("❌ sqlite-vss extraction failed!");
-        }
-        try (InputStream tarIn = Files.newInputStream(tarPath)) {
-            boolean found = safeExtractTar(tarIn, vector0FileName, vector0OutputPath);
-            if (!found) LOGGER.warn("⚠️ vector0 not found in archive — vss0 may fail to load");
-            else LOGGER.info("✅ vector0 extracted to: {}", vector0OutputPath);
-        }
+        Map<String, Path> files = new LinkedHashMap<>();
+        files.put(asset.fileName(), outputPath);
+        files.put(asset.dependencyFileName(), vector0OutputPath);
+        downloadAndInstall(asset.downloadUrl(), vssDir, "sqlite-vss", platform, files);
 
         LOGGER.info("✅ sqlite-vss ready at: {}", outputPath);
         return outputPath;
@@ -216,8 +387,7 @@ public class VectorExtensionHelper {
     // =========================================================================
 
     public static void loadSqliteVector0Extension(Connection conn, Path vssDir) throws SQLException {
-        String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-        String vector0FileName = osName.contains("nux") || osName.contains("nix") ? "vector0.so" : "vector0.dylib";
+        String vector0FileName = sqliteVssAsset(currentPlatform()).dependencyFileName();
         Path vector0Path = vssDir.resolve(vector0FileName);
 
         if (!Files.exists(vector0Path)) {
@@ -259,13 +429,10 @@ public class VectorExtensionHelper {
     }
 
     // =========================================================================
-    // Fallback: cosine_distance UDF (Windows only)
+    // Portable cosine_distance UDF
     // =========================================================================
 
     public static void registerCosineDistanceIfNeeded(Connection conn) throws SQLException {
-        String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
-        if (!osName.contains("win")) return;
-
         try {
             Function.create(conn, "cosine_distance", new Function() {
                 @Override
@@ -293,10 +460,69 @@ public class VectorExtensionHelper {
                     return vec;
                 }
             });
-            LOGGER.info("✅ Registered fallback cosine_distance for Windows (TEXT VECTOR)");
+            LOGGER.info("✅ Registered portable cosine_distance UDF (TEXT VECTOR)");
         } catch (SQLException e) {
             LOGGER.error("❌ Failed to register cosine_distance UDF: {}", e.getMessage(), e);
             throw e;
+        }
+    }
+
+    private static void downloadAndInstall(String downloadUrl,
+                                           Path destinationDirectory,
+                                           String archivePrefix,
+                                           Platform platform,
+                                           Map<String, Path> archiveEntries) throws IOException {
+        LOGGER.info("⬇️ Downloading native SQLite extensions for {} from {}", platform, downloadUrl);
+
+        Path compressedArchive = Files.createTempFile(destinationDirectory, archivePrefix + "-", ".tar.gz.part");
+        Path tarArchive = Files.createTempFile(destinationDirectory, archivePrefix + "-", ".tar.part");
+        Map<String, Path> extractedFiles = new LinkedHashMap<>();
+
+        try {
+            try (InputStream in = URI.create(downloadUrl).toURL().openStream()) {
+                Files.copy(in, compressedArchive, StandardCopyOption.REPLACE_EXISTING);
+            }
+            try (GZIPInputStream gzipIn = new GZIPInputStream(Files.newInputStream(compressedArchive));
+                 OutputStream out = Files.newOutputStream(tarArchive, StandardOpenOption.TRUNCATE_EXISTING)) {
+                gzipIn.transferTo(out);
+            }
+
+            for (Map.Entry<String, Path> entry : archiveEntries.entrySet()) {
+                Path temporaryLibrary = Files.createTempFile(destinationDirectory,
+                        entry.getKey().replace('.', '-') + "-", ".part");
+                extractedFiles.put(entry.getKey(), temporaryLibrary);
+                try (InputStream tarIn = Files.newInputStream(tarArchive)) {
+                    if (!safeExtractTar(tarIn, entry.getKey(), temporaryLibrary)) {
+                        throw new IOException("Native extension '" + entry.getKey()
+                                + "' was not found in downloaded archive " + downloadUrl);
+                    }
+                }
+
+                NativeLibraryValidation validation = validateNativeLibrary(temporaryLibrary, platform);
+                if (!validation.compatible()) {
+                    throw new IOException("Downloaded native extension '" + entry.getKey()
+                            + "' is incompatible with " + platform + ": " + validation.reason());
+                }
+            }
+
+            for (Map.Entry<String, Path> entry : archiveEntries.entrySet()) {
+                replaceAtomically(extractedFiles.get(entry.getKey()), entry.getValue());
+                LOGGER.info("✅ Installed compatible native extension: {}", entry.getValue());
+            }
+        } finally {
+            for (Path temporaryLibrary : extractedFiles.values()) {
+                Files.deleteIfExists(temporaryLibrary);
+            }
+            Files.deleteIfExists(tarArchive);
+            Files.deleteIfExists(compressedArchive);
+        }
+    }
+
+    private static void replaceAtomically(Path source, Path destination) throws IOException {
+        try {
+            Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException ignored) {
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 

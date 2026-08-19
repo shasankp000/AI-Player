@@ -51,7 +51,7 @@ public class JsonUtils {
 
         int counter = 0;
         while (matcher.find()) {
-            matcher.appendReplacement(sb, "\"parameterName\":\"" + matcher.group(1) + "\",\"parameterValue\":\"" + matcher.group(2) + "\"");
+            matcher.appendReplacement(sb, Matcher.quoteReplacement("\"parameterName\":\"" + matcher.group(1) + "\",\"parameterValue\":\"" + matcher.group(2) + "\""));
             counter++;
         }
         matcher.appendTail(sb);

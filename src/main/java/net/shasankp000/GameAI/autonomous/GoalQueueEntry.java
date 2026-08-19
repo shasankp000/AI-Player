@@ -5,7 +5,7 @@ package net.shasankp000.GameAI.autonomous;
  *
  * @param goalText   Natural-language goal string fed into GoalMapper.
  * @param priority   Higher value = processed first. Normal LLM goals = 0,
- *                   world-event injections = 10, hard interrupts = 100.
+ *                   world-event injections = 10.
  * @param source     Where this goal came from (for logging / debug).
  */
 public record GoalQueueEntry(String goalText, int priority, Source source)

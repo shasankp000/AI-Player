@@ -16,7 +16,7 @@ public class AISearchConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger("ai-search-config");
     public static String GEMINI_API_KEY = "";
     public static String SERPER_API_KEY = "";
-    public static String PREFERRED_PROVIDER = "gemini";
+    public static String PREFERRED_PROVIDER = defaultProvider();
 
     static {
         if (!AIPlayer.CONFIG.getGeminiKey().isEmpty()) {
@@ -24,6 +24,14 @@ public class AISearchConfig {
         }
 
         loadConfig();
+    }
+
+    private static String defaultProvider() {
+        String mode = System.getProperty("aiplayer.llmMode", "ollama");
+        if (mode.equalsIgnoreCase("ollama")) {
+            return "serper";
+        }
+        return "gemini";
     }
 
     private static void loadConfig() {
@@ -38,7 +46,7 @@ public class AISearchConfig {
             JsonNode node = mapper.readTree(json);
             GEMINI_API_KEY = node.path("gemini_api_key").asText("");
             SERPER_API_KEY = node.path("serper_api_key").asText("");
-            PREFERRED_PROVIDER = node.path("preferred_provider").asText("gemini");
+            PREFERRED_PROVIDER = node.path("preferred_provider").asText(defaultProvider());
         } catch (IOException e) {
             LOGGER.error("❌ Failed to load AI Search config: {}", e.getMessage());
         }
@@ -58,7 +66,7 @@ public class AISearchConfig {
                 ObjectNode root = mapper.createObjectNode();
                 root.put("gemini_api_key", "YOUR_GEMINI_API_KEY_HERE");
                 root.put("serper_api_key", "YOUR_SERPER_API_KEY_HERE");
-                root.put("preferred_provider", "gemini");
+                root.put("preferred_provider", defaultProvider());
 
                 Files.writeString(
                         configPath,

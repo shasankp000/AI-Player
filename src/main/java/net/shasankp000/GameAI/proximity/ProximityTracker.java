@@ -26,13 +26,11 @@ public final class ProximityTracker {
     public static final double LINGER_RADIUS = 4.0;
     public static final int LINGER_THRESHOLD_TICKS = 150;
     private static final int LINGER_THRESHOLD_SECONDS = 5;
-    public static final long GREET_COOLDOWN_MS  = 60_000L;
     public static final long LINGER_COOLDOWN_MS = 120_000L;
 
     private static final float GREET_VALENCE_BOOST = 0.05f;
     private static final float GREET_AROUSAL_BOOST = 0.03f;
 
-    private static final ConcurrentHashMap<UUID, Long>    greetCooldowns  = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<UUID, Long>    lingerCooldowns = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<UUID, Integer> lingerTicks     = new ConcurrentHashMap<>();
 
@@ -162,9 +160,7 @@ public final class ProximityTracker {
 
             // 1. Approach greeting
             if (dist <= GREET_RADIUS) {
-                long lastGreet = greetCooldowns.getOrDefault(pid, 0L);
-                if (now - lastGreet >= GREET_COOLDOWN_MS) {
-                    greetCooldowns.put(pid, now);
+                if (GreetingCooldownTracker.tryAcquire(botName, playerName)) {
                     fireReaction(bot, botName, playerName, GREET_REACTIONS, FALLBACK_GREET);
                     MoodEngine.applyDelta(botName, GREET_VALENCE_BOOST, GREET_AROUSAL_BOOST);
                     LOGGER.debug("[proximity] Greeted {} (dist={})", playerName, String.format("%.1f", dist));
@@ -192,13 +188,12 @@ public final class ProximityTracker {
     }
 
     public static void evict(UUID playerUuid) {
-        greetCooldowns.remove(playerUuid);
         lingerCooldowns.remove(playerUuid);
         lingerTicks.remove(playerUuid);
     }
 
     public static void clear() {
-        greetCooldowns.clear();
+        GreetingCooldownTracker.clear();
         lingerCooldowns.clear();
         lingerTicks.clear();
     }

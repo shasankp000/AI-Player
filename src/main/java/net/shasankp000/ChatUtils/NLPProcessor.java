@@ -569,7 +569,16 @@ public class NLPProcessor {
             LOGGER.error("Error while resolving the final decision: {}", e.getMessage());
         }
 
-        return Intent.valueOf(decision);
+        if (decision == null || decision.isBlank()) {
+            LOGGER.warn("⚠️ Decision resolver produced no valid intent; defaulting to UNSPECIFIED.");
+            return Intent.UNSPECIFIED;
+        }
+        try {
+            return Intent.valueOf(decision.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            LOGGER.warn("⚠️ Unknown intent label '{}'; defaulting to UNSPECIFIED.", decision);
+            return Intent.UNSPECIFIED;
+        }
 
     }
 

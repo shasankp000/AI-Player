@@ -28,6 +28,8 @@ public class StateActions {
         HOTBAR_8,
         HOTBAR_9,
         EVADE, // Adaptive evasion from threats - uses smart movement and pathfinding
+        /** Learned survival action: find or place a bed and sleep when safe at night. */
+        SLEEP,
     }
 
 }
