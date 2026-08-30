@@ -1,6 +1,7 @@
 package net.shasankp000.Commands;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -35,6 +36,10 @@ import net.shasankp000.OllamaClient.ollamaClient;
 import net.shasankp000.PathFinding.BotStance;
 import net.shasankp000.PathFinding.ChartPathToBlock;
 import net.shasankp000.PathFinding.GoTo;
+import net.shasankp000.PathFinding.NavigationOptions;
+import net.shasankp000.PathFinding.NavigationService;
+import net.shasankp000.PathFinding.NavigationDebugSnapshot;
+import net.shasankp000.PathFinding.SuspensionReason;
 import net.shasankp000.PathFinding.PathFinder;
 import net.shasankp000.PathFinding.PathTracer;
 import net.shasankp000.PathFinding.Segment;
@@ -143,6 +148,14 @@ public class modCommandRegistry {
                                                 )
                                         )
                                 )
+                        )
+                        .then(literal("navigation_debug")
+                                .then(Commands.argument("bot", EntityArgument.player())
+                                        .then(literal("status")
+                                                .executes(context -> navigationDebugStatus(context)))
+                                        .then(literal("particles")
+                                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                                        .executes(context -> navigationDebugParticles(context)))))
                         )
                         // ----------------------------------------------------------------
                         // /bot stance <bot> <stay|follow|cancel> [targetPlayerName]
@@ -406,7 +419,7 @@ public class modCommandRegistry {
 
                                                     Vec3 aimPosition;
                                                     if (isMovingFast) {
-                                                        aimPosition = RangedWeaponUtils.calculateLeadPosition(target, projectileSpeed);
+                                                        aimPosition = RangedWeaponUtils.calculateLeadPosition(bot, target, projectileSpeed);
                                                         LOGGER.info("Applied lead compensation for fast-moving target");
                                                     } else {
                                                         aimPosition = target.position().add(0, target.getBbHeight() * 0.6, 0);
@@ -450,7 +463,7 @@ public class modCommandRegistry {
                                                         if (finalTarget.isAlive()) {
                                                             Vec3 finalAimPosition;
                                                             if (isMovingFast) {
-                                                                finalAimPosition = RangedWeaponUtils.calculateLeadPosition(finalTarget, finalProjectileSpeed);
+                                                                finalAimPosition = RangedWeaponUtils.calculateLeadPosition(bot, finalTarget, finalProjectileSpeed);
                                                             } else {
                                                                 finalAimPosition = finalTarget.position().add(0, finalTarget.getBbHeight() * 0.6, 0);
                                                             }
@@ -490,7 +503,7 @@ public class modCommandRegistry {
                                             MinecraftServer server = bot.createCommandSourceStack().getServer();
                                             assert server != null;
                                             blockDetectionUnit.setIsBlockDetectionActive(false);
-                                            PathTracer.flushAllMovementTasks();
+                                            NavigationService.cancel(server, bot.getUUID(), "Autoface reset");
                                             AutoFaceEntity.setBotExecutingTask(false);
                                             AutoFaceEntity.isBotMoving = false;
 
@@ -565,7 +578,10 @@ public class modCommandRegistry {
                                                                             int x = IntegerArgumentType.getInteger(context, "x");
                                                                             int y = IntegerArgumentType.getInteger(context, "y");
                                                                             int z = IntegerArgumentType.getInteger(context, "z");
-                                                                            MiningTool.mineBlock(bot, new BlockPos(x, y, z));
+                                                                            CommandSourceStack source = context.getSource();
+                                                                            MiningTool.mineBlock(bot, new BlockPos(x, y, z))
+                                                                                    .thenAccept(result -> ChatUtils.sendSystemMessage(
+                                                                                            source, result.functionMessage()));
 
                                                                             return 1;
                                                                         })
@@ -893,9 +909,9 @@ public class modCommandRegistry {
 
                                     ChatUtils.sendSystemMessage(serverSource, "Exporting Q-table to JSON. Please wait.... ");
 
-                                    QTableExporter.exportQTable(BotEventHandler.qTableDir + "/qtable.bin", BotEventHandler.qTableDir + "./fullQTable.json");
+                                    QTableExporter.exportQTable(BotEventHandler.qTableDir + "/qtable.bin", BotEventHandler.qTableDir + "/fullQTable.json");
 
-                                    ChatUtils.sendSystemMessage(serverSource, "Q-table has been successfully exported to a json file at: " + BotEventHandler.qTableDir + "./fullQTable.json" );
+                                    ChatUtils.sendSystemMessage(serverSource, "Q-table has been successfully exported to a json file at: " + BotEventHandler.qTableDir + "/fullQTable.json" );
 
                                     return 1;
                                 })
@@ -1033,7 +1049,7 @@ public class modCommandRegistry {
 
                                     MinecraftServer server = context.getSource().getServer();
                                     CommandSourceStack serverSource = server.createCommandSourceStack();
-                                    PathTracer.flushAllMovementTasks();
+                                    NavigationService.cancelAll(server, "Administrative movement flush");
 
                                     ChatUtils.sendSystemMessage(serverSource, "Flushed all movement tasks");
 
@@ -1335,9 +1351,11 @@ public class modCommandRegistry {
         else {
             String botName = bot.getName().tryCollapseToString();
 
+            NavigationService.suspend(bot.getUUID(), SuspensionReason.MANUAL_OVERRIDE);
             BlockPos currentPosition = bot.blockPosition();
             BlockPos newPosition = currentPosition.offset(1, 0, 0);
             bot.teleportTo(bot.level(), newPosition.getX(), newPosition.getY(), newPosition.getZ(), Set.of(), bot.getYRot(), bot.getXRot(), false);
+            NavigationService.resume(bot.getUUID(), SuspensionReason.MANUAL_OVERRIDE);
 
             LOGGER.info("Teleported {} 1 positive block ahead", botName);
 
@@ -1398,7 +1416,10 @@ public class modCommandRegistry {
 
             String botName = bot.getName().tryCollapseToString();
 
+            NavigationService.suspend(bot.getUUID(), SuspensionReason.MANUAL_OVERRIDE);
             bot.jumpFromGround();
+            UUID botId = bot.getUUID();
+            server.execute(() -> NavigationService.resume(botId, SuspensionReason.MANUAL_OVERRIDE));
 
             LOGGER.info("{} jumped!", botName);
 
@@ -1452,8 +1473,6 @@ public class modCommandRegistry {
         int y_distance = position.getY();
         int z_distance = position.getZ();
 
-        ServerLevel world = server.overworld();
-
         ServerPlayer bot = null;
         try {
             bot = EntityArgument.getPlayer(context, "bot");
@@ -1466,27 +1485,42 @@ public class modCommandRegistry {
             return;
         }
 
-        String botName = bot.getName().tryCollapseToString();
-        CommandSourceStack botSource = bot.createCommandSourceStack().withPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS).withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+        server.sendSystemMessage(Component.literal("Planning a server-authoritative route to the target"));
+        boolean requestedSprint = sprint;
+        NavigationService.navigate(bot, new BlockPos(x_distance, y_distance, z_distance),
+                        NavigationOptions.of(requestedSprint))
+                .thenAccept(result -> server.execute(() ->
+                        ChatUtils.sendSystemMessage(context.getSource(), result.message())));
+    }
 
-        server.sendSystemMessage(Component.literal("Finding the shortest path to the target, please wait patiently if the game seems hung"));
+    private static int navigationDebugStatus(CommandContext<CommandSourceStack> context)
+            throws CommandSyntaxException {
+        ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+        NavigationDebugSnapshot status = NavigationService.debugSnapshot(bot);
+        String goals = status.requestedGoal() == null ? "none"
+                : status.requestedGoal() + " -> " + status.effectiveGoal() + " (" + status.disposition() + ")";
+        context.getSource().sendSystemMessage(Component.literal(
+                "Navigation " + status.phase() + " | goal " + goals
+                        + " | waypoint " + status.waypointIndex() + "/" + status.waypointCount()
+                        + " | suspended " + status.suspensions() + " | air " + status.air()));
+        context.getSource().sendSystemMessage(Component.literal(
+                "Recoveries " + status.recoveries() + " | penalties " + status.penalties()
+                        + " | replans " + status.totalReplans() + " (" + status.lastReplanReason() + ")"
+                        + " | search open/closed/expanded " + status.searchOpen() + "/"
+                        + status.searchClosed() + "/" + status.searchExpansions()
+                        + " | global budget " + status.globalPlanningBudget()));
+        return 1;
+    }
 
-        ServerPlayer finalBot = bot;
-
-        server.execute(() -> {
-            List<PathFinder.PathNode> rawPath = PathFinder.calculatePath(finalBot.blockPosition(), new BlockPos(x_distance, y_distance, z_distance), world);
-
-            List<PathFinder.PathNode> finalPath = PathFinder.simplifyPath(rawPath, world);
-
-            LOGGER.info("Path output: {}", finalPath);
-
-            Queue<Segment> segments = convertPathToSegments(finalPath, sprint);
-
-            LOGGER.info("Generated segments: {}", segments);
-
-            PathTracer.tracePath(server, botSource, botName, segments, sprint);
-
-        });
+    private static int navigationDebugParticles(CommandContext<CommandSourceStack> context)
+            throws CommandSyntaxException {
+        ServerPlayer bot = EntityArgument.getPlayer(context, "bot");
+        boolean enabled = BoolArgumentType.getBool(context, "enabled");
+        NavigationService.setParticleDebug(bot.getUUID(), enabled);
+        context.getSource().sendSystemMessage(Component.literal(
+                "Navigation route particles " + (enabled ? "enabled" : "disabled") + " for "
+                        + bot.getName().getString()));
+        return 1;
     }
 
 
@@ -1496,6 +1530,7 @@ public class modCommandRegistry {
 
         if (source.getPlayer() != null) {
 
+            NavigationService.suspend(source.getPlayer().getUUID(), SuspensionReason.MANUAL_OVERRIDE);
             server.getCommands().performPrefixedCommand(source, "/player " + botName + " move forward");
 
         }
@@ -1518,6 +1553,7 @@ public class modCommandRegistry {
         if (source.getPlayer() != null) {
 
             server.getCommands().performPrefixedCommand(source, "/player " + botName + " stop");
+            NavigationService.resume(source.getPlayer().getUUID(), SuspensionReason.MANUAL_OVERRIDE);
 
         }
 

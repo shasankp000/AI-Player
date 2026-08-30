@@ -15,7 +15,6 @@ import net.shasankp000.ChatUtils.ChatContextManager;
 import net.shasankp000.ChatUtils.ChatUtils;
 import net.shasankp000.ChatUtils.ClarificationState;
 import net.shasankp000.FilingSystem.LLMClientFactory;
-import net.shasankp000.FilingSystem.ManualConfig;
 import net.shasankp000.LauncherDetection.LauncherEnvironment;
 import net.shasankp000.Network.OpenConfigPayload;
 import net.shasankp000.ServiceLLMClients.*;
@@ -34,7 +33,6 @@ public class AIPlayerClient implements ClientModInitializer {
     private static final Path BOT_PROFILE_PATH = Paths.get(LauncherEnvironment.getStorageDirectory("config") + File.separator + "settings.json5");
     private static JsonObject botProfiles;
     public static final Logger LOGGER = LoggerFactory.getLogger("ai-player-client");
-    public static final ManualConfig CONFIG = ManualConfig.load();
 
 
     static {

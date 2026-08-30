@@ -94,6 +94,9 @@ public class DecisionResolver {
 
 
     public static String processLLMOutput(String fullResponse) {
+        if (fullResponse == null || fullResponse.isBlank()) {
+            return "No response!";
+        }
         Matcher matcher = THINK_BLOCK.matcher(fullResponse);
 
         if (matcher.find()) {
@@ -109,12 +112,7 @@ public class DecisionResolver {
                 return "No response!";
             }
         } else {
-            if (fullResponse != null || !fullResponse.isEmpty()) {
-                return fullResponse;
-            }
-            else {
-                return "No response!";
-            }
+            return fullResponse.trim();
         }
     }
 

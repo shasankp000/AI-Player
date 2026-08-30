@@ -57,8 +57,7 @@ import net.shasankp000.Overlay.ThinkingStateManager;
 import net.shasankp000.PathFinding.ChartPathToBlock;
 
 import net.shasankp000.PathFinding.GoTo;
-
-import net.shasankp000.PathFinding.PathTracer;
+import net.shasankp000.PathFinding.NavigationService;
 
 import net.shasankp000.PlayerUtils.*;
 import net.shasankp000.FilingSystem.LLMClientFactory;
@@ -469,35 +468,6 @@ public class FunctionCallerV2 {
             String botName = botSource.getTextName();
             server.getCommands().performPrefixedCommand(botSource, "/player " + botName + " look " + cardinalDirection); // choosing the command route instead of calling function to check if the bug still exists.
             getFunctionOutput("Now facing cardinal direction: " + Objects.requireNonNull(botSource.getPlayer()).getNearestViewDirection().getName() + " which is in " + Objects.requireNonNull(botSource.getPlayer()).getNearestViewDirection().getAxis().getSerializedName() + " axis.");
-        }
-
-        /** mineBlock: break block **/
-        private static void mineBlock(int targetX, int targetY, int targetZ) {
-            System.out.println("Mining block at: " + targetX + ", " + targetY + ", " + targetZ);
-            if (botSource == null || botSource.getPlayer() == null) {
-                getFunctionOutput("Bot not found.");
-                return;
-            }
-            try {
-                // ✅ Use CompletableFuture.get() to wait for completion
-                CompletableFuture<String> miningFuture = CompletableFuture.supplyAsync(() -> {
-                    try {
-                        return MiningTool.mineBlock(
-                                Objects.requireNonNull(botSource.getPlayer()),
-                                new BlockPos(targetX, targetY, targetZ)
-                        ).get();
-                    } catch (Exception e) {
-                        logger.error("Failed to mine block: {}", e.getMessage(), e);
-                        return "⚠️ Failed to mine block: " + e.getMessage();
-                    }
-                });
-                // Wait for result with timeout
-                String result = miningFuture.get(10, TimeUnit.SECONDS);
-                getFunctionOutput(result);
-            } catch (Exception e) {
-                logger.error("Error in mineBlock: ", e);
-                getFunctionOutput("⚠️ Failed to mine block: " + e.getMessage());
-            }
         }
 
         /** placeBlock: place block at coordinates **/
@@ -1364,7 +1334,9 @@ public class FunctionCallerV2 {
             }
         }
         blockDetectionUnit.setIsBlockDetectionActive(false);
-        PathTracer.flushAllMovementTasks();
+        if (botSource != null && botSource.getPlayer() != null) {
+            NavigationService.cancel(botSource.getServer(), botSource.getPlayer().getUUID(), "Function pipeline reset");
+        }
         AutoFaceEntity.setBotExecutingTask(false);
         AutoFaceEntity.isBotMoving = false;
         logger.info("✔️ Autoface module has been reset.");
@@ -1535,7 +1507,9 @@ public class FunctionCallerV2 {
             }
         }
         blockDetectionUnit.setIsBlockDetectionActive(false);
-        PathTracer.flushAllMovementTasks();
+        if (botSource != null && botSource.getPlayer() != null) {
+            NavigationService.cancel(botSource.getServer(), botSource.getPlayer().getUUID(), "Function pipeline reset");
+        }
         AutoFaceEntity.setBotExecutingTask(false);
         AutoFaceEntity.isBotMoving = false;
         logger.info("✔️ Autoface module has been reset.");
@@ -1713,6 +1687,34 @@ public class FunctionCallerV2 {
     }
 
     private static CompletableFuture<Void> callFunction(String functionName, Map<String, String> paramMap, Map<String, Object> state) {
+        if ("mineBlock".equals(functionName)) {
+            try {
+                int targetX = Integer.parseInt(resolvePlaceholder(paramMap.get("targetX"), state));
+                int targetY = Integer.parseInt(resolvePlaceholder(paramMap.get("targetY"), state));
+                int targetZ = Integer.parseInt(resolvePlaceholder(paramMap.get("targetZ"), state));
+                logger.info("Calling method: mineBlock with targetX={} targetY={} targetZ={}",
+                        targetX, targetY, targetZ);
+                if (botSource == null || botSource.getPlayer() == null) {
+                    getFunctionOutput("⚠️ Failed to mine block: Bot not found");
+                    return CompletableFuture.completedFuture(null);
+                }
+                return MiningTool.mineBlock(botSource.getPlayer(), new BlockPos(targetX, targetY, targetZ))
+                        .handle((result, error) -> {
+                            if (error != null) {
+                                logger.error("Mining failed", error);
+                                getFunctionOutput("⚠️ Failed to mine block: " + error.getMessage());
+                            } else {
+                                getFunctionOutput(result.functionMessage());
+                            }
+                            return null;
+                        });
+            } catch (Exception e) {
+                logger.error("Could not start mining", e);
+                getFunctionOutput("⚠️ Failed to mine block: " + e.getMessage());
+                return CompletableFuture.completedFuture(null);
+            }
+        }
+
         return CompletableFuture.runAsync(() -> {
             logger.info("🔧 callFunction: {} with params: {}", functionName, paramMap);
 
@@ -1761,13 +1763,6 @@ public class FunctionCallerV2 {
                     String cardinalDirection = resolvePlaceholder(paramMap.get("cardinalDirection"), state);
                     logger.info("Calling method: look with cardinal direction={}", cardinalDirection);
                     Tools.look(cardinalDirection);
-                }
-                case "mineBlock" -> {
-                    int targetX = Integer.parseInt(resolvePlaceholder(paramMap.get("targetX"), state));
-                    int targetY = Integer.parseInt(resolvePlaceholder(paramMap.get("targetY"), state));
-                    int targetZ = Integer.parseInt(resolvePlaceholder(paramMap.get("targetZ"), state));
-                    logger.info("Calling method: mineBlock with targetX={} targetY={} targetZ={}", targetX, targetY, targetZ);
-                    Tools.mineBlock(targetX, targetY, targetZ);
                 }
                 case "placeBlock" -> {
                     int targetX = Integer.parseInt(resolvePlaceholder(paramMap.get("targetX"), state));

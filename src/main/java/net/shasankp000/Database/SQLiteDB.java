@@ -168,6 +168,9 @@ public class SQLiteDB {
     }
 
     private static String vectorToLiteral(List<Double> vec) {
+        if (vec == null || vec.isEmpty()) {
+            return "[]";
+        }
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < vec.size(); i++) {
             sb.append(vec.get(i));

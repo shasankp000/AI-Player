@@ -162,9 +162,9 @@ public class EmbeddingClientFactory {
 
     /**
      * Intelligently derive embedding endpoint from base API URL.
-     * Handles common patterns like /v1/chat/completions, /chat/completions, etc.
+     * Handles common patterns like /v1/chat/completions, /v1/responses, etc.
      *
-     * @param baseUrl The base API URL (e.g., https://api.provider.com/v1/chat/completions)
+     * @param baseUrl The base API URL (e.g., https://api.provider.com/v1/responses)
      * @return The embedding endpoint URL (e.g., https://api.provider.com/v1/embeddings)
      */
     private static String deriveEmbeddingEndpoint(String baseUrl) {
@@ -179,6 +179,11 @@ public class EmbeddingClientFactory {
         // Pattern 2: URL ends with /completions -> replace with /embeddings
         if (normalizedUrl.matches(".*/(v1/)?completions$")) {
             return normalizedUrl.replaceAll("/completions$", "/embeddings");
+        }
+
+        // Responses API endpoint -> replace with /embeddings
+        if (normalizedUrl.matches(".*/(v1/)?responses$")) {
+            return normalizedUrl.replaceAll("/responses$", "/embeddings");
         }
 
         // Pattern 3: URL ends with /chat -> replace with /embeddings

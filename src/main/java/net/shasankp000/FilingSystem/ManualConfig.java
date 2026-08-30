@@ -82,9 +82,10 @@ public class ManualConfig {
      * Asynchronously updates the list of available models based on the selected provider.
      * This method fetches the model list and then saves the updated configuration to the file.
      */
-    public void updateModels() {
-        // Run the network operation on a separate thread to prevent freezing.
-        CompletableFuture.runAsync(() -> {
+    public CompletableFuture<List<String>> updateModels() {
+        // Return the future so callers can update their state only after the
+        // network operation has finished.
+        return CompletableFuture.supplyAsync(() -> {
             try {
                 List<String> fetchedModels = new ArrayList<>();
                 ModelFetcher modelFetcher = null;
@@ -104,7 +105,7 @@ public class ManualConfig {
 
                         this.modelList = fetchedModels;
                         this.save();
-                        return;
+                        return new ArrayList<>(this.modelList);
                     case "openai":
                         modelFetcher = new OpenAIModelFetcher();
                         apiKey = this.openAIKey;
@@ -127,12 +128,12 @@ public class ManualConfig {
                             apiKey = this.customApiKey;
                         } else {
                             LOGGER.error("Custom provider selected but no API URL configured");
-                            return;
+                            return new ArrayList<>(this.modelList);
                         }
                         break;
                     default:
                         LOGGER.error("Unsupported provider: {}", llmMode);
-                        return;
+                        return new ArrayList<>(this.modelList);
                 }
 
                 if (llmMode.equals("ollama")) {
@@ -173,6 +174,7 @@ public class ManualConfig {
                 this.save();
             }
 
+            return new ArrayList<>(this.modelList);
         });
     }
 

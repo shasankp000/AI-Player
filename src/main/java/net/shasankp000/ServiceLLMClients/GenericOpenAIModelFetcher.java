@@ -37,6 +37,7 @@ public class GenericOpenAIModelFetcher implements ModelFetcher {
         String normalized = baseUrl.trim().replaceAll("/+$", "");
         normalized = normalized.replaceAll("/chat/completions$", "");
         normalized = normalized.replaceAll("/completions$", "");
+        normalized = normalized.replaceAll("/responses$", "");
         normalized = normalized.replaceAll("/embeddings$", "");
         return normalized + "/";
     }

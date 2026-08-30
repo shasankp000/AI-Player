@@ -9,6 +9,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.shasankp000.GameAI.BotEventHandler;
+import net.shasankp000.PathFinding.NavigationService;
+import net.shasankp000.PathFinding.SuspensionReason;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +78,8 @@ public final class TradeListener {
      */
     public static void tickPrune(long currentTick) {
         SESSIONS.entrySet().removeIf(e -> e.getValue().isExpired(currentTick));
+        if (SESSIONS.isEmpty() && BotEventHandler.bot != null)
+            NavigationService.resume(BotEventHandler.bot.getUUID(), SuspensionReason.TRADE);
     }
 
     // ── Dispatch (called by PlayerPickupMixin) ───────────────────────────────
@@ -142,6 +146,7 @@ public final class TradeListener {
 
             TradeSession session = new TradeSession(throwerUuid, thrown, counterOffer, currentTick);
             SESSIONS.put(throwerUuid, session);
+            NavigationService.suspend(bot.getUUID(), SuspensionReason.TRADE);
 
             String botName = bot.getName().getString();
             String offName = TradeEvaluator.displayName(thrown);
@@ -174,6 +179,7 @@ public final class TradeListener {
                         + "] §fI can't find that item in my inventory anymore. Trade cancelled."),
                     false);
                 SESSIONS.remove(throwerUuid);
+                resumeTradeNavigationIfIdle(bot);
                 return false;
             }
 
@@ -194,6 +200,7 @@ public final class TradeListener {
                 TradeEvaluator.displayName(existing.counterOfferItem));
 
             SESSIONS.remove(throwerUuid);
+            resumeTradeNavigationIfIdle(bot);
             // Return true: item was consumed by trade, suppress vanilla pickup
             return true;
         }
@@ -223,6 +230,10 @@ public final class TradeListener {
         world.addFreshEntity(ie);
     }
 
+    private static void resumeTradeNavigationIfIdle(ServerPlayer bot) {
+        if (SESSIONS.isEmpty()) NavigationService.resume(bot.getUUID(), SuspensionReason.TRADE);
+    }
+
     // ── Public session access ────────────────────────────────────────────────
 
     /** Returns the active session for {@code playerUuid}, or {@code null}. */
@@ -235,5 +246,7 @@ public final class TradeListener {
      */
     public static void cancelSession(UUID playerUuid) {
         SESSIONS.remove(playerUuid);
+        if (SESSIONS.isEmpty() && BotEventHandler.bot != null)
+            NavigationService.resume(BotEventHandler.bot.getUUID(), SuspensionReason.TRADE);
     }
 }

@@ -16,9 +16,7 @@ import java.util.concurrent.*;
  *
  * <p>Design constraints respected:</p>
  * <ul>
- *   <li>Movement is server-sided and pre-planned — we call {@link GoTo#goTo}
- *       only when the bot is <em>not</em> already moving
- *       ({@link PathTracer.BotSegmentManager#getBotMovementStatus()} == false).</li>
+ *   <li>Movement is server-sided and only starts when that bot has no active navigation session.</li>
  *   <li>Stop is not block-precise — STAY uses a {@value STAY_TRIGGER_DISTANCE}-block
  *       threshold before issuing a correction path.</li>
  *   <li>FOLLOW re-plans only when the target has moved > {@value FOLLOW_TRIGGER_DISTANCE}
@@ -67,7 +65,7 @@ public class StanceController {
     public static synchronized void start() {
         if (started) return;
         scheduler.scheduleAtFixedRate(
-                StanceController::tick,
+                StanceController::enqueueTick,
                 CHECK_INTERVAL_SEC, CHECK_INTERVAL_SEC, TimeUnit.SECONDS);
         started = true;
         LOGGER.info("[StanceController] Started (check interval={}s)", CHECK_INTERVAL_SEC);
@@ -77,7 +75,11 @@ public class StanceController {
     public static void cancelStance(String botName) {
         BotStance.clearStance(botName);
         lastFollowPathOrigin.remove(botName);
-        PathTracer.flushAllMovementTasks();
+        MinecraftServer server = AIPlayer.serverInstance;
+        if (server != null) {
+            ServerPlayer bot = server.getPlayerList().getPlayerByName(botName);
+            if (bot != null) NavigationService.cancel(server, bot.getUUID(), "Stance cancelled");
+        }
         LOGGER.info("[StanceController] Stance cancelled for bot '{}'", botName);
     }
 
@@ -85,10 +87,13 @@ public class StanceController {
     // Tick
     // -------------------------------------------------------------------------
 
-    private static void tick() {
+    private static void enqueueTick() {
         if (AIPlayer.serverInstance == null) return;
         MinecraftServer server = AIPlayer.serverInstance;
+        server.execute(() -> tick(server));
+    }
 
+    private static void tick(MinecraftServer server) {
         for (ServerPlayer botEntity : server.getPlayerList().getPlayers()) {
             String botName = botEntity.getName().getString();
             BotStance.StanceState stance = BotStance.getStance(botName);
@@ -107,7 +112,7 @@ public class StanceController {
 
     private static void tickStay(MinecraftServer server, ServerPlayer bot,
                                   String botName, BotStance.StanceState stance) {
-        if (PathTracer.BotSegmentManager.getBotMovementStatus()) {
+        if (NavigationService.isNavigating(bot.getUUID())) {
             return;
         }
 
@@ -122,15 +127,9 @@ public class StanceController {
         LOGGER.info("[StanceController] STAY correction for '{}': dist={} → pathing to anchor {}",
                 botName, String.format("%.2f", dist), anchor);
 
-        CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
-
-        Thread.ofVirtual().name("stance-stay-" + botName).start(() -> {
-            try {
-                GoTo.goTo(botSource, anchor.getX(), anchor.getY(), anchor.getZ(), false);
-            } catch (Exception e) {
-                LOGGER.error("[StanceController] STAY goTo failed for '{}': {}", botName, e.getMessage());
-            }
-        });
+        NavigationService.navigate(bot, anchor, NavigationOptions.of(false))
+                .thenAccept(result -> LOGGER.debug("[StanceController] STAY navigation for '{}' ended: {}",
+                        botName, result.status()));
     }
 
     // -------------------------------------------------------------------------
@@ -139,7 +138,7 @@ public class StanceController {
 
     private static void tickFollow(MinecraftServer server, ServerPlayer bot,
                                     String botName, BotStance.StanceState stance) {
-        if (PathTracer.BotSegmentManager.getBotMovementStatus()) {
+        if (NavigationService.isNavigating(bot.getUUID())) {
             return;
         }
 
@@ -169,14 +168,8 @@ public class StanceController {
 
         lastFollowPathOrigin.put(botName, targetPos);
 
-        CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
-
-        Thread.ofVirtual().name("stance-follow-" + botName).start(() -> {
-            try {
-                GoTo.goTo(botSource, targetPos.getX(), targetPos.getY(), targetPos.getZ(), false);
-            } catch (Exception e) {
-                LOGGER.error("[StanceController] FOLLOW goTo failed for '{}': {}", botName, e.getMessage());
-            }
-        });
+        NavigationService.navigate(bot, targetPos, NavigationOptions.of(false))
+                .thenAccept(result -> LOGGER.debug("[StanceController] FOLLOW navigation for '{}' ended: {}",
+                        botName, result.status()));
     }
 }

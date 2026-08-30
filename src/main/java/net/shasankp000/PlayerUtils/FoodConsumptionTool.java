@@ -12,6 +12,8 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.Consumable;
+import net.shasankp000.PathFinding.NavigationService;
+import net.shasankp000.PathFinding.SuspensionReason;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,6 +138,7 @@ public final class FoodConsumptionTool {
 
         UUID botId = bot.getUUID();
         if (PAUSE_STARTED_AT.putIfAbsent(botId, System.currentTimeMillis()) != null) return null;
+        NavigationService.suspend(botId, SuspensionReason.EATING);
 
         PausedActions pausedActions = pauseActions(bot);
         Inventory inventory = bot.getInventory();
@@ -246,7 +249,8 @@ public final class FoodConsumptionTool {
         savedActions.copyFrom(liveActions);
         liveActions.stopAll();
         if (bot.isUsingItem()) bot.stopUsingItem();
-        return new PausedActions(savedActions, wasSprinting, wasSneaking);
+        return new PausedActions(savedActions, wasSprinting, wasSneaking,
+                MiningTool.isMining(bot.getUUID()));
     }
 
     private static void restoreSession(ConsumptionSession session) {
@@ -261,7 +265,13 @@ public final class FoodConsumptionTool {
                 && !session.bot.hasDisconnected()
                 && session.pausedActions != null
                 && session.bot instanceof ServerPlayerInterface playerInterface) {
-            playerInterface.getActionPack().copyFrom(session.pausedActions.actionPack);
+            EntityPlayerActionPack liveActions = playerInterface.getActionPack();
+            liveActions.copyFrom(session.pausedActions.actionPack);
+            if (session.pausedActions.miningWasActive) {
+                // Mining owns ATTACK and will re-establish it on its next server tick
+                // if the generation is still active. Never restore a stale attack.
+                liveActions.start(EntityPlayerActionPack.ActionType.ATTACK, null);
+            }
             session.bot.setShiftKeyDown(session.pausedActions.wasSneaking);
             session.bot.setSprinting(session.pausedActions.wasSprinting);
         }
@@ -274,6 +284,7 @@ public final class FoodConsumptionTool {
             TOTAL_PAUSED_MILLIS.merge(
                     botId, Math.max(0L, System.currentTimeMillis() - started), Long::sum);
         }
+        NavigationService.resume(botId, SuspensionReason.EATING);
     }
 
     private static <T> T callOnServer(MinecraftServer server, Callable<T> callable) throws Exception {
@@ -341,7 +352,8 @@ public final class FoodConsumptionTool {
     private record PausedActions(
             EntityPlayerActionPack actionPack,
             boolean wasSprinting,
-            boolean wasSneaking
+            boolean wasSneaking,
+            boolean miningWasActive
     ) {}
 
     private record FoodCandidate(int slot, String itemId, int nutrition, float saturation) {

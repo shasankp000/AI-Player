@@ -22,7 +22,9 @@ import net.minecraft.world.phys.Vec3;
 import net.shasankp000.AIPlayer;
 import net.shasankp000.GameAI.companion.BotStance;
 import net.shasankp000.GameAI.companion.CompanionController;
-import net.shasankp000.PathFinding.GoTo;
+import net.shasankp000.PathFinding.NavigationOptions;
+import net.shasankp000.PathFinding.NavigationResult;
+import net.shasankp000.PathFinding.NavigationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,18 +116,20 @@ public final class NearbyBedSleepController {
         NavigationContext navigation = callOnServer(() -> {
             ServerPlayer bot = resolveBot();
             if (bot == null || !isEligible(bot)) return null;
-            CommandSourceStack source = bot.createCommandSourceStack()
-                    .withSuppressedOutput()
-                    .withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
-            return new NavigationContext(source,
-                    bot.blockPosition().distManhattan(target.standPos()) <= 1);
+            return new NavigationContext(bot, bot.blockPosition().distManhattan(target.standPos()) <= 1);
         }, null);
         if (navigation == null) return false;
 
         if (!navigation.alreadyThere()) {
-            String navigationResult = GoTo.goTo(navigation.source(),
-                    target.standPos().getX(), target.standPos().getY(), target.standPos().getZ(), false);
-            LOGGER.debug("[sleep] Navigation to bed {} returned: {}", target.headPos(), navigationResult);
+            try {
+                NavigationResult navigationResult = NavigationService.navigate(navigation.bot(), target.standPos(),
+                        NavigationOptions.of(false)).get(5, TimeUnit.MINUTES);
+                LOGGER.debug("[sleep] Navigation to bed {} returned: {}", target.headPos(), navigationResult.status());
+                if (!navigationResult.reached()) return false;
+            } catch (Exception e) {
+                LOGGER.warn("[sleep] Navigation to bed {} failed: {}", target.headPos(), e.getMessage());
+                return false;
+            }
         }
 
         SleepResult result = callOnServer(() -> startSleeping(target), SleepResult.FAILED);
@@ -466,6 +470,6 @@ public final class NearbyBedSleepController {
 
     private record BedTarget(BlockPos headPos, BlockPos standPos, boolean placedByBot) {}
     private record PlacementSite(BlockPos footPos, BlockPos supportPos) {}
-    private record NavigationContext(CommandSourceStack source, boolean alreadyThere) {}
+    private record NavigationContext(ServerPlayer bot, boolean alreadyThere) {}
     private enum SleepResult { SUCCESS, FAILED, CANCELLED }
 }

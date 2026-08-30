@@ -72,6 +72,7 @@ public class EmbeddingProvider {
         String normalized = baseUrl.trim().replaceAll("/+$", "");
         normalized = normalized.replaceAll("/chat/completions$", "");
         normalized = normalized.replaceAll("/completions$", "");
+        normalized = normalized.replaceAll("/responses$", "");
         normalized = normalized.replaceAll("/embeddings$", "");
         if (normalized.endsWith("/v1")) {
             normalized = normalized.substring(0, normalized.length() - 3);
