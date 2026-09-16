@@ -33,7 +33,7 @@
 		"minecraft": "~26.3",
 		"java": ">=25",
 		"fabric-api": ">=0.160.5",
-		"carpet": ">=26.3-beta-3 <26.4"
+		"carpet": ">=26.3 <26.4"
 	},
 	"suggests": {
 		"owo-lib": "0.12.15.4+1.21"
