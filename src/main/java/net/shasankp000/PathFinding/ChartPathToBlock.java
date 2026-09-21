@@ -2,10 +2,8 @@ package net.shasankp000.PathFinding;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Vec3i;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.shasankp000.Entity.LookController;
 import net.shasankp000.PlayerUtils.FoodConsumptionTool;
@@ -33,14 +31,7 @@ public class ChartPathToBlock {
             // If the bot collides with a block, stop
             Vec3 nextPos = bot.position().add(bot.getViewVector(1.0f).scale(0.1));
 
-            // Convert manually to Vec3i
-            Vec3i nextPosInt = new Vec3i(
-                    Mth.floor(nextPos.x),
-                    Mth.floor(nextPos.y),
-                    Mth.floor(nextPos.z)
-            );
-
-            if (bot.level().getBlockState(new BlockPos(nextPosInt)).canOcclude()) {
+            if (bot.level().getBlockState(BlockPos.containing(nextPos)).canOcclude()) {
                 Objects.requireNonNull(server).getCommands().performPrefixedCommand(botSource, "/player " + botName + " stop");
 
                 // Check if it’s the correct block

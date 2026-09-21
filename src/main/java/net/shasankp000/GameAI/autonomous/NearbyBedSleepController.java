@@ -322,15 +322,17 @@ public final class NearbyBedSleepController {
 
         ServerLevel level = bot.level();
         BlockState state = level.getBlockState(target.headPos());
-        if (!(state.getBlock() instanceof BedBlock)
+        if (!(state.getBlock() instanceof BedBlock bedBlock)
                 || state.getValue(BedBlock.PART) != BedPart.HEAD
-                || state.getValue(BedBlock.OCCUPIED)
-                || !bedRuleAllowsSleep(level, target.headPos())) {
+                || state.getValue(BedBlock.OCCUPIED)) {
             return SleepResult.FAILED;
         }
 
+        BedRule bedRule = bedBlock.getBedRule(level, target.headPos());
+        if (bedRule.destroyOnUse() || !bedRule.canSleep(level)) return SleepResult.FAILED;
+
         Either<Player.BedSleepingProblem, net.minecraft.util.Unit> result =
-                bot.startSleepInBed(target.headPos());
+                bot.startSleepInBed(bedBlock, state, bedRule, target.headPos());
         if (result.right().isPresent()) return SleepResult.SUCCESS;
 
         result.left().ifPresent(problem -> LOGGER.warn(
@@ -356,7 +358,7 @@ public final class NearbyBedSleepController {
 
     private static boolean bedRuleAllowsSleep(ServerLevel level, BlockPos pos) {
         BedRule rule = level.environmentAttributes().getValue(EnvironmentAttributes.BED_RULE, pos);
-        return !rule.explodes() && rule.canSleep(level);
+        return !rule.destroyOnUse() && rule.canSleep(level);
     }
 
     private static boolean validBedCell(ServerLevel level, BlockPos pos) {

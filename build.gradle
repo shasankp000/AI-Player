@@ -18,6 +18,21 @@ repositories {
 	exclusiveContent {
 		forRepository {
 			maven {
+				name = "JitPackCarpet"
+				url = "https://jitpack.io"
+				metadataSources {
+					mavenPom()
+					artifact()
+				}
+			}
+		}
+		filter {
+			includeModule "com.github.gnembon", "fabric-carpet"
+		}
+	}
+	exclusiveContent {
+		forRepository {
+			maven {
 				name = "Modrinth"
 				url = "https://api.modrinth.com/maven"
 			}
@@ -49,7 +64,7 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	implementation "maven.modrinth:TQTTVgYE:bGrLxJ8v"
+	implementation "com.github.gnembon:fabric-carpet:v26.3"
 
 	// Core application dependencies
 	implementation 'com.github.amithkoujalgi:ollama4j:1.0.77'

@@ -29,11 +29,11 @@
 		"ai-player.mixins.json"
 	],
 	"depends": {
-		"fabricloader": ">=0.19.3",
-		"minecraft": "~26.2",
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
 		"java": ">=25",
-		"fabric-api": ">=0.155.2",
-		"carpet": ">=26.2 <26.3"
+		"fabric-api": ">=0.160.5",
+		"carpet": ">=26.3 <26.4"
 	},
 	"suggests": {
 		"owo-lib": "0.12.15.4+1.21"

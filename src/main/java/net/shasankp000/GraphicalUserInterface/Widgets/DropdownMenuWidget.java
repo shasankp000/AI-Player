@@ -1,6 +1,6 @@
 package net.shasankp000.GraphicalUserInterface.Widgets;
 
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,13 +119,13 @@ public class DropdownMenuWidget extends AbstractWidget {
         int listSize = Math.min(options.size(), maxVisibleOptions);
         if (listSize == 0) return super.keyPressed(event);
 
-        if (keyCode == GLFW.GLFW_KEY_DOWN) {
+        if (keyCode == InputConstants.KEY_DOWN) {
             this.hoveredIndex = (this.hoveredIndex + 1) % listSize;
             return true;
-        } else if (keyCode == GLFW.GLFW_KEY_UP) {
+        } else if (keyCode == InputConstants.KEY_UP) {
             this.hoveredIndex = (this.hoveredIndex - 1 + listSize) % listSize;
             return true;
-        } else if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+        } else if (keyCode == InputConstants.KEY_RETURN || keyCode == InputConstants.KEY_NUMPADENTER) {
             if (hoveredIndex >= 0 && hoveredIndex < options.size()) {
                 this.selectedIndex = hoveredIndex;
                 this.selectedOption = options.get(hoveredIndex);
@@ -133,7 +133,7 @@ public class DropdownMenuWidget extends AbstractWidget {
                 this.playDownSound(Minecraft.getInstance().getSoundManager());
             }
             return true;
-        } else if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+        } else if (keyCode == InputConstants.KEY_ESCAPE) {
             this.isOpen = false;
             return true;
         }

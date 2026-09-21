@@ -83,7 +83,7 @@ public class ConfigManager extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         int centerX = this.width / 2;
-        String title = "AI-Player Mod Configuration Menu v1.0.6-release+26.2";
+        String title = "AI-Player Mod Configuration Menu v1.0.6.2-release+26.3";
         context.text(this.font, title, centerX - (this.font.width(title) / 2), 20, 0xFFFFFFFF, true);
 
         int labelX = searchField.getX();

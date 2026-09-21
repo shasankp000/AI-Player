@@ -1757,9 +1757,9 @@ public class BotEventHandler {
             net.minecraft.world.item.ItemStack offHand = player.getOffhandItem();
 
             // Check for weapons
-            if (mainHand.getItem() instanceof net.minecraft.world.item.Item) {
+            if (mainHand.is(net.minecraft.tags.ItemTags.SWORDS)) {
                 baseThreat += 15.0; // Sword wielding player
-            } else if (mainHand.getItem() instanceof net.minecraft.world.item.AxeItem) {
+            } else if (mainHand.is(net.minecraft.tags.ItemTags.AXES)) {
                 baseThreat += 12.0; // Axe wielding player
             } else if (mainHand.getItem() instanceof net.minecraft.world.item.BowItem ||
                       mainHand.getItem() instanceof net.minecraft.world.item.CrossbowItem) {
